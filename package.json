@@ -1,0 +1,38 @@
+{
+  "name": "video-downloader-gemini",
+  "version": "1.0.0",
+  "description": "Desktop application for video downloading and conversion",
+  "main": "electron-main.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "electron:dev": "cross-env NODE_ENV=development electron .",
+    "electron": "cross-env NODE_ENV=production electron .",
+    "build": "npm run build:win",
+    "build:win": "electron-packager . \"Video Downloader Gemini\" --platform=win32 --arch=x64 --out=dist --prune=true --asar --icon=./public/Logo_1.ico --extra-resource=./bin --extra-resource=./assets --extra-resource=./public"
+  },
+  "keywords": [
+    "video",
+    "downloader",
+    "converter",
+    "youtube",
+    "instagram",
+    "electron"
+  ],
+  "author": "FCGLITCHES",
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "get-port": "^7.1.0",
+    "glob": "^10.4.2",
+    "open": "^10.1.2",
+    "p-limit": "^3.1.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "cross-env": "^7.0.3",
+    "electron": "^28.3.3",
+    "electron-packager": "^17.1.2"
+  }
+}

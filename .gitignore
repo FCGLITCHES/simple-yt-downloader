@@ -1,0 +1,23 @@
+# Dependency and build folders
+node_modules/
+dist/
+downloads/
+bin/
+
+# Large binaries and build artifacts
+*.exe
+*.asar
+*.dll
+*.pak
+*.mp4
+*.zip
+*.bin
+*.dat
+*.blob
+*.html
+*.ico
+*.png
+*.mp3
+
+# Locales and build output
+locales/
