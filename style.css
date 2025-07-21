@@ -1293,9 +1293,9 @@ body.compact-mode .history-filters label {
 
 .history-list {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
-    gap: 1.5rem;
-    padding: 0.5rem;
+    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+    gap: 0.5rem 1.5rem;
+    padding: 1.5rem;
     overflow-y: auto;
     height: 100%;
 }
@@ -1480,17 +1480,6 @@ body.compact-mode .history-filters label {
     }
 }
 
-/* Fix Compact Mode - More specific selectors */
-body.compact-mode .card {
-    padding: 1.2rem 1.8rem !important;
-}
-body.compact-mode .form-group {
-    margin-bottom: 0.8rem !important;
-}
-body.compact-mode .options-grid {
-    gap: 0.8rem !important;
-    margin: 1rem 0 !important;
-}
 body.compact-mode .download-item {
     padding: 0.6rem 0 !important;
     margin-bottom: 0.6rem !important;
@@ -1515,10 +1504,7 @@ body.compact-mode .item-remove-btn {
     padding: 0.25rem 0.5rem !important;
     font-size: 0.75rem !important;
 }
-body.compact-mode .history-item {
-    padding: 0.8rem !important;
-    gap: 0.8rem !important;
-}
+
 body.compact-mode .history-thumb {
     width: 80px !important;
     height: 60px !important;
@@ -1658,12 +1644,7 @@ body.compact-mode .card .subtitle {
     }
 }
 
-/* Enhanced Compact Mode */
-body.compact-mode .history-item {
-    padding: 0.5rem !important;
-    gap: 0.6rem !important;
-    min-height: 60px !important;
-}
+
 body.compact-mode .history-thumb {
     width: 60px !important;
     height: 45px !important;
@@ -1682,8 +1663,8 @@ body.compact-mode .history-action-btn {
     font-size: 0.8rem !important;
 }
 body.compact-mode .history-sidebar {
-    min-width: 180px !important;
-    max-width: 180px !important;
+    min-width: 240px !important;
+    max-width: 240px !important;
     padding: 1.2rem 1rem !important;
 }
 body.compact-mode .history-tab {
@@ -1713,7 +1694,8 @@ body.compact-mode .item-count {
 }
 body.compact-mode .history-list {
     padding: 1.2rem !important;
-    gap: 1rem !important;
+    gap: 0.5rem 0.4rem !important;
+    grid-template-columns: repeat(3, 1fr) !important;
 }
 body.compact-mode .history-bulk-actions {
     padding: 0.6rem !important;
@@ -1730,15 +1712,7 @@ body.compact-mode .bulk-action-btn .btn-text {
 body.compact-mode .sidebar-btn .btn-text {
     display: none !important;
 }
-body.compact-mode .download-btn .btn-text {
-    display: none !important;
-}
-body.compact-mode .download-btn {
-    padding: 0.8rem !important;
-    justify-content: center !important;
-    min-width: 2.5rem !important;
-    width: auto !important;
-}
+
 body.compact-mode .item-cancel-btn,
 body.compact-mode .item-remove-btn {
     padding: 0.2rem 0.4rem !important;
@@ -1825,7 +1799,6 @@ button {
 }
 
 /* Compact mode: keep centering */
-body.compact-mode .download-btn,
 body.compact-mode .sidebar-btn,
 body.compact-mode .bulk-action-btn,
 body.compact-mode .item-cancel-btn,
@@ -1864,7 +1837,6 @@ body.compact-mode .history-filters {
 body.compact-mode .filter-group {
     gap: 0.18em !important;
 }
-
 .select-field,
 .time-filter-select,
 .sort-select {
@@ -2253,4 +2225,75 @@ body.compact-mode .history-bulk-actions-row {
 
 body.compact-mode .bulk-actions-container {
     gap: 0.6rem !important;
+}
+
+body.compact-mode .selected-count {
+    font-size: 0.8rem !important;
+    padding: 0.4rem 0.8rem !important;
+    margin-left: 0 !important;
+    background: var(--primary-color) !important;
+    color: #fff !important;
+    border-radius: 0.4rem !important;
+    border: none !important;
+    font-weight: 600 !important;
+    display: flex !important;
+    align-items: center !important;
+    height: 87% !important;
+}
+
+body.compact-mode .history-list {
+    padding: 1.2rem !important;
+    gap: 0.5rem 1rem !important; /* Reduced horizontal gap */
+    grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)) !important; /* Use auto-fill with fixed min width */
+    justify-content: start !important; /* Align items to start */
+}
+
+/* Further adjustments for very wide screens in compact mode */
+@media (min-width: 1400px) {
+    body.compact-mode .history-list {
+        grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)) !important;
+        max-width: 1200px !important; /* Limit overall width */
+        margin: 0 auto !important; /* Center the grid */
+    }
+}
+
+
+/* Remove conflicting compact mode grid settings for .history-list and .history-item */
+body.compact-mode .history-list {
+    grid-template-columns: unset !important;
+}
+body.compact-mode .history-list {
+    grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)) !important;
+}
+
+/* Compact mode: reduce history item width while maintaining 3 columns */
+body.compact-mode .history-item {
+    padding: 0.5rem !important;
+    gap: 0.6rem !important;
+    max-width: 320px !important; /* Significantly reduced width */
+    min-height: 40px !important;
+    width: 320px !important; /* Fixed width instead of 100% */
+    margin: 0 auto !important; /* Center items within their grid cells */
+}
+
+body.compact-mode .history-list {
+    padding: 1.2rem !important;
+    gap: 0.3rem 0.4rem !important; /* Reduced row gap from 0.5rem to 0.3rem */
+    grid-template-columns: repeat(3, 1fr) !important; /* Keep exactly 3 columns */
+    justify-items: center !important; /* Center items within grid cells */
+}
+
+/* Responsive adjustments for smaller screens */
+@media (max-width: 1200px) {
+    body.compact-mode .history-item {
+        max-width: 280px !important;
+        width: 280px !important;
+    }
+}
+
+@media (max-width: 900px) {
+    body.compact-mode .history-item {
+        max-width: 250px !important;
+        width: 250px !important;
+    }
 }

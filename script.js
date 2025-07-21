@@ -612,27 +612,27 @@ document.addEventListener('DOMContentLoaded', () => {
             if (format === 'mp4') {
                 qualities = [
                     { value: 'highest', text: 'Highest Available MP4' },
-                    { value: '2160', text: '2160p (4K Ultra HD) ⚡' },
-                    { value: '1440', text: '1440p (2K Quad HD) 🔥' },
-                    { value: '1080', text: '1080p (Full HD)' },
-                    { value: '720', text: '720p (HD)' },
+                    { value: '2160', text: '4K' },
+                    { value: '1440', text: '1440p' },
+                    { value: '1080', text: '1080p' },
+                    { value: '720', text: '720p' },
                     { value: '480', text: '480p' },
                     { value: '360', text: '360p' }
                 ];
             } else if (format === 'mp3') {
                 qualities = [
-                    { value: 'highest', text: 'Highest Quality MP3 (VBR 0)' },
-                    { value: '320', text: '320 kbps (Premium)' },
-                    { value: '256', text: '256 kbps (High)' },
-                    { value: '192', text: '192 kbps (Standard)' },
-                    { value: '128', text: '128 kbps (Basic)' }
+                    { value: 'highest', text: 'Highest Quality MP3' },
+                    { value: '320', text: '320 kbps' },
+                    { value: '256', text: '256 kbps' },
+                    { value: '192', text: '192 kbps' },
+                    { value: '128', text: '128 kbps' }
                 ];
             }
         } else if (source === 'instagram') {
             qualities = [
                 { value: 'highest', text: 'Highest Available' },
-                { value: '1080', text: '1080p (if available)' },
-                { value: '720', text: '720p (if available)' }
+                { value: '1080', text: '1080p' },
+                { value: '720', text: '720p' }
             ];
         }
         qualities.forEach(q => {

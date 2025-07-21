@@ -392,29 +392,29 @@ function saveCookieWindowState(win) {
 // Enhanced cookie helper with window state persistence
 ipcMain.handle('open-cookies-helper', async () => {
     const savedState = loadCookieWindowState();
-    const win = new BrowserWindow({
+  const win = new BrowserWindow({
         width: savedState.width,
         height: savedState.height,
         x: savedState.x,
         y: savedState.y,
-        webPreferences: {
-            nodeIntegration: false,
-            contextIsolation: true,
-            preload: path.join(__dirname, 'preload.js')
-        },
-        parent: mainWindow,
-        modal: false,
-        show: true,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      preload: path.join(__dirname, 'preload.js')
+    },
+    parent: mainWindow,
+    modal: false,
+    show: true,
         title: 'Import YouTube Cookies',
         minWidth: 320,
         minHeight: 200,
         resizable: true
-    });
-    win.setMenuBarVisibility(false);
+  });
+  win.setMenuBarVisibility(false);
     win.on('resize', () => saveCookieWindowState(win));
     win.on('move', () => saveCookieWindowState(win));
-    win.loadFile(path.join(__dirname, 'public', 'cookies.html'));
-    return true;
+  win.loadFile(path.join(__dirname, 'public', 'cookies.html'));
+  return true;
 });
 
 // Add file upload handler for cookies
