@@ -499,7 +499,7 @@ body {
     padding-top: 0.2rem;
 }
 
-.item-cancel-btn, .item-remove-btn {
+.item-cancel-btn {
     font-size: 0.85rem;
     padding: 0.35rem 0.7rem;
     border-radius: 0.4rem;
@@ -530,7 +530,7 @@ body {
 .item-remove-btn {
     background: none;
     color: var(--error-color);
-    font-size: 1.3rem; /* Keep larger for visibility */
+    font-size: 2rem; /* Keep larger for visibility */
     font-weight: bold;
     padding: 0.1rem 0.4rem;
     line-height: 1;
@@ -1314,7 +1314,7 @@ body.compact-mode .history-filters label {
     border-radius: 0.6rem;
     box-shadow: 0 2px 8px var(--shadow-color);
     padding: 1.2rem;
-    gap: 1.2rem;
+    gap: 0.2rem;
     position: relative;
     transition: all 0.2s ease;
     border: 2px solid transparent;
@@ -1499,10 +1499,9 @@ body.compact-mode .item-status {
 body.compact-mode .item-buttons {
     gap: 0.3rem !important;
 }
-body.compact-mode .item-cancel-btn, 
-body.compact-mode .item-remove-btn {
+body.compact-mode .item-cancel-btn {
     padding: 0.25rem 0.5rem !important;
-    font-size: 0.75rem !important;
+    font-size: 0.85rem !important;
 }
 
 body.compact-mode .history-thumb {
@@ -1693,7 +1692,7 @@ body.compact-mode .item-count {
     font-size: 0.8rem !important;
 }
 body.compact-mode .history-list {
-    padding: 1.2rem !important;
+    padding: 0.5rem !important;
     gap: 0.5rem 0.4rem !important;
     grid-template-columns: repeat(3, 1fr) !important;
 }
@@ -1713,10 +1712,9 @@ body.compact-mode .sidebar-btn .btn-text {
     display: none !important;
 }
 
-body.compact-mode .item-cancel-btn,
 body.compact-mode .item-remove-btn {
     padding: 0.2rem 0.4rem !important;
-    font-size: 0.7rem !important;
+    font-size: 1rem !important;
 }
 body.compact-mode .clear-search-btn {
     padding: 0.3rem !important;
@@ -2256,20 +2254,10 @@ body.compact-mode .history-list {
         margin: 0 auto !important; /* Center the grid */
     }
 }
-
-
-/* Remove conflicting compact mode grid settings for .history-list and .history-item */
-body.compact-mode .history-list {
-    grid-template-columns: unset !important;
-}
-body.compact-mode .history-list {
-    grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)) !important;
-}
-
 /* Compact mode: reduce history item width while maintaining 3 columns */
 body.compact-mode .history-item {
     padding: 0.5rem !important;
-    gap: 0.6rem !important;
+    gap: 0.3rem !important;
     max-width: 320px !important; /* Significantly reduced width */
     min-height: 40px !important;
     width: 320px !important; /* Fixed width instead of 100% */
@@ -2277,8 +2265,8 @@ body.compact-mode .history-item {
 }
 
 body.compact-mode .history-list {
-    padding: 1.2rem !important;
-    gap: 0.3rem 0.4rem !important; /* Reduced row gap from 0.5rem to 0.3rem */
+    padding: 1rem !important;
+    gap: 0.5rem 0.5rem !important; /* Reduced row gap from 0.5rem to 0.3rem */
     grid-template-columns: repeat(3, 1fr) !important; /* Keep exactly 3 columns */
     justify-items: center !important; /* Center items within grid cells */
 }
