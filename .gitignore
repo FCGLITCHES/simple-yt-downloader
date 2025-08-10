@@ -1,3 +1,12 @@
+# Hide source code from public view
+*.js
+*.html
+*.css
+*.json
+*.md
+*.ps1
+*.bat
+
 # Dependency folders
 node_modules/
 downloads/
@@ -15,11 +24,10 @@ dist/
 # Media files
 *.mp4
 *.mp3
-*.html
 *.ico
 *.png
 
-# Keep essential source files and small binaries
+# Keep only essential binaries for functionality
 !bin/ffmpeg.dll
 !bin/ffmpeg.exe
 !bin/*.dll
