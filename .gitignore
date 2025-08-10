@@ -1,23 +1,25 @@
-# Dependency and build folders
+# Dependency folders
 node_modules/
-dist/
 downloads/
-bin/
 
-# Large binaries and build artifacts
+# Build output and large files (exclude from Git, keep locally)
+dist/
 *.exe
-*.asar
-*.dll
-*.pak
-*.mp4
 *.zip
-*.bin
-*.dat
-*.blob
+
+# Source control and temporary files
+*.log
+*.tmp
+*.temp
+
+# Media files
+*.mp4
+*.mp3
 *.html
 *.ico
 *.png
-*.mp3
 
-# Locales and build output
-locales/
+# Keep essential source files and small binaries
+!bin/ffmpeg.dll
+!bin/ffmpeg.exe
+!bin/*.dll
