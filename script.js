@@ -107,6 +107,8 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         };
 
+        // To smooth speed updates, throttle UI updates to ~500ms
+        let lastSpeedUpdateAt = 0;
         ws.onmessage = (event) => {
             try {
                 const data = JSON.parse(event.data);
@@ -122,6 +124,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
                 
+                // throttle speed-heavy progress updates
+                if (data.type === 'progress' && (typeof data.speedBytesPerSec === 'number')) {
+                    const now = Date.now();
+                    if (now - lastSpeedUpdateAt < 500) {
+                        return; // skip until next window
+                    }
+                    lastSpeedUpdateAt = now;
+                }
                 handleWebSocketMessage(data);
             } catch (error) {
                 console.error('Error parsing WebSocket message:', error);
@@ -162,7 +172,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Message Handling ---
     function handleWebSocketMessage(data) {
-        const { type, message, itemId, downloadUrl, filename, title, estimatedSize, actualSize, percent, rawSpeed, speedBytesPerSec, source = activeDownloader, isPlaylistItem, playlistIndex } = data;
+        const { type, message, itemId, downloadUrl, filename, title, /* estimatedSize (deprecated) */ actualSize, percent, rawSpeed, speedBytesPerSec, source = activeDownloader, isPlaylistItem, playlistIndex, thumbnail, fullPath } = data;
         const currentItemState = downloadItemsState.get(itemId);
 
         // Hide playlist meta items (e.g., 'Fetching playlist: ...')
@@ -179,29 +189,30 @@ document.addEventListener('DOMContentLoaded', () => {
 
         switch (type) {
             case 'queued':
-                createDownloadItemStructure(itemId, title || 'Processing...', source, estimatedSize || 'N/A', isPlaylistItem);
-                updateDownloadItemStatus(itemId, message || 'Queued...', source);
+                createDownloadItemStructure(itemId, title || 'Processing...', source, isPlaylistItem);
+                updateDownloadItemStatus(itemId, 'Queued...', source);
                 if (currentItemState) currentItemState.status = 'queued';
                 updateDownloadStats();
                 break;
             case 'item_info':
                 if (!downloadItemsState.has(itemId)) {
-                    createDownloadItemStructure(itemId, title || 'Fetching info...', source, estimatedSize || 'N/A', isPlaylistItem);
+                    createDownloadItemStructure(itemId, title || 'Fetching info...', source, isPlaylistItem);
                 }
                 updateDownloadItemTitle(itemId, title, source);
-                updateDownloadItemEstimatedSize(itemId, estimatedSize, source);
+                if (thumbnail) updateDownloadItemThumbnail(itemId, thumbnail);
                 if (currentItemState) {
                     currentItemState.title = title;
-                    currentItemState.estimatedSize = estimatedSize;
+                    if (thumbnail) currentItemState.thumbnail = thumbnail;
+                    if (fullPath) currentItemState.fullPath = fullPath;
                 }
                 break;
             case 'progress':
-                updateDownloadItemProgress(itemId, message, percent, rawSpeed, source, speedBytesPerSec);
+                updateDownloadItemProgress(itemId, '', percent, rawSpeed, source, speedBytesPerSec);
                 if (currentItemState) currentItemState.status = 'downloading';
                 updateDownloadStats();
                 break;
             case 'complete':
-                updateDownloadItemComplete(itemId, message, downloadUrl, filename, actualSize, source);
+                updateDownloadItemComplete(itemId, message, downloadUrl, filename, actualSize, source, fullPath, thumbnail);
                 if (userSettings.notificationSound && completionSound) playNotificationSound();
                 if (userSettings.notificationPopup) showDesktopNotification(filename || title, message || 'Download complete!');
                 if (userSettings.removeCompleted) {
@@ -222,10 +233,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 history.unshift({
                   name: filename,
                   path: downloadUrl,
+                  folder: data.downloadFolder || getDownloadFolder(), // <-- add this
                   type: subtabKey === 'youtube' ? 'youtubeSingles' : subtabKey,
                   size: actualSize || 'N/A',
                   mtime: new Date().toISOString(),
-                  thumbnail: currentItemState?.thumbnail || null
+                  thumbnail: (thumbnail || currentItemState?.thumbnail) || null
                 });
                 localStorage.setItem('ytdHistory', JSON.stringify(history.slice(0, 500)));
                 renderFromLocalStorage();
@@ -274,7 +286,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return source === 'youtube' ? youtubeDownloadLinksArea : instagramDownloadLinksArea;
     }
 
-    function createDownloadItemStructure(itemId, titleText, source, estimatedSizeText = 'N/A', isPlaylistItem = false) {
+    function createDownloadItemStructure(itemId, titleText, source, isPlaylistItem = false) {
         const linksArea = getLinksArea(source);
         if (!linksArea || downloadItemsState.has(itemId)) return;
 
@@ -297,10 +309,7 @@ document.addEventListener('DOMContentLoaded', () => {
         titleDiv.textContent = titleText;
         itemContentDiv.appendChild(titleDiv);
 
-        const estimatedSizeSpan = document.createElement('span');
-        estimatedSizeSpan.className = 'item-size';
-        estimatedSizeSpan.textContent = estimatedSizeText ? ` (Est: ${estimatedSizeText})` : '';
-        titleDiv.appendChild(estimatedSizeSpan);
+        // Size will be shown accurately after completion; no estimated size.
 
         const statusDiv = document.createElement('div');
         statusDiv.className = 'item-status';
@@ -333,7 +342,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const removeBtn = document.createElement('button');
         removeBtn.className = 'item-remove-btn';
-        removeBtn.innerHTML = '&times;';
+        removeBtn.innerHTML = '<i class="fas fa-times"></i>';
         removeBtn.title = 'Remove this item';
         removeBtn.style.display = 'none';
         removeBtn.onclick = () => handleRemoveDownloadItem(itemId, source);
@@ -346,9 +355,10 @@ document.addEventListener('DOMContentLoaded', () => {
             title: titleText, 
             status: 'queued', 
             source: source,
-            estimatedSize: estimatedSizeText, 
+            estimatedSize: null, 
             domElement: itemDiv,
-            isPlaylist: isPlaylistItem // Store the playlist flag
+            isPlaylist: isPlaylistItem, // Store the playlist flag
+            thumbnailEl: thumbnailImg
         });
         
         updateDownloadStats();
@@ -384,28 +394,27 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function updateDownloadItemEstimatedSize(itemId, newSize, source) {
+    function updateDownloadItemThumbnail(itemId, thumbnailUrl) {
         const itemDiv = document.getElementById(`item-${itemId}`);
-        if (itemDiv) {
-            let sizeEl = itemDiv.querySelector('.item-title .item-size');
-            if (!sizeEl) {
-                sizeEl = document.createElement('span');
-                sizeEl.className = 'item-size';
-                const titleEl = itemDiv.querySelector('.item-title');
-                if (titleEl) titleEl.appendChild(sizeEl);
+        if (itemDiv && thumbnailUrl) {
+            const img = itemDiv.querySelector('.item-thumbnail');
+            if (img) {
+                img.src = thumbnailUrl;
             }
-            if (sizeEl) sizeEl.textContent = newSize ? ` (Est: ${newSize})` : '';
         }
     }
 
+    // Estimated size UI removed; show final size only on completion
+
     function formatSpeed(speedBytesPerSec, unit) {
         if (typeof speedBytesPerSec !== 'number' || isNaN(speedBytesPerSec)) return '';
+        // Use decimal MB (1e6); user unit preference from settings
         if (unit === 'MBps') {
             return (speedBytesPerSec / 1e6).toFixed(2) + ' MB/s';
         } else if (unit === 'Mbps') {
             return ((speedBytesPerSec * 8) / 1e6).toFixed(2) + ' Mbps';
         } else {
-            return speedBytesPerSec + ' B/s';
+            return (speedBytesPerSec / 1e6).toFixed(2) + ' MB/s';
         }
     }
 
@@ -459,28 +468,39 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function updateDownloadItemComplete(itemId, message, downloadUrl, filename, actualSize, source) {
+    function updateDownloadItemComplete(itemId, message, downloadUrl, filename, actualSize, source, fullPath, thumb) {
         const itemDiv = document.getElementById(`item-${itemId}`);
         if (itemDiv) {
             updateDownloadItemStatus(itemId, message || `Complete: ${filename}`, source, 'success');
             const linkEl = itemDiv.querySelector('.item-link');
             if (linkEl && downloadUrl && filename) {
                 linkEl.innerHTML = '';
-                const a = document.createElement('a');
-                a.href = downloadUrl;
-                a.textContent = `Download "${filename}" ${actualSize ? '(' + actualSize + ')' : ''}`;
-                a.download = filename;
-                a.style.display = 'none';
-                linkEl.appendChild(a);
+                const infoSpan = document.createElement('span');
+                infoSpan.className = 'download-complete-label';
+                infoSpan.textContent = `Download complete${actualSize ? ' • ' + actualSize : ''}`;
+                linkEl.appendChild(infoSpan);
 
                 const openFolderBtn = document.createElement('button');
-                openFolderBtn.className = 'ml-2 inline-flex items-center justify-center text-xs bg-green-100 hover:bg-green-200 text-green-700 rounded px-2 py-1 transition';
+                openFolderBtn.className = 'modern-folder-btn align-with-complete';
                 openFolderBtn.title = 'Open containing folder';
-                openFolderBtn.innerHTML = '<i class="fas fa-folder-open"></i>';
+                openFolderBtn.innerHTML = '<i class="fas fa-folder-open"></i> Open Folder';
                 openFolderBtn.onclick = async () => {
                     if (window.electronAPI && window.electronAPI.openPathInExplorer) {
-                        const folderPath = getDownloadFolder();
-                        await window.electronAPI.openPathInExplorer(folderPath);
+                        try {
+                            let targetPath = fullPath;
+                            if (!targetPath && window.electronAPI?.resolvePath) {
+                                const root = getDownloadFolder();
+                                const rel = decodeURIComponent(downloadUrl.replace('/downloads/', ''));
+                                targetPath = await window.electronAPI.resolvePath(root, rel);
+                            }
+                            const folderPath = window.electronAPI?.getDirname && targetPath
+                                ? await window.electronAPI.getDirname(targetPath)
+                                : getDownloadFolder();
+                            await window.electronAPI.openPathInExplorer(folderPath);
+                        } catch (e) {
+                            console.error('Open folder failed:', e);
+                            alert('Unable to open containing folder.');
+                        }
                     } else {
                         console.error('Open folder not available. window.electronAPI:', window.electronAPI);
                         alert('Open folder not available. Make sure you are running in Electron.');
@@ -488,6 +508,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 };
                 linkEl.appendChild(openFolderBtn);
             }
+            if (thumb) updateDownloadItemThumbnail(itemId, thumb);
             disableCancelButton(itemId, source);
             const removeBtn = itemDiv.querySelector('.item-remove-btn');
             if (removeBtn) removeBtn.style.display = 'inline-block';
@@ -609,7 +630,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let qualities = [];
         if (source === 'youtube') {
-            if (format === 'mp4') {
+            const videoFormats = ['mp4','mkv','mov'];
+            const isVideo = videoFormats.includes(format);
+            if (isVideo) {
                 qualities = [
                     { value: 'highest', text: 'Highest Available MP4' },
                     { value: '2160', text: '4K' },
@@ -619,9 +642,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     { value: '480', text: '480p' },
                     { value: '360', text: '360p' }
                 ];
-            } else if (format === 'mp3') {
+            } else {
                 qualities = [
-                    { value: 'highest', text: 'Highest Quality MP3' },
+                    { value: 'highest', text: 'Highest Quality' },
                     { value: '320', text: '320 kbps' },
                     { value: '256', text: '256 kbps' },
                     { value: '192', text: '192 kbps' },
@@ -1295,12 +1318,17 @@ document.addEventListener('DOMContentLoaded', () => {
     async function createHistoryItemElement(item, index, rootFolder) {
         try {
             let absPath;
+            const itemFolder = item.folder || rootFolder;
             if (item.path.startsWith('/downloads/')) {
-                const relativePath = decodeURIComponent(item.path.replace('/downloads/', ''));
-                if (window.electronAPI?.resolvePath) {
-                    absPath = await window.electronAPI.resolvePath(rootFolder, relativePath);
+                let relativePath = decodeURIComponent(item.path.replace('/downloads/', ''));
+                // If relativePath is already absolute, use it directly
+                const isAbsolute = /^[a-zA-Z]:[\\/]/.test(relativePath) || relativePath.startsWith('/');
+                if (isAbsolute) {
+                    absPath = relativePath;
+                } else if (window.electronAPI?.resolvePath) {
+                    absPath = await window.electronAPI.resolvePath(itemFolder, relativePath);
                 } else {
-                    absPath = rootFolder + '\\' + relativePath.replace(/\//g, '\\');
+                    absPath = itemFolder + '\\' + relativePath.replace(/\//g, '\\');
                 }
             } else if (item.path.startsWith('http')) {
                 return null;
@@ -1311,30 +1339,30 @@ document.addEventListener('DOMContentLoaded', () => {
             if (window.electronAPI?.pathExists) {
                 fileExists = await window.electronAPI.pathExists(absPath);
             }
-        const div = document.createElement('div');
-        div.className = 'history-item';
+            const div = document.createElement('div');
+            div.className = 'history-item';
             div.dataset.index = index;
             div.dataset.originalIndex = findOriginalIndex(item);
             if (!fileExists) {
                 div.classList.add('file-missing');
             }
-        div.innerHTML = `
-                <img class="history-thumb" src="${item.thumbnail || 'https://placehold.co/120x90/e0e0e0/7f7f7f?text=Video'}" alt="Thumbnail" loading="lazy">
-                <div style="flex: 1; min-width: 0;">
-                    <div class="history-title" title="${item.name.replace(/"/g, '&quot;')}">${item.name}${!fileExists ? ' (Missing)' : ''}</div>
-                    <div class="history-meta">${new Date(item.mtime).toLocaleString()} • ${item.size}</div>
-          </div>
-          <div class="history-actions">
-                    <button class="history-action-btn play" title="Play Video" data-action="play" data-path="${absPath}" data-index="${index}" ${!fileExists ? 'disabled' : ''}>
-              <i class="fas fa-play"></i>
-            </button>
-                    <button class="history-action-btn folder" title="Open Folder" data-action="folder" data-path="${absPath}" data-index="${index}">
-              <i class="fas fa-folder-open"></i>
-            </button>
-                    <button class="history-action-btn delete" title="Delete File" data-action="delete" data-path="${absPath}" data-index="${index}">
-              <i class="fas fa-trash"></i>
-            </button>
-          </div>`;
+            div.innerHTML = `
+                    <img class="history-thumb" src="${item.thumbnail || 'https://placehold.co/120x90/e0e0e0/7f7f7f?text=Video'}" alt="Thumbnail" loading="lazy">
+                    <div style="flex: 1; min-width: 0;">
+                        <div class="history-title" title="${item.name.replace(/"/g, '&quot;')}">${item.name}${!fileExists ? ' (Missing)' : ''}</div>
+                        <div class="history-meta">${new Date(item.mtime).toLocaleString()} • ${item.size}</div>
+              </div>
+              <div class="history-actions">
+                        <button class="history-action-btn play" title="Play Video" data-action="play" data-path="${absPath}" data-index="${index}" ${!fileExists ? 'disabled' : ''}>
+                  <i class="fas fa-play"></i>
+                </button>
+                        <button class="history-action-btn folder" title="Open Folder" data-action="folder" data-path="${absPath}" data-index="${index}">
+                  <i class="fas fa-folder-open"></i>
+                </button>
+                        <button class="history-action-btn delete" title="Delete File" data-action="delete" data-path="${absPath}" data-index="${index}">
+                  <i class="fas fa-trash"></i>
+                </button>
+              </div>`;
             return div;
         } catch (error) {
             console.error(`Error creating history item element:`, error);

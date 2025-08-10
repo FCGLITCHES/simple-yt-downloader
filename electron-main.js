@@ -208,7 +208,8 @@ function startServer() {
           ...process.env,
           YTDLP_PATH: ytdlpPath,
           FFMPEG_PATH: ffmpegPath,
-          ELECTRON_RUN_AS_NODE: '1'
+          ELECTRON_RUN_AS_NODE: '1',
+          USER_DATA_PATH: app.getPath('userData')
         }
       }
     );

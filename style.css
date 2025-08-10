@@ -1,35 +1,37 @@
 /* Complete theme definitions */
 :root {
-    /* Light Theme (Default) */
-    --bg-color: #f8f9fa;
+    /* Light Theme (Default) - Ruby Red + Champagne */
+    --bg-color: #fdfdfd;
     --card-bg: #ffffff;
-    --text-color: #2d3436;
-    --primary-color: #e74c3c;
-    --secondary-color: #ff7675;
+    --text-color: #2f2f2f; /* Charcoal */
+    --primary-color: #9b111e; /* Ruby Red */
+    --secondary-color: #f7e7ce; /* Champagne */
     --success-color: #00b894;
     --error-color: #d63031;
     --cancelled-color: #7f8c8d;
-    --input-bg: #f1f3f5;
-    --border-color: #dee2e6;
-    --header-gradient: linear-gradient(to right, #e74c3c, #c0392b);
+    --input-bg: #f6f6f6;
+    --border-color: #dcdcdc;
+    --header-gradient: linear-gradient(to right, #9b111e, #7f0d18);
+    --header-text: #ffffff;
     --shadow-color: rgba(0, 0, 0, 0.1);
-    --progress-bar-bg: #e74c3c;
+    --progress-bar-bg: var(--primary-color);
 }
 
 [data-theme="dark"] {
-    --bg-color: #2d3436;
-    --card-bg: #404040;
-    --text-color: #f8f9fa;
-    --primary-color: #ff7675;
-    --secondary-color: #e74c3c;
+    --bg-color: #1f1f1f; /* Charcoal */
+    --card-bg: #2b2b2b;
+    --text-color: #f3f3f3;
+    --primary-color: #c21b2a; /* Ruby highlight */
+    --secondary-color: #d6c7b2; /* Champagne-muted */
     --success-color: #55efc4;
-    --error-color: #ff7675;
+    --error-color: #ff6b6b;
     --cancelled-color: #95a5a6;
-    --input-bg: #4a4a4a;
-    --border-color: #5c5c5c;
-    --header-gradient: linear-gradient(to right, #ff7675, #e74c3c);
-    --shadow-color: rgba(0, 0, 0, 0.3);
-    --progress-bar-bg: #ff7675;
+    --input-bg: #303030;
+    --border-color: #444;
+    --header-gradient: linear-gradient(to right, #c21b2a, #8e1120);
+    --header-text: #ffffff;
+    --shadow-color: rgba(0, 0, 0, 0.4);
+    --progress-bar-bg: var(--primary-color);
 }
 
 [data-theme="minimal"] {
@@ -49,19 +51,21 @@
 }
 
 [data-theme="vibrant"] {
-    --bg-color: #1a1a2e;
+    /* Keep blue background but switch to vibrant ruby accents */
+    --bg-color: #1a1a2e; /* Blue-ish background retained */
     --card-bg: #16213e;
     --text-color: #eee;
-    --primary-color: #ff6b6b;
-    --secondary-color: #4ecdc4;
+    --primary-color: #e01224; /* Vibrant ruby */
+    --secondary-color: #f2d9bf; /* Champagne accent */
     --success-color: #51cf66;
     --error-color: #ff6b6b;
     --cancelled-color: #868e96;
     --input-bg: #0f3460;
-    --border-color: #533483;
-    --header-gradient: linear-gradient(45deg, #ff6b6b, #4ecdc4, #45b7d1);
-    --shadow-color: rgba(255, 107, 107, 0.2);
-    --progress-bar-bg: linear-gradient(90deg, #ff6b6b, #4ecdc4);
+    --border-color: #2a3a6b;
+    --header-gradient: linear-gradient(45deg, #e01224, #9b111e);
+    --header-text: #ffffff;
+    --shadow-color: rgba(224, 18, 36, 0.25);
+    --progress-bar-bg: #e01224;
 }
 
 /* Minimal Theme */
@@ -85,13 +89,11 @@
 }
 
 [data-theme="vibrant"] .download-btn {
-    background: linear-gradient(45deg, var(--primary-color), var(--secondary-color));
-    box-shadow: 0 4px 15px rgba(255, 107, 107, 0.3);
+    background: linear-gradient(45deg, var(--primary-color), #b31322);
+    box-shadow: 0 4px 15px rgba(224, 18, 36, 0.35);
 }
 
-[data-theme="vibrant"] .progress-bar {
-    background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
-}
+[data-theme="vibrant"] .progress-bar { background: var(--primary-color); }
 
 * {
     margin: 0;
@@ -155,6 +157,12 @@ body {
     color: var(--header-text);
     letter-spacing: -0.5px;
     white-space: nowrap;
+}
+
+/* Ensure light mode header text remains readable */
+[data-theme="light"] .logo-text,
+:root .logo-text {
+    color: #ffffff;
 }
 
 .header-buttons {
@@ -269,6 +277,7 @@ body {
 }
 
 .youtube-icon { color: #FF0000; }
+.video-icon { color: var(--primary-color); }
 .instagram-icon {
     background: radial-gradient(circle at 30% 107%, #fdf497 0%, #fdf497 5%, #fd5949 45%, #d6249f 60%, #285AEB 90%);
     -webkit-background-clip: text;
@@ -414,7 +423,8 @@ body {
 }
 
 .item-thumbnail {
-    width: 120px;
+    /* Maintain 16:9 ratio by height; 16/9 * 90px = 160px */
+    width: 160px;
     height: 90px;
     object-fit: cover;
     border-radius: 0.4rem; /* Consistent rounding */
@@ -490,6 +500,20 @@ body {
     transform: scale(1.03);
 }
 
+/* Align open folder button with completion text */
+.item-link {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+}
+.download-complete-label {
+    font-weight: 600;
+    color: var(--success-color);
+}
+.modern-folder-btn.align-with-complete {
+    margin-left: 0;
+}
+
 .item-buttons {
     display: flex;
     flex-direction: column;
@@ -528,17 +552,19 @@ body {
 }
 
 .item-remove-btn {
-    background: none;
-    color: var(--error-color);
-    font-size: 2rem; /* Keep larger for visibility */
-    font-weight: bold;
-    padding: 0.1rem 0.4rem;
-    line-height: 1;
-    opacity: 0.7; /* Slightly more visible */
+    background-color: var(--error-color);
+    color: #fff;
+    border: none;
+    padding: 0.3rem 0.6rem; /* slightly smaller */
+    border-radius: 0.4rem;
+    cursor: pointer;
+    font-size: 0.8rem; /* slightly smaller, maintains ratio */
+    transition: background-color 0.2s ease, transform 0.2s ease, filter 0.2s ease;
 }
 .item-remove-btn:hover {
-    opacity: 1;
-    transform: scale(1.1);
+    background-color: #b71c1c;
+    transform: scale(1.05);
+    filter: brightness(1.05);
 }
 
 .download-links-container::-webkit-scrollbar { width: 8px; }
@@ -668,6 +694,28 @@ body {
 .footer p { margin-bottom: 0.5rem; }
 .footer a { color: var(--primary-color); text-decoration: none; }
 .footer a:hover { text-decoration: underline; }
+
+/* Support button */
+.support-btn {
+    background: var(--primary-color);
+    color: #fff !important;
+    padding: 0.4rem 0.8rem;
+    border-radius: 0.4rem;
+    text-decoration: none;
+    font-weight: 600;
+}
+.support-btn:hover {
+    background: var(--secondary-color);
+    color: var(--text-color) !important;
+}
+
+/* Ensure inline links in settings tips are readable in all themes */
+.settings-section a {
+    color: var(--primary-color);
+}
+.settings-section a:hover {
+    text-decoration: underline;
+}
 
 /* Ensure Instagram specific styles are correctly scoped and applied */
 #instagramDownloader .card .subtitle,
@@ -1352,7 +1400,7 @@ body.compact-mode .history-filters label {
 }
 
 .history-thumb {
-    width: 120px;
+    width: 160px;
     height: 90px;
     object-fit: cover;
     border-radius: 0.5rem;
@@ -1457,10 +1505,7 @@ body.compact-mode .history-filters label {
         padding: 0.8rem;
         gap: 0.8rem;
     }
-    .history-thumb {
-        width: 80px;
-        height: 60px;
-    }
+    .history-thumb { width: 106px; height: 60px; }
 }
 
 @media (max-width: 600px) {
@@ -1474,10 +1519,7 @@ body.compact-mode .history-filters label {
         padding: 0.5rem;
         gap: 0.5rem;
     }
-    .history-thumb {
-        width: 60px;
-        height: 45px;
-    }
+    .history-thumb { width: 80px; height: 45px; }
 }
 
 body.compact-mode .download-item {
@@ -1485,7 +1527,7 @@ body.compact-mode .download-item {
     margin-bottom: 0.6rem !important;
 }
 body.compact-mode .item-thumbnail {
-    width: 80px !important;
+    width: 106px !important; /* 16:9 with 60px height */
     height: 60px !important;
 }
 body.compact-mode .item-title {
@@ -1505,7 +1547,7 @@ body.compact-mode .item-cancel-btn {
 }
 
 body.compact-mode .history-thumb {
-    width: 80px !important;
+    width: 106px !important;
     height: 60px !important;
 }
 body.compact-mode .history-title {
@@ -2274,14 +2316,14 @@ body.compact-mode .history-list {
 /* Responsive adjustments for smaller screens */
 @media (max-width: 1200px) {
     body.compact-mode .history-item {
-        max-width: 280px !important;
-        width: 280px !important;
+        max-width: 300px !important;
+        width: 300px !important;
     }
 }
 
 @media (max-width: 900px) {
     body.compact-mode .history-item {
-        max-width: 250px !important;
-        width: 250px !important;
+        max-width: 260px !important;
+        width: 260px !important;
     }
 }
