@@ -19,7 +19,7 @@ This document outlines the comprehensive debugging system we created to troubles
 - yt-dlp was not using authentication cookies properly
 
 ### Root Causes Identified
-1. **Path Mismatch**: Backend expected `Video Downloader Gemini` while frontend used `video-downloader-gemini`
+1. **Path Mismatch**: Backend expected `SimplyYTD` while frontend used `simply-ytd`
 2. **Unsupported Arguments**: yt-dlp version didn't support `--timeout` argument
 3. **Complex Path Detection**: 26+ paths being checked unnecessarily
 
@@ -163,7 +163,7 @@ app.get('/debug-cookie-paths', async (req, res) => {
         const platform = os.platform();
         const homedir = os.homedir();
         
-        const appName = 'Video Downloader Gemini';
+        const appName = 'SimplyYTD';
         let electronUserDataPath;
         
         switch (platform) {
@@ -350,7 +350,7 @@ async function getCookiesPath() {
     const platform = os.platform();
     const homedir = os.homedir();
     
-    const appName = 'Video Downloader Gemini';
+            const appName = 'SimplyYTD';
     let electronUserDataPath;
     
     switch (platform) {
@@ -369,7 +369,7 @@ async function getCookiesPath() {
     
     const alternativeNames = [
         'video-downloader-gemini',
-        'Video Downloader Gemini',
+                    'SimplyYTD',
         'simple-ytd',
         'Simple YTD'
     ];
@@ -448,7 +448,7 @@ async function getCookiesPath() {
 
 ### Step 2: Path Analysis
 - Found mismatch between expected paths
-- Backend: `Video Downloader Gemini`
+- Backend: `SimplyYTD`
 - Frontend: `video-downloader-gemini`
 
 ### Step 3: Cookie Testing
