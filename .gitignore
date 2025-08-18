@@ -21,3 +21,6 @@ bin/
 
 # Locales and build output
 locales/
+
+# Cookies directory (contains sensitive authentication data)
+cookies/

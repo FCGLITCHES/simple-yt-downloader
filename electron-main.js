@@ -1,5 +1,5 @@
 // electron-main.js - Main process for Electron application
-const { app, BrowserWindow, ipcMain, dialog, shell, clipboard } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, clipboard, powerSaveBlocker } = require('electron');
 const path = require('path');
 const { fork } = require('child_process');
 const fs = require('fs');
@@ -317,37 +317,38 @@ ipcMain.handle('get-userdata-path', async () => {
     return app.getPath('userData');
 });
 
-// Update the save-cookies-txt handler
+// Update the save-cookies-txt handler (Simplified - fixed location)
 ipcMain.handle('save-cookies-txt', async (event, content) => {
-  try {
-        const userDataPath = app.getPath('userData');
-        const filePath = path.join(userDataPath, 'cookies.txt');
+    try {
+        // Save to project_folder/cookies/cookies.txt
+        const cookiesDir = path.join(__dirname, 'cookies');
+        const cookiesPath = path.join(cookiesDir, 'cookies.txt');
         
-        // Ensure the userData directory exists
-        if (!fs.existsSync(userDataPath)) {
-            fs.mkdirSync(userDataPath, { recursive: true });
-            console.log(`[save-cookies-txt] Created userData directory: ${userDataPath}`);
+        // Ensure cookies directory exists
+        if (!fs.existsSync(cookiesDir)) {
+            fs.mkdirSync(cookiesDir, { recursive: true });
+            console.log(`[save-cookies-txt] Created cookies directory: ${cookiesDir}`);
+        }
+        
+        console.log(`[save-cookies-txt] Saving cookies to: ${cookiesPath}`);
+        fs.writeFileSync(cookiesPath, content, 'utf8');
+        
+        return { success: true, path: cookiesPath };
+    } catch (err) {
+        console.error('Failed to save cookies.txt:', err);
+        return { success: false, error: err.message };
     }
-    
-    console.log(`[save-cookies-txt] Saving cookies to: ${filePath}`);
-    fs.writeFileSync(filePath, content, 'utf8');
-        
-    return { success: true, path: filePath };
-  } catch (err) {
-    console.error('Failed to save cookies.txt:', err);
-    return { success: false, error: err.message };
-  }
 });
 
-// Add handler to get cookies content (for the cookies helper)
+// Add handler to get cookies content (for the cookies helper) (Simplified - fixed location)
 ipcMain.handle('get-cookies-txt', async () => {
     try {
-        const userDataPath = app.getPath('userData');
-        const filePath = path.join(userDataPath, 'cookies.txt');
+        const cookiesDir = path.join(__dirname, 'cookies');
+        const cookiesPath = path.join(cookiesDir, 'cookies.txt');
         
-        if (fs.existsSync(filePath)) {
-            const content = fs.readFileSync(filePath, 'utf8');
-            return { success: true, content, path: filePath };
+        if (fs.existsSync(cookiesPath)) {
+            const content = fs.readFileSync(cookiesPath, 'utf8');
+            return { success: true, content, path: cookiesPath };
         } else {
             return { success: false, error: 'Cookies file not found' };
         }
@@ -535,3 +536,56 @@ ipcMain.handle('normalize-path', async (event, filePath) => {
         return filePath; // Return original if normalization fails
     }
 });
+
+// Power Save Blocker handlers
+let powerSaveBlockerId = null;
+
+ipcMain.handle('start-power-save-blocker', async () => {
+    try {
+        // If we have no ID or the blocker with current ID isn't running
+        if (powerSaveBlockerId === null || !powerSaveBlocker.isStarted(powerSaveBlockerId)) {
+            // Stop any existing blocker just in case
+            if (powerSaveBlockerId !== null) {
+                try {
+                    powerSaveBlocker.stop(powerSaveBlockerId);
+                } catch (e) {
+                    // Ignore errors when stopping
+                }
+            }
+            
+            // Start fresh
+            powerSaveBlockerId = powerSaveBlocker.start('prevent-app-suspension');
+            console.log('Power save blocker started:', powerSaveBlockerId);
+            return { success: true, id: powerSaveBlockerId };
+        } else {
+            // Already running
+            console.log('Power save blocker already active:', powerSaveBlockerId);
+            return { success: true, id: powerSaveBlockerId }; // Return success, not failure!
+        }
+    } catch (error) {
+        console.error('Error starting power save blocker:', error);
+        powerSaveBlockerId = null;
+        return { success: false, error: error.message };
+    }
+});
+
+ipcMain.handle('stop-power-save-blocker', async () => {
+    try {
+        if (powerSaveBlockerId !== null && powerSaveBlocker.isStarted(powerSaveBlockerId)) {
+            powerSaveBlocker.stop(powerSaveBlockerId);
+            console.log('Power save blocker stopped:', powerSaveBlockerId);
+            powerSaveBlockerId = null;
+            return { success: true };
+        } else {
+            console.log('No active power save blocker to stop');
+            powerSaveBlockerId = null; // Reset state
+            return { success: true }; // Return success, not failure!
+        }
+    } catch (error) {
+        console.error('Error stopping power save blocker:', error);
+        powerSaveBlockerId = null;
+        return { success: false, error: error.message };
+    }
+});
+
+

@@ -46,5 +46,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
     pathExists: async (filePath) => {
         return await ipcRenderer.invoke('path-exists', filePath);
-    }
+    },
+    startPowerSaveBlocker: async () => {
+        return await ipcRenderer.invoke('start-power-save-blocker');
+    },
+    stopPowerSaveBlocker: async () => {
+        return await ipcRenderer.invoke('stop-power-save-blocker');
+    },
+
 });

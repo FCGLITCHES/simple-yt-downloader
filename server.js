@@ -74,6 +74,324 @@ console.log("[server.js] Received FFMPEG_PATH from env: ", process.env.FFMPEG_PA
 
   console.log("[server.js] Effective ytdlpExecutable: ", ytdlpExecutable);
   console.log("[server.js] Effective ffmpegExecutable: ", ffmpegExecutable);
+
+  // Auto-update system for yt-dlp and FFmpeg
+  async function checkAndUpdateTools() {
+    console.log('🔄 Starting automatic tool updates...');
+    
+    try {
+      // Check and update yt-dlp
+      const ytdlpResult = await updateYtDlp();
+      
+      // Check and update FFmpeg
+      const ffmpegResult = await updateFFmpeg();
+      
+      console.log('✅ Tool update check completed');
+      return { ytdlp: ytdlpResult, ffmpeg: ffmpegResult };
+    } catch (error) {
+      console.error('❌ Error during tool updates:', error);
+      return { error: error.message };
+    }
+  }
+
+  async function updateYtDlp() {
+    try {
+      console.log('🔄 Checking yt-dlp for updates...');
+      
+      // Get current version
+      const currentVersion = await getToolVersion(ytdlpExecutable);
+      console.log(`📋 Current yt-dlp version: ${currentVersion}`);
+      
+      // Check if update is needed (run every 7 days)
+      const lastUpdateCheck = getLastUpdateCheck('ytdlp');
+      const daysSinceLastCheck = (Date.now() - lastUpdateCheck) / (1000 * 60 * 60 * 24);
+      
+      if (daysSinceLastCheck < 7) {
+        console.log(`⏰ yt-dlp update check skipped (last checked ${Math.round(daysSinceLastCheck)} days ago)`);
+        return { updated: false, currentVersion, reason: 'Update check skipped (checked recently)' };
+      }
+      
+      // Attempt update
+      console.log('📥 Updating yt-dlp...');
+      const updateResult = await runToolUpdate(ytdlpExecutable, ['-U']);
+      
+      if (updateResult.success) {
+        const newVersion = await getToolVersion(ytdlpExecutable);
+        console.log(`✅ yt-dlp updated successfully! ${currentVersion} → ${newVersion}`);
+        setLastUpdateCheck('ytdlp');
+        return { updated: true, oldVersion: currentVersion, newVersion: newVersion };
+      } else {
+        console.log(`⚠️ yt-dlp update failed: ${updateResult.error}`);
+        return { updated: false, currentVersion, error: updateResult.error };
+      }
+      
+    } catch (error) {
+      console.error('❌ Error updating yt-dlp:', error.message);
+      return { updated: false, error: error.message };
+    }
+  }
+
+  async function updateFFmpeg() {
+    try {
+      console.log('🔄 Checking FFmpeg for updates...');
+      
+      // Get current version
+      let currentVersion = await getToolVersion(ffmpegExecutable);
+      console.log(`📋 Current FFmpeg version: ${currentVersion}`);
+      
+      // If version is still unknown, try to test if FFmpeg is working
+      if (currentVersion === 'unknown' || currentVersion === 'error') {
+        console.log('🔄 FFmpeg version unknown, testing if executable works...');
+        const isWorking = await testFFmpegWorking();
+        if (isWorking) {
+          currentVersion = 'Working (version unknown)';
+          console.log('✅ FFmpeg is working but version detection failed');
+        } else {
+          currentVersion = 'Not working';
+          console.log('❌ FFmpeg executable is not working');
+        }
+      }
+      
+      // Check if update is needed (run every 14 days for FFmpeg)
+      const lastUpdateCheck = getLastUpdateCheck('ffmpeg');
+      const daysSinceLastCheck = (Date.now() - lastUpdateCheck) / (1000 * 60 * 60 * 24);
+      
+      if (daysSinceLastCheck < 14) {
+        console.log(`⏰ FFmpeg update check skipped (last checked ${Math.round(daysSinceLastCheck)} days ago)`);
+        return { updated: false, currentVersion, reason: 'Update check skipped (checked recently)' };
+      }
+      
+      // For FFmpeg, we'll download the latest version from official sources
+      console.log('📥 Checking FFmpeg for new versions...');
+      const ffmpegResult = await checkFFmpegUpdates();
+      
+      if (ffmpegResult.hasUpdate) {
+        console.log(`🔄 FFmpeg update available: ${ffmpegResult.latestVersion}`);
+        // Note: FFmpeg updates require manual download, so we just log the info
+        return { updated: false, currentVersion, hasUpdate: true, latestVersion: ffmpegResult.latestVersion, reason: 'Manual update required' };
+      } else {
+        console.log('✅ FFmpeg is up to date');
+        setLastUpdateCheck('ffmpeg');
+        return { updated: false, currentVersion, reason: 'Already up to date' };
+      }
+      
+    } catch (error) {
+      console.error('❌ Error checking FFmpeg updates:', error.message);
+      return { updated: false, error: error.message };
+    }
+  }
+
+    async function getToolVersion(executable) {
+    try {
+      return await new Promise((resolve) => {
+        console.log(`🔍 Getting version for: ${executable}`);
+        
+        const versionProc = spawn(executable, ['--version'], { 
+          stdio: ['ignore', 'pipe', 'pipe'],
+          timeout: 10000
+        });
+        
+        let stdout = '';
+        let stderr = '';
+        
+        versionProc.stdout.on('data', (data) => {
+          stdout += data;
+          console.log(`📤 stdout data: ${data.toString().trim()}`);
+        });
+        
+        versionProc.stderr.on('data', (data) => {
+          stderr += data;
+          console.log(`⚠️ stderr data: ${data.toString().trim()}`);
+        });
+        
+        versionProc.on('close', (code) => {
+          console.log(`🔍 Process closed with code: ${code}`);
+          console.log(`📤 Final stdout: "${stdout.trim()}"`);
+          console.log(`⚠️ Final stderr: "${stderr.trim()}"`);
+          
+          // FFmpeg can return various exit codes but still output version info
+          // Accept any code as long as we got output
+          const output = stdout.trim() || stderr.trim();
+          if (output) {
+            // Handle different output formats
+            if (executable.includes('ffmpeg') || executable.includes('ffmpeg.exe')) {
+              console.log(`🔍 Processing FFmpeg output: "${output}"`);
+              // FFmpeg format: "ffmpeg version 2025-05-26-git-43a69886b2-essentials_build-www.gyan.dev"
+              const match = output.match(/ffmpeg version ([0-9]{4}-[0-9]{2}-[0-9]{2}-git-[a-f0-9]+)/);
+              if (match) {
+                console.log(`✅ FFmpeg version match found: ${match[1]}`);
+                resolve(`ffmpeg version ${match[1]}`);
+              } else {
+                // Fallback: try to extract just the date part
+                const dateMatch = output.match(/ffmpeg version ([0-9]{4}-[0-9]{2}-[0-9]{2})/);
+                if (dateMatch) {
+                  console.log(`✅ FFmpeg date version found: ${dateMatch[1]}`);
+                  resolve(`ffmpeg version ${dateMatch[1]}`);
+                } else {
+                  console.log(`⚠️ No FFmpeg version match, using first line: "${output.split('\n')[0]}"`);
+                  resolve(output.split('\n')[0]); // Fallback to first line
+                }
+              }
+            } else if (executable.includes('yt-dlp') || executable.includes('yt-dlp.exe')) {
+              console.log(`🔍 Processing yt-dlp output: "${output}"`);
+              // yt-dlp format: "yt-dlp 2025.08.11"
+              const match = output.match(/yt-dlp ([0-9]+\.[0-9]+\.[0-9]+)/);
+              if (match) {
+                console.log(`✅ yt-dlp version match found: ${match[1]}`);
+                resolve(`yt-dlp ${match[1]}`);
+              } else {
+                console.log(`⚠️ No yt-dlp version match, using first line: "${output.split('\n')[0]}"`);
+                resolve(output.split('\n')[0]); // Fallback to first line
+              }
+            } else {
+              console.log(`🔍 Generic tool, using first line: "${output.split('\n')[0]}"`);
+              resolve(output.split('\n')[0]); // Generic fallback
+            }
+          } else {
+            console.log(`❌ No output from ${executable}`);
+            resolve('unknown');
+          }
+        });
+        
+        versionProc.on('error', (error) => {
+          console.error(`❌ Error getting version for ${executable}:`, error.message);
+          resolve('error');
+        });
+      });
+    } catch (error) {
+      console.error(`❌ Exception getting version for ${executable}:`, error.message);
+      return 'error';
+    }
+  }
+
+  async function runToolUpdate(executable, args) {
+    return new Promise((resolve) => {
+      const updateProc = spawn(executable, args, { 
+        stdio: ['ignore', 'pipe', 'pipe'],
+        timeout: 120000 // 2 minute timeout
+      });
+      
+      let updateOutput = '';
+      let updateError = '';
+      
+      updateProc.stdout.on('data', (data) => {
+        updateOutput += data;
+        console.log(`📥 Update output: ${data.toString().trim()}`);
+      });
+      
+      updateProc.stderr.on('data', (data) => {
+        updateError += data;
+        console.log(`⚠️ Update warning: ${data.toString().trim()}`);
+      });
+      
+      updateProc.on('close', (code) => {
+        if (code === 0) {
+          resolve({ success: true, output: updateOutput });
+        } else {
+          resolve({ success: false, error: updateError, code });
+        }
+      });
+      
+      updateProc.on('error', (error) => {
+        resolve({ success: false, error: error.message });
+      });
+    });
+  }
+
+  async function checkFFmpegUpdates() {
+    try {
+      // Check FFmpeg website for latest version
+      const response = await fetch('https://ffmpeg.org/download.html');
+      const html = await response.text();
+      
+      // Extract version from HTML (this is a simple approach)
+      const versionMatch = html.match(/FFmpeg ([0-9]+\.[0-9]+\.[0-9]+)/);
+      if (versionMatch) {
+        const latestVersion = versionMatch[1];
+        const currentVersion = await getToolVersion(ffmpegExecutable);
+        
+        // Simple version comparison
+        const hasUpdate = compareVersions(currentVersion, latestVersion) < 0;
+        
+        return { hasUpdate, latestVersion, currentVersion };
+      }
+      
+      return { hasUpdate: false, latestVersion: 'unknown' };
+    } catch (error) {
+      console.error('Error checking FFmpeg updates:', error);
+      return { hasUpdate: false, latestVersion: 'unknown', error: error.message };
+    }
+  }
+
+  function compareVersions(v1, v2) {
+    if (v1 === 'unknown' || v1 === 'error') return 0;
+    if (v2 === 'unknown') return 0;
+    
+    const parts1 = v1.split('.').map(Number);
+    const parts2 = v2.split('.').map(Number);
+    
+    for (let i = 0; i < Math.max(parts1.length, parts2.length); i++) {
+      const part1 = parts1[i] || 0;
+      const part2 = parts2[i] || 0;
+      
+      if (part1 < part2) return -1;
+      if (part1 > part2) return 1;
+    }
+    
+    return 0;
+  }
+
+  function getLastUpdateCheck(tool) {
+    try {
+      const checkFile = path.join(__dirname, `${tool}_last_check.json`);
+      if (fs.existsSync(checkFile)) {
+        const data = JSON.parse(fs.readFileSync(checkFile, 'utf8'));
+        return data.lastCheck || 0;
+      }
+    } catch (error) {
+      console.error(`Error reading last update check for ${tool}:`, error);
+    }
+    return 0;
+  }
+
+  function setLastUpdateCheck(tool) {
+    try {
+      const checkFile = path.join(__dirname, `${tool}_last_check.json`);
+      const data = { lastCheck: Date.now() };
+      fs.writeFileSync(checkFile, JSON.stringify(data, null, 2));
+    } catch (error) {
+      console.error(`Error writing last update check for ${tool}:`, error);
+    }
+  }
+
+  async function testFFmpegWorking() {
+    try {
+      return await new Promise((resolve) => {
+        // Test with a simple command that should work
+        const testProc = spawn(ffmpegExecutable, ['-f', 'lavfi', '-i', 'testsrc=duration=1:size=320x240:rate=1', '-f', 'null', '-'], { 
+          stdio: ['ignore', 'ignore', 'pipe'],
+          timeout: 10000
+        });
+        
+        let stderr = '';
+        testProc.stderr.on('data', (data) => stderr += data);
+        
+        testProc.on('close', (code) => {
+          // FFmpeg often returns non-zero codes for test commands, but stderr output indicates it's working
+          const isWorking = stderr.includes('ffmpeg') || stderr.includes('Input') || stderr.includes('Output');
+          resolve(isWorking);
+        });
+        
+        testProc.on('error', (error) => {
+          console.error('FFmpeg test error:', error.message);
+          resolve(false);
+        });
+      });
+    } catch (error) {
+      console.error('Exception testing FFmpeg:', error.message);
+      return false;
+    }
+  }
   // ... rest of your server.js code
 
   // Dynamically import p-limit
@@ -237,7 +555,6 @@ console.log("[server.js] Received FFMPEG_PATH from env: ", process.env.FFMPEG_PA
                       itemId: individualItemId, 
                       title: itemData.title, 
                       source, 
-                      estimatedSize: "Fetching...",
                       isPlaylistItem: itemData.isPlaylistItem || false,
                       playlistIndex: itemData.playlistIndex || null
                   });
@@ -275,7 +592,7 @@ console.log("[server.js] Received FFMPEG_PATH from env: ", process.env.FFMPEG_PA
               title: `Video: ${videoUrl}` // Placeholder, will be updated by getVideoInfo
           };
           downloadQueue.set(itemId, itemData);
-          sendMessageToClient(clientId, { type: 'queued', itemId: itemId, title: itemData.title, source, estimatedSize: "Fetching..." });
+          sendMessageToClient(clientId, { type: 'queued', itemId: itemId, title: itemData.title, source });
 
 
           // Update single video concurrency limit if provided and different
@@ -409,61 +726,17 @@ console.log("[server.js] Received FFMPEG_PATH from env: ", process.env.FFMPEG_PA
       return parseFloat((bytes / Math.pow(k, Math.min(i, sizes.length - 1))).toFixed(dm)) + ' ' + sizes[Math.min(i, sizes.length - 1)];
   }
 
-  // Enhanced getVideoInfo with quality-specific size estimation
+  // Enhanced getVideoInfo without size estimation
   async function getVideoInfo(clientId, videoUrl, itemId, requestedQuality = 'highest', format = 'mp4') {
       const baseArgs = ['--no-playlist', '--skip-download', '--print-json', videoUrl];
       try {
           const { stdout } = await runYtDlpCommand(clientId, baseArgs, `info_${itemId}`, true);
           const info = JSON.parse(stdout.trim());
           const title = info.title || 'video';
-          let estimatedSize = null;
           let thumbnail = info.thumbnail || null;
-          // Calculate size based on requested quality and format
-          if (info.formats && Array.isArray(info.formats)) {
-              let selectedFormat = null;
-              if (format === 'mp3') {
-                  // For MP3, find best audio format
-                  const audioFormats = info.formats.filter(f => f.acodec && f.acodec !== 'none' && f.filesize);
-                  if (audioFormats.length > 0) {
-                      if (requestedQuality === 'highest') {
-                          selectedFormat = audioFormats.reduce((best, current) => 
-                              (current.abr || 0) > (best.abr || 0) ? current : best
-                          );
-                      } else {
-                          const targetBitrate = parseInt(requestedQuality) || 128;
-                          selectedFormat = audioFormats.find(f => (f.abr || 128) <= targetBitrate) || audioFormats[0];
-                      }
-                  }
-              } else {
-                  // For MP4, find best video format matching quality
-                  const targetHeight = requestedQuality === 'highest' ? 9999 : parseInt(requestedQuality) || 720;
-                  const videoFormats = info.formats.filter(f => 
-                      f.height && f.height <= targetHeight && f.vcodec && f.vcodec !== 'none' && f.filesize
-                  );
-                  if (videoFormats.length > 0) {
-                      // Get the best quality that matches the target
-                      selectedFormat = videoFormats.reduce((best, current) => 
-                          (current.height || 0) > (best.height || 0) ? current : best
-                      );
-                      // Add estimated audio size (typically 10-15% of video size for same duration)
-                      if (selectedFormat.filesize) {
-                          const audioSizeEstimate = Math.round(selectedFormat.filesize * 0.12);
-                          estimatedSize = selectedFormat.filesize + audioSizeEstimate;
-                      }
-                  }
-              }
-              if (selectedFormat && selectedFormat.filesize) {
-                  estimatedSize = selectedFormat.filesize;
-                  logDetailed('info', itemId, `Size estimated for ${format} at ${requestedQuality}: ${formatBytes(estimatedSize)}`);
-              }
-          }
-          // Fallback to general filesize
-          if (!estimatedSize) {
-              estimatedSize = info.filesize || info.filesize_approx || null;
-          }
+          
           return {
               title,
-              fileSize: estimatedSize,
               thumbnail,
               availableQualities: extractAvailableQualities(info.formats)
           };
@@ -474,7 +747,7 @@ console.log("[server.js] Received FFMPEG_PATH from env: ", process.env.FFMPEG_PA
               message: 'Could not fetch detailed video info, proceeding with defaults.',
               itemId
           });
-          return { title: 'video', fileSize: null, thumbnail: null, availableQualities: [] };
+          return { title: 'video', thumbnail: null, availableQualities: [] };
       }
   }
 
@@ -539,12 +812,10 @@ console.log("[server.js] Received FFMPEG_PATH from env: ", process.env.FFMPEG_PA
 
           const videoInfo = await getVideoInfo(clientId, videoUrl, itemId, quality, format);
           currentVideoTitle = videoInfo.title || currentVideoTitle;
-          const formattedEstimatedSize = videoInfo.fileSize ? formatBytes(videoInfo.fileSize) : null;
           sendMessageToClient(clientId, { 
               type: 'item_info', 
               itemId, 
               title: currentVideoTitle, 
-              estimatedSize: formattedEstimatedSize, 
               source, 
               thumbnail: videoInfo.thumbnail,
               isPlaylistItem: itemData.isPlaylistItem || false,
@@ -574,111 +845,110 @@ console.log("[server.js] Received FFMPEG_PATH from env: ", process.env.FFMPEG_PA
               outputTemplate = path.join(targetDir, `${source}_${finalBaseFilename}_${itemId}.%(ext)s`);
           }
 
-          let downloadedPrimaryPath, tempAudioPath;
-          let finalExtension = format;
-          let needsConversion = false;
-
-          sendMessageToClient(clientId, { type: 'status', message: 'Preparing download...', itemId, source });
+          let finalFilePathValue;
+          
+          sendMessageToClient(clientId, { type: 'status', message: 'Starting optimized download...', itemId, source });
 
           if (format === 'mp3') {
-              const tempDownloadFilenamePattern = `tmp_${itemId}_audio.*`;
-              downloadedPrimaryPath = path.join(DOWNLOAD_DIR, `tmp_${itemId}_audio.%(ext)s`); // For yt-dlp output
-              tempFilesCreated.push(path.join(DOWNLOAD_DIR, tempDownloadFilenamePattern)); // Use wildcard for cleanup
-
-              let audioDownloadArgs = ['-f', 'bestaudio/best', '--no-playlist', '-o', downloadedPrimaryPath, videoUrl];
-              if (settings.skipDuplicates && isPlaylistItem) audioDownloadArgs.unshift('--no-overwrites');
-              if (settings.maxSpeed && parseInt(settings.maxSpeed) > 0) audioDownloadArgs.unshift('--limit-rate', `${settings.maxSpeed}K`);
+              // OPTIMIZED MP3: Use yt-dlp's built-in extraction (much faster)
+              const finalOutputFilename = outputTemplate.replace('%(ext)s', 'mp3');
               
-              const { actualPath } = await runYtDlpCommand(clientId, audioDownloadArgs, itemId, false, itemProcInfo);
-              if (!actualPath) throw new Error("yt-dlp did not return an output path for audio.");
-              downloadedPrimaryPath = actualPath; // Update with actual path
+              let mp3Args = [
+                  '--extract-audio',
+                  '--audio-format', 'mp3',
+                  '--no-playlist',
+                  '-o', outputTemplate,
+                  videoUrl
+              ];
+              
+              // Add quality setting for MP3
+              if (quality && quality !== 'highest' && !isNaN(parseInt(quality))) {
+                  mp3Args.push('--audio-quality', quality + 'K');
+              } else {
+                  mp3Args.push('--audio-quality', '0'); // Best quality
+              }
+              
+              // Add metadata if requested
+              if (settings.searchTags) {
+                  mp3Args.push('--embed-metadata');
+              }
+              
+              // Add rate limiting only if specified and > 0
+              if (settings.maxSpeed && parseInt(settings.maxSpeed) > 0) {
+                  mp3Args.unshift('--limit-rate', `${settings.maxSpeed}K`);
+              }
+              
+              if (settings.skipDuplicates && isPlaylistItem) {
+                  mp3Args.unshift('--no-overwrites');
+              }
 
-              if (itemProcInfo.cancelled) { console.log(`[${itemId}] Cancelled after audio dl for mp3.`); return; }
-              sendMessageToClient(clientId, { type: 'status', message: 'Audio download finished. Converting...', itemId, source });
-              needsConversion = true; finalExtension = 'mp3';
+              const { actualPath } = await runYtDlpCommand(clientId, mp3Args, itemId, false, itemProcInfo);
+              finalFilePathValue = actualPath || finalOutputFilename;
+
           } else if (format === 'mp4') {
-              const tempVideoFilenamePattern = `tmp_${itemId}_video.*`;
-              downloadedPrimaryPath = path.join(DOWNLOAD_DIR, `tmp_${itemId}_video.%(ext)s`);
-              tempFilesCreated.push(path.join(DOWNLOAD_DIR, tempVideoFilenamePattern));
+              // ENHANCED MP4: Precise quality selection with fallbacks
+              const finalOutputFilename = outputTemplate.replace('%(ext)s', 'mp4');
+              
+              let formatString;
+              if (quality === 'highest') {
+                  // Get the absolute best quality available
+                  formatString = 'bestvideo+bestaudio/best';
+              } else {
+                  const targetHeight = parseInt(quality);
+                  if (!isNaN(targetHeight)) {
+                      // Create a comprehensive format string with quality preferences
+                      if (targetHeight >= 2160) {
+                          // 4K: Prefer 4K, accept up to 8K, fallback to lower if needed
+                          formatString = `bestvideo[height=${targetHeight}]+bestaudio/bestvideo[height<=${targetHeight+1080}]+bestaudio/bestvideo[height>=${targetHeight-360}]+bestaudio/bestvideo+bestaudio`;
+                      } else if (targetHeight >= 1080) {
+                          // 1080p: Prefer exact match, accept higher, fallback to 720p minimum
+                          formatString = `bestvideo[height=${targetHeight}]+bestaudio/bestvideo[height<=${targetHeight+360}]+bestaudio/bestvideo[height>=${Math.max(720, targetHeight-360)}]+bestaudio/bestvideo+bestaudio`;
+                      } else if (targetHeight >= 720) {
+                          // 720p: Similar logic with 480p minimum fallback
+                          formatString = `bestvideo[height=${targetHeight}]+bestaudio/bestvideo[height<=${targetHeight+240}]+bestaudio/bestvideo[height>=${Math.max(480, targetHeight-240)}]+bestaudio/bestvideo+bestaudio`;
+                      } else {
+                          // Lower qualities: More flexible fallback
+                          formatString = `bestvideo[height<=${targetHeight+120}]+bestaudio/bestvideo+bestaudio`;
+                      }
+                  } else {
+                      // Non-numeric quality (shouldn't happen, but just in case)
+                      formatString = 'bestvideo+bestaudio/best';
+                  }
+              }
 
-              const tempAudioFilenamePattern = `tmp_${itemId}_audio_for_mp4.*`;
-              tempAudioPath = path.join(DOWNLOAD_DIR, `tmp_${itemId}_audio_for_mp4.%(ext)s`);
-              tempFilesCreated.push(path.join(DOWNLOAD_DIR, tempAudioFilenamePattern));
+              let mp4Args = [
+                  '-f', formatString,
+                  '--merge-output-format', 'mp4',
+                  '--no-playlist',
+                  '-o', outputTemplate,
+                  videoUrl
+              ];
+              
+              // Add rate limiting only if specified and > 0
+              if (settings.maxSpeed && parseInt(settings.maxSpeed) > 0) {
+                  mp4Args.unshift('--limit-rate', `${settings.maxSpeed}K`);
+              }
+              
+              if (settings.skipDuplicates && isPlaylistItem) {
+                  mp4Args.unshift('--no-overwrites');
+              }
 
-              const height = parseInt(quality);
-              let formatString = height === 2160
-                ? 'bestvideo[height<=2160][ext=mp4]+bestaudio[ext=m4a]/best[height<=2160][ext=mp4]/best'
-                : height && !isNaN(height)
-                  ? `bestvideo[height<=?${height}][ext=mp4]+bestaudio[ext=m4a]/best[height<=?${height}][ext=mp4]/best`
-                  : 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best';
+              const qualityText = quality === 'highest' ? 'highest available quality' : `${quality}p quality`;
+              sendMessageToClient(clientId, { type: 'status', message: `Downloading in ${qualityText}...`, itemId, source });
+              const { actualPath } = await runYtDlpCommand(clientId, mp4Args, itemId, false, itemProcInfo);
+              finalFilePathValue = actualPath || finalOutputFilename;
 
-              let videoArgs = ['-f', formatString, '--no-playlist', '-o', downloadedPrimaryPath, videoUrl];
-              if (settings.skipDuplicates && isPlaylistItem) videoArgs.unshift('--no-overwrites');
-              if (settings.maxSpeed && parseInt(settings.maxSpeed) > 0) videoArgs.unshift('--limit-rate', `${settings.maxSpeed}K`);
-              sendMessageToClient(clientId, { type: 'status', message: 'Downloading video stream...', itemId, source });
-              const { actualPath: actualVideoPath } = await runYtDlpCommand(clientId, videoArgs, itemId, false, itemProcInfo);
-              if (!actualVideoPath) throw new Error("yt-dlp did not return an output path for video.");
-              downloadedPrimaryPath = actualVideoPath;
-
-              if (itemProcInfo.cancelled) { console.log(`[${itemId}] Cancelled after video dl for mp4.`); return; }
-              sendMessageToClient(clientId, { type: 'status', message: 'Video stream finished. Downloading audio...', itemId, source });
-
-              let audioArgs = ['-f', 'bestaudio[ext=m4a]/bestaudio/best', '--no-playlist', '-o', tempAudioPath, videoUrl];
-              if (settings.skipDuplicates && isPlaylistItem) audioArgs.unshift('--no-overwrites');
-              if (settings.maxSpeed && parseInt(settings.maxSpeed) > 0) audioArgs.unshift('--limit-rate', `${settings.maxSpeed}K`);
-              const { actualPath: actualAudioPath } = await runYtDlpCommand(clientId, audioArgs, itemId, false, itemProcInfo);
-              if (!actualAudioPath) throw new Error("yt-dlp did not return an output path for audio merge.");
-              tempAudioPath = actualAudioPath;
-
-              if (itemProcInfo.cancelled) { console.log(`[${itemId}] Cancelled after audio for MP4 dl.`); return; }
-              sendMessageToClient(clientId, { type: 'status', message: 'Audio stream finished. Merging...', itemId, source });
-              needsConversion = true; finalExtension = 'mp4';
           } else {
               throw new Error(`Unsupported format: ${format}`);
           }
 
-          if (itemProcInfo.cancelled) { console.log(`[${itemId}] Cancelled before conversion.`); return; }
-
-          let finalFilePathValue;
-          const finalOutputFilenameWithExt = outputTemplate.replace('%(ext)s', finalExtension);
-
-          if (needsConversion) {
-              let ffmpegArgs = [];
-              if (format === 'mp3') {
-                  if (!fs.existsSync(downloadedPrimaryPath)) throw new Error(`Missing temp audio file for MP3 conversion: ${downloadedPrimaryPath}`);
-                  ffmpegArgs = ['-i', downloadedPrimaryPath, '-vn'];
-                  if (quality && quality !== 'highest' && !isNaN(parseInt(quality))) {
-                      ffmpegArgs.push('-b:a', `${quality}k`);
-                  } else {
-                      ffmpegArgs.push('-q:a', '0');
-                  }
-                  if (settings.searchTags) ffmpegArgs.push('-map_metadata', '0', '-id3v2_version', '3', '-write_id3v1', '1');
-                  ffmpegArgs.push('-y', finalOutputFilenameWithExt);
-              } else if (format === 'mp4') {
-                  if (!fs.existsSync(downloadedPrimaryPath)) throw new Error(`Missing temp video file for MP4 muxing: ${downloadedPrimaryPath}`);
-                  if (!fs.existsSync(tempAudioPath)) throw new Error(`Missing temp audio file for MP4 muxing: ${tempAudioPath}`);
-                  ffmpegArgs = ['-i', downloadedPrimaryPath, '-i', tempAudioPath, '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k', '-y', finalOutputFilenameWithExt];
-              }
-              await runFFmpegCommand(clientId, ffmpegArgs, itemId, itemProcInfo); // ffmpeg writes directly to finalOutputFilenameWithExt
-              finalFilePathValue = finalOutputFilenameWithExt;
-          } else { // Should not happen with current logic as both mp3 and mp4 need conversion/merge
-              if (fs.existsSync(downloadedPrimaryPath)) {
-                  fs.renameSync(downloadedPrimaryPath, finalOutputFilenameWithExt);
-                  finalFilePathValue = finalOutputFilenameWithExt;
-                  // Remove downloadedPrimaryPath from tempFilesCreated as it's now the final file
-                  itemProcInfo.tempFiles = itemProcInfo.tempFiles.filter(f => f !== downloadedPrimaryPath);
-              } else {
-                   throw new Error("Downloaded file not found for renaming (no conversion).");
-              }
-          }
-
-          if (itemProcInfo.cancelled) { console.log(`[${itemId}] Cancelled after conversion/merge step.`); return; }
+          if (itemProcInfo.cancelled) { console.log(`[${itemId}] Cancelled after download.`); return; }
 
           if (!finalFilePathValue || !fs.existsSync(finalFilePathValue)) {
               throw new Error("Processing failed, final file not found at: " + finalFilePathValue);
           }
 
-          // Set file modification time to now (always)
+          // Set file modification time to now
           try {
               const now = new Date();
               fs.utimesSync(finalFilePathValue, now, now);
@@ -687,7 +957,6 @@ console.log("[server.js] Received FFMPEG_PATH from env: ", process.env.FFMPEG_PA
           }
 
           const actualFinalFilenameDisplay = path.basename(finalFilePathValue);
-          // For download link, always make it relative to DOWNLOAD_DIR (main one)
           const relativePathForLink = path.relative(DOWNLOAD_DIR, finalFilePathValue);
           const downloadLink = `/downloads/${encodeURIComponent(relativePathForLink.replace(/\\/g, '/'))}`;
           let actualSize = null;
@@ -696,7 +965,17 @@ console.log("[server.js] Received FFMPEG_PATH from env: ", process.env.FFMPEG_PA
               actualSize = formatBytes(stats.size);
           } catch (e) { console.error(`[${itemId}] Stat error for ${finalFilePathValue}:`, e); }
 
-          sendMessageToClient(clientId, { type: 'complete', message: 'Download complete!', downloadUrl: downloadLink, filename: actualFinalFilenameDisplay, actualSize: actualSize, itemId, source });
+          sendMessageToClient(clientId, { 
+              type: 'complete', 
+              message: 'Download complete!', 
+              downloadUrl: downloadLink, 
+              filename: actualFinalFilenameDisplay, 
+              actualSize: actualSize, 
+              itemId, 
+              source,
+              downloadFolder: targetDir,
+              fullPath: finalFilePathValue
+          });
 
       } catch (error) {
           if (!itemProcInfo.cancelled) {
@@ -707,10 +986,9 @@ console.log("[server.js] Received FFMPEG_PATH from env: ", process.env.FFMPEG_PA
               sendMessageToClient(clientId, { type: 'cancel_confirm', message: 'Processing stopped due to cancellation.', itemId, source });
           }
       } finally {
-          // Clean up temp files after download/conversion is complete (YouTube)
+          // Clean up any remaining temp files
           itemProcInfo.tempFiles.forEach(tempPathPattern => {
               const glob = require('glob');
-              // Clean from DOWNLOAD_DIR
               let files = glob.sync(path.basename(tempPathPattern), { cwd: DOWNLOAD_DIR });
               files.forEach(file => {
                   const fullPath = path.join(DOWNLOAD_DIR, file);
@@ -718,20 +996,6 @@ console.log("[server.js] Received FFMPEG_PATH from env: ", process.env.FFMPEG_PA
                       try { fs.unlinkSync(fullPath); } catch (e) { console.error(`[${itemId}] Error cleaning up temp file ${fullPath}:`, e); }
                   }
               });
-              // Also clean from playlistFolderPath if different
-              if (itemData.playlistFolderPath && itemData.playlistFolderPath !== DOWNLOAD_DIR) {
-                  files = glob.sync(path.basename(tempPathPattern), { cwd: itemData.playlistFolderPath });
-                  files.forEach(file => {
-                      const fullPath = path.join(itemData.playlistFolderPath, file);
-                      if (fs.existsSync(fullPath)) {
-                          try { fs.unlinkSync(fullPath); } catch (e) { console.error(`[${itemId}] Error cleaning up temp file ${fullPath}:`, e); }
-                      }
-                  });
-              }
-              // Also clean up absolute tempPathPattern if it exists (in case temp files are written elsewhere)
-              if (fs.existsSync(tempPathPattern)) {
-                  try { fs.unlinkSync(tempPathPattern); } catch (e) { console.error(`[${itemId}] Error cleaning up temp file ${tempPathPattern}:`, e); }
-              }
           });
           activeProcesses.delete(itemId);
       }
@@ -753,8 +1017,7 @@ console.log("[server.js] Received FFMPEG_PATH from env: ", process.env.FFMPEG_PA
           sendMessageToClient(clientId, { type: 'status', message: 'Fetching Instagram video info...', itemId, source });
           const videoInfo = await getVideoInfo(clientId, videoUrl, itemId);
           currentVideoTitle = videoInfo.title || currentVideoTitle;
-          const formattedEstimatedSize = videoInfo.fileSize ? formatBytes(videoInfo.fileSize) : null;
-          sendMessageToClient(clientId, { type: 'item_info', itemId, title: currentVideoTitle, estimatedSize: formattedEstimatedSize, source, thumbnail: videoInfo.thumbnail });
+          sendMessageToClient(clientId, { type: 'item_info', itemId, title: currentVideoTitle, source, thumbnail: videoInfo.thumbnail });
 
           // Always use 'Instagram' folder inside DOWNLOAD_DIR
           let targetDir = path.join(DOWNLOAD_DIR, 'Instagram');
@@ -803,7 +1066,17 @@ console.log("[server.js] Received FFMPEG_PATH from env: ", process.env.FFMPEG_PA
               actualSize = formatBytes(stats.size);
           } catch (statError) { console.error(`[${itemId}] Error getting file stats for ${finalFilePathValue}:`, statError); }
 
-          sendMessageToClient(clientId, { type: 'complete', message: `Instagram download complete.`, filename: actualFinalFilenameDisplay, downloadUrl: downloadLink, actualSize: actualSize, itemId, source });
+          sendMessageToClient(clientId, { 
+              type: 'complete', 
+              message: `Instagram download complete.`, 
+              filename: actualFinalFilenameDisplay, 
+              downloadUrl: downloadLink, 
+              actualSize: actualSize, 
+              itemId, 
+              source,
+              downloadFolder: targetDir,
+              fullPath: finalFilePathValue
+          });
 
       } catch (error) {
           if (!itemProcInfo.cancelled) {
@@ -853,349 +1126,640 @@ console.log("[server.js] Received FFMPEG_PATH from env: ", process.env.FFMPEG_PA
   }
 
 
-  // --- Command Execution Wrappers ---
+  // --- Simplified Cookie Path Management ---
   async function getCookiesPath() {
-      const isDev = process.env.NODE_ENV !== 'production';
+      // Simple, fixed location: project_folder/cookies/cookies.txt
+      const cookiesDir = path.join(__dirname, 'cookies');
+      const cookiesPath = path.join(cookiesDir, 'cookies.txt');
       
-      let cookieFilePath = null;
-      const possiblePaths = [];
+      console.log('[getCookiesPath] 📁 Checking cookies at:', cookiesPath);
       
-      if (isDev) {
-            // Development: check project root first, then userData
-          possiblePaths.push(
-              path.join(__dirname, 'cookies.txt'),
-                path.join(os.homedir(), '.video-downloader-gemini', 'cookies.txt')
-          );
-      } else {
-            // Production: Use Electron's userData directory
-            // We need to get this from the main process, but for now we'll construct the standard path
-            const userDataPath = getUserDataPath();
-          possiblePaths.push(
-                path.join(userDataPath, 'cookies.txt'),
-                // Fallback paths
-                path.join(os.homedir(), '.video-downloader-gemini', 'cookies.txt')
-          );
+      // Ensure cookies directory exists
+      if (!fs.existsSync(cookiesDir)) {
+          fs.mkdirSync(cookiesDir, { recursive: true });
+          console.log('[getCookiesPath] 📁 Created cookies directory:', cookiesDir);
       }
-        
-        console.log('[getCookiesPath] Environment:', isDev ? 'Development' : 'Production');
-        console.log('[getCookiesPath] Checking paths:', possiblePaths);
       
-      // Check existing files
-      for (const testPath of possiblePaths) {
-          try {
-              if (fs.existsSync(testPath)) {
-                    const stats = fs.statSync(testPath);
-                    if (stats.isFile() && stats.size > 0) {
-                        console.log(`[getCookiesPath] Found valid cookies.txt at: ${testPath}`);
-                  return testPath;
-                    }
-              }
-          } catch (e) {
-                console.log(`[getCookiesPath] Error checking ${testPath}:`, e.message);
+      // Check if cookies file exists
+      if (fs.existsSync(cookiesPath)) {
+          const stats = fs.statSync(cookiesPath);
+          if (stats.size > 50) {
+              console.log(`[getCookiesPath] ✅ Found cookies file: ${cookiesPath} (${stats.size} bytes)`);
+              return cookiesPath;
+          } else {
+              console.log(`[getCookiesPath] ⚠️ Cookies file too small: ${cookiesPath} (${stats.size} bytes)`);
           }
+      } else {
+          console.log(`[getCookiesPath] ℹ️ No cookies file found at: ${cookiesPath}`);
       }
       
-        console.log(`[getCookiesPath] No cookies.txt found. Downloads will proceed without authentication cookies.`);
-        return null;
-    }
-    
-    // Helper function to get userData path
-    function getUserDataPath() {
-        const os = require('os');
-        const platform = os.platform();
-        const homedir = os.homedir();
-        
-        switch (platform) {
-            case 'win32':
-                return path.join(homedir, 'AppData', 'Roaming', 'Video Downloader Gemini');
-            case 'darwin':
-                return path.join(homedir, 'Library', 'Application Support', 'Video Downloader Gemini');
-            case 'linux':
-                return path.join(homedir, '.config', 'Video Downloader Gemini');
-            default:
-                return path.join(homedir, '.video-downloader-gemini');
-        }
+      return null;
+  }
+
+  // Function that matches Electron's userData path logic exactly
+  function getElectronUserDataPath() {
+      const platform = os.platform();
+      const homedir = os.homedir();
+      
+      // This should match exactly what app.getPath('userData') returns in Electron
+      const appName = 'Video Downloader Gemini';
+      
+      switch (platform) {
+          case 'win32':
+              return path.join(homedir, 'AppData', 'Roaming', appName);
+          case 'darwin':
+              return path.join(homedir, 'Library', 'Application Support', appName);
+          case 'linux':
+              return path.join(homedir, '.config', appName);
+          default:
+              return path.join(homedir, '.video-downloader-gemini');
+      }
+  }
+
+  // Fallback function (renamed from original getUserDataPath)
+  function getUserDataPathFallback() {
+      const platform = os.platform();
+      const homedir = os.homedir();
+      
+      switch (platform) {
+          case 'win32':
+              return path.join(homedir, 'AppData', 'Roaming', 'Video Downloader Gemini');
+          case 'darwin':
+              return path.join(homedir, 'Library', 'Application Support', 'Video Downloader Gemini');
+          case 'linux':
+              return path.join(homedir, '.config', 'Video Downloader Gemini');
+          default:
+              return path.join(homedir, '.video-downloader-gemini');
+      }
+  }
+
+  // Add cookies file validation (RELAXED VERSION)
+  async function validateCookiesFile(filePath) {
+      try {
+          const content = fs.readFileSync(filePath, 'utf8').trim();
+          
+          // Check if it's empty
+          if (!content || content.length < 10) {
+              console.log(`[validateCookiesFile] File too small or empty: ${filePath} (${content.length} bytes)`);
+              return false;
+          }
+          
+          // Much more lenient validation - just check if it has some cookie-like content
+          const lines = content.split('\n');
+          const nonCommentLines = lines.filter(line => {
+              const trimmed = line.trim();
+              return trimmed && !trimmed.startsWith('#') && !trimmed.startsWith('//');
+          });
+          
+          if (nonCommentLines.length === 0) {
+              console.log(`[validateCookiesFile] No non-comment lines found: ${filePath}`);
+              return false;
+          }
+          
+          // Very basic check - if ANY line contains common cookie indicators, consider it valid
+          const hasAnyValidIndicator = content.toLowerCase().includes('youtube') || 
+                                     content.toLowerCase().includes('google') || 
+                                     content.includes('\t') || 
+                                     content.includes('.com') ||
+                                     nonCommentLines.length >= 3; // Or just has multiple lines
+          
+          if (!hasAnyValidIndicator) {
+              console.log(`[validateCookiesFile] No recognizable cookie patterns: ${filePath}`);
+              return false;
+          }
+          
+          console.log(`[validateCookiesFile] ✅ Valid cookies file: ${filePath} (${content.length} chars, ${nonCommentLines.length} cookie lines)`);
+          return true;
+          
+      } catch (e) {
+          console.error(`[validateCookiesFile] Error validating ${filePath}:`, e.message);
+          return false;
+      }
+  }
+
+  // Enhanced cookie testing function (Fixed - removed unsupported --timeout argument)
+  async function testCookieValidity(cookieFilePath, clientId, itemId) {
+      if (!cookieFilePath || !fs.existsSync(cookieFilePath)) {
+          console.log(`[${itemId}] ❌ No cookies file found at: ${cookieFilePath}`);
+          return { valid: false, reason: 'No cookies file' };
+      }
+      
+      try {
+          console.log(`[${itemId}] 🧪 Testing cookie validity with file: ${cookieFilePath}`);
+          
+          // Simple test: just get basic info without downloading - REMOVED --timeout argument
+          const testArgs = [
+              '--cookies', cookieFilePath,
+              '--no-download',
+              '--print', '%(title)s',
+              '--no-warnings',
+              'https://www.youtube.com/watch?v=dQw4w9WgXcQ'
+          ];
+          
+          console.log(`[${itemId}] 🔧 Running simplified test...`);
+          
+          const testResult = await new Promise((resolve) => {
+              const testProc = spawn(ytdlpExecutable, testArgs, { 
+                  stdio: ['ignore', 'pipe', 'pipe']
+              });
+              
+              let stdout = '';
+              let stderr = '';
+              let resolved = false;
+              
+              testProc.stdout.on('data', (data) => {
+                  stdout += data;
+                  console.log(`[${itemId}] 📝 Test stdout: ${data.toString().trim()}`);
+              });
+              
+              testProc.stderr.on('data', (data) => {
+                  stderr += data;
+                  console.log(`[${itemId}] ⚠️ Test stderr: ${data.toString().trim()}`);
+              });
+              
+              testProc.on('close', (code, signal) => {
+                  if (!resolved) {
+                      resolved = true;
+                      console.log(`[${itemId}] 🏁 Test process closed with code: ${code}, signal: ${signal}`);
+                      resolve({ code, stdout: stdout.trim(), stderr: stderr.trim(), signal });
+                  }
+              });
+              
+              testProc.on('error', (error) => {
+                  if (!resolved) {
+                      resolved = true;
+                      console.error(`[${itemId}] 💥 Test process error: ${error.message}`);
+                      resolve({ code: -1, stdout: '', stderr: error.message, error: true });
+                  }
+              });
+              
+              // Manual timeout handling (15 seconds)
+              setTimeout(() => {
+                  if (!resolved) {
+                      resolved = true;
+                      console.log(`[${itemId}] ⏰ Test process timed out, killing...`);
+                      testProc.kill('SIGTERM');
+                      resolve({ code: -1, stdout: stdout.trim(), stderr: 'Process timeout', timeout: true });
+                  }
+              }, 15000);
+          });
+          
+          console.log(`[${itemId}] 📊 Simplified test result - Code: ${testResult.code}, Has output: ${!!testResult.stdout}`);
+          
+          if (testResult.code === 0 && testResult.stdout) {
+              console.log(`[${itemId}] ✅ Cookies are valid! Video title: "${testResult.stdout}"`);
+              return { valid: true, title: testResult.stdout };
+          } else {
+              console.log(`[${itemId}] ❌ Cookie test failed - proceeding without cookies`);
+              if (testResult.stderr) {
+                  console.log(`[${itemId}] 🔍 STDERR details: ${testResult.stderr}`);
+              }
+              if (testResult.timeout) {
+                  console.log(`[${itemId}] ⏰ Test timed out - this might indicate network issues or invalid cookies`);
+              }
+              return { 
+                  valid: false, 
+                  reason: testResult.stderr || testResult.timeout ? 'Timeout' : 'Unknown auth error',
+                  details: testResult
+              };
+          }
+          
+      } catch (error) {
+          console.error(`[${itemId}] 💀 Cookie test exception:`, error.message);
+          console.error(`[${itemId}] Stack trace:`, error.stack);
+          return { valid: false, reason: error.message };
+      }
   }
 
   async function runYtDlpCommand(clientId, baseArgs, itemId, suppressProgress = false, itemProcInfoRef = null) {
-    // Get correct cookies path - may return null if no cookies exist
-      const cookieFilePath = await getCookiesPath();
-      
-      let cookieArgs = [];
+    console.log(`[${itemId}] 🚀 Starting yt-dlp command...`);
+    
+    const cookieFilePath = await getCookiesPath();
+    
+    let cookieArgs = [];
     if (cookieFilePath) {
-          cookieArgs = ['--cookies', cookieFilePath];
-          console.log(`[${itemId}] Using cookies file: ${cookieFilePath}`);
-      } else {
-        console.log(`[${itemId}] No cookies.txt found, proceeding without authentication cookies`);
-      }
+        try {
+            const stats = fs.statSync(cookieFilePath);
+            console.log(`[${itemId}] 📁 Found cookies file: ${cookieFilePath} (${stats.size} bytes)`);
+            
+            // FORCE the cookie test to run and wait for it
+            console.log(`[${itemId}] 🔬 Starting mandatory cookie validity test...`);
+            const cookieTest = await testCookieValidity(cookieFilePath, clientId, itemId);
+            console.log(`[${itemId}] 📊 Cookie test completed:`, cookieTest);
+            
+            if (cookieTest.valid) {
+                console.log(`[${itemId}] ✅ Cookies are valid and working! Using authenticated requests.`);
+                cookieArgs = [
+                    '--cookies', cookieFilePath,
+                    '--extractor-retries', '5',
+                    '--sleep-requests', '1'
+                ];
+                
+                // Send success message to client
+                sendMessageToClient(clientId, {
+                    type: 'status',
+                    message: '✅ Using authenticated cookies for enhanced access',
+                    itemId
+                });
+            } else {
+                console.log(`[${itemId}] ⚠️ Cookies found but not working: ${cookieTest.reason}`);
+                console.log(`[${itemId}] 🔄 Proceeding without cookies (may have limited access)`);
+                
+                // Send warning message to client
+                sendMessageToClient(clientId, {
+                    type: 'status',
+                    message: `⚠️ Cookies invalid (${cookieTest.reason}). Trying without authentication...`,
+                    itemId
+                });
+            }
+        } catch (e) {
+            console.error(`[${itemId}] ❌ Cookie file error: ${e.message}`);
+            sendMessageToClient(clientId, {
+                type: 'status',
+                message: `❌ Cookie error: ${e.message}`,
+                itemId
+            });
+        }
+    } else {
+        console.log(`[${itemId}] ℹ️ No cookies file found - using unauthenticated requests`);
+        sendMessageToClient(clientId, {
+            type: 'status',
+            message: 'ℹ️ No cookies found - using unauthenticated access',
+            itemId
+        });
+    }
 
-      const finalArgs = [...cookieArgs, ...baseArgs, '--encoding', 'utf-8', '--no-colors', '--retries', '3', '--fragment-retries', '3'];
-      if(!suppressProgress) finalArgs.push('--progress', '--newline');
+    // Enhanced arguments for better reliability
+    const finalArgs = [
+        ...cookieArgs, 
+        ...baseArgs, 
+        '--encoding', 'utf-8', 
+        '--no-colors',
+        '--retries', '8', // More retries for auth issues
+        '--fragment-retries', '10', // More fragment retries for 403 errors
+        '--concurrent-fragments', '2', // Very conservative concurrency
+        '--buffer-size', '16384', // Smaller buffer to be less aggressive
+        '--no-part',
+        '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' // Modern user agent
+    ];
+    
+    if(!suppressProgress) finalArgs.push('--progress', '--newline');
 
-      return new Promise((resolve, reject) => {
-          const currentProcInfo = itemProcInfoRef || activeProcesses.get(itemId);
-          if (currentProcInfo?.cancelled) {
-              return reject(new Error(`[${itemId}] Download cancelled before yt-dlp process start.`));
-          }
+    console.log(`[${itemId}] 🎯 Final yt-dlp args:`, finalArgs.slice(0, 10), '... (truncated)');
 
-        console.log(`[${itemId}] Spawning yt-dlp with args: ${finalArgs.join(' ')}`);
-          const ytdlpProc = spawn(ytdlpExecutable, finalArgs, { detached: os.platform() !== 'win32', stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
+    return new Promise((resolve, reject) => {
+        const currentProcInfo = itemProcInfoRef || activeProcesses.get(itemId);
+        if (currentProcInfo?.cancelled) {
+            return reject(new Error(`[${itemId}] Download cancelled before yt-dlp process start.`));
+        }
+
+        console.log(`[${itemId}] 🚀 Starting yt-dlp with enhanced auth handling...`);
+        const ytdlpProc = spawn(ytdlpExecutable, finalArgs, { 
+            detached: os.platform() !== 'win32', 
+            stdio: ['ignore', 'pipe', 'pipe'], 
+            windowsHide: true 
+        });
 
         // ... rest of the function remains the same
-          if (currentProcInfo) currentProcInfo.ytdlpProc = ytdlpProc;
-          else if (itemProcInfoRef && typeof itemProcInfoRef === 'object') itemProcInfoRef.ytdlpProc = ytdlpProc;
+        if (currentProcInfo) currentProcInfo.ytdlpProc = ytdlpProc;
+        else if (itemProcInfoRef && typeof itemProcInfoRef === 'object') itemProcInfoRef.ytdlpProc = ytdlpProc;
 
-          let stdoutData = '';
-          let stderrData = '';
-          let destinationPath = null;
+        let stdoutData = '';
+        let stderrData = '';
+        let destinationPath = null;
 
-          ytdlpProc.stdout.setEncoding('utf8');
-          ytdlpProc.stderr.setEncoding('utf8');
+        ytdlpProc.stdout.setEncoding('utf8');
+        ytdlpProc.stderr.setEncoding('utf8');
 
-          ytdlpProc.stdout.on('data', (data) => {
-              stdoutData += data;
-              if (!suppressProgress) {
-                  const progressMatch = data.match(/\[download\]\s*(\d+\.?\d*)%.*?at\s*([\d.]+(?:[KMG]?i?B)\/s)/);
-                  const destMatch = data.match(/\[download\] Destination:\s*(.*)/) || data.match(/\[Merger\] Merging formats into "([^"]+)"/) || data.match(/\[ExtractAudio\] Destination:\s*(.*)/) ;
-                  const alreadyDownloadedMatch = data.match(/\[download\] (.*?) has already been downloaded/);
+        ytdlpProc.stdout.on('data', (data) => {
+            stdoutData += data;
+            if (!suppressProgress) {
+                const progressMatch = data.match(/\[download\]\s*(\d+\.?\d*)%.*?at\s*([\d.]+(?:[KMG]?i?B)\/s)/);
+                const destMatch = data.match(/\[download\] Destination:\s*(.*)/) || data.match(/\[Merger\] Merging formats into "([^"]+)"/) || data.match(/\[ExtractAudio\] Destination:\s*(.*)/) ;
+                const alreadyDownloadedMatch = data.match(/\[download\] (.*?) has already been downloaded/);
 
-                  if (destMatch && destMatch[1]) {
-                      destinationPath = destMatch[1].trim();
-                  }
-                  if (alreadyDownloadedMatch && alreadyDownloadedMatch[1]) {
-                      sendMessageToClient(clientId, { type: 'progress', percent: 100, message: `Already downloaded: ${path.basename(destinationPath)}`, itemId });
-                  }
+                if (destMatch && destMatch[1]) {
+                    destinationPath = destMatch[1].trim();
+                }
+                if (alreadyDownloadedMatch && alreadyDownloadedMatch[1]) {
+                    sendMessageToClient(clientId, { type: 'progress', percent: 100, message: `Already downloaded: ${path.basename(destinationPath)}`, itemId });
+                }
 
-                  if (progressMatch) {
-                      const percent = parseFloat(progressMatch[1]);
-                      const speed = progressMatch[2];
-                      sendMessageToClient(clientId, { type:'progress', percent, rawSpeed: speed, itemId });
-                  } else if (data.includes('[download]') && data.includes('%')) {
-                       sendMessageToClient(clientId, { type: 'progress', message: data.trim(), itemId });
-                  }
-              }
-          });
+                if (progressMatch) {
+                    const percent = parseFloat(progressMatch[1]);
+                    const speed = progressMatch[2];
+                    sendMessageToClient(clientId, { type:'progress', percent, rawSpeed: speed, itemId });
+                } else if (data.includes('[download]') && data.includes('%')) {
+                     sendMessageToClient(clientId, { type: 'progress', message: data.trim(), itemId });
+                }
+            }
+        });
 
-          ytdlpProc.stderr.on('data', (data) => {
-              stderrData += data;
-          });
+        ytdlpProc.stderr.on('data', (data) => {
+            stderrData += data;
+            
+            // Log 403 errors specifically
+            if (data.includes('403') || data.includes('Forbidden')) {
+                console.log(`[${itemId}] 🚨 Auth error detected: ${data.trim()}`);
+            }
+        });
 
-          ytdlpProc.on('error', (error) => {
-              console.error(`[${itemId}] yt-dlp spawn error using ${ytdlpExecutable}: ${error.message}`);
-              if (currentProcInfo) currentProcInfo.ytdlpProc = null;
-              if (!itemProcInfoRef) activeProcesses.delete(itemId);
-              reject(new Error(`yt-dlp process failed to start (${ytdlpExecutable}): ${error.message}`));
-          });
+        ytdlpProc.on('error', (error) => {
+            console.error(`[${itemId}] yt-dlp spawn error using ${ytdlpExecutable}: ${error.message}`);
+            if (currentProcInfo) currentProcInfo.ytdlpProc = null;
+            if (!itemProcInfoRef) activeProcesses.delete(itemId);
+            reject(new Error(`yt-dlp process failed to start (${ytdlpExecutable}): ${error.message}`));
+        });
 
-          ytdlpProc.on('close', (code, signal) => {
-              if (currentProcInfo) currentProcInfo.ytdlpProc = null;
+        ytdlpProc.on('close', (code, signal) => {
+            if (currentProcInfo) currentProcInfo.ytdlpProc = null;
 
-              if (currentProcInfo?.cancelled) {
-                  return reject(new Error(`Download cancelled for item ${itemId}`));
-              }
-              if (code === 0) {
-                  if (!destinationPath && stdoutData) {
-                      const mergedPathMatch = stdoutData.match(/Merging formats into "([^"]+)"/);
-                      const downloadedPathMatch = stdoutData.match(/\[download\] (.*?) has already been downloaded/);
-                      const extractAudioMatch = stdoutData.match(/\[ExtractAudio\] Destination: (.*)/);
-                      if (mergedPathMatch && mergedPathMatch[1]) destinationPath = mergedPathMatch[1];
-                      else if (extractAudioMatch && extractAudioMatch[1]) destinationPath = extractAudioMatch[1];
-                      else if (downloadedPathMatch && downloadedPathMatch[1]) destinationPath = downloadedPathMatch[1];
-                  }
-                  if (!destinationPath && baseArgs.includes('-o')) {
-                      const outputTemplateIndex = baseArgs.indexOf('-o') + 1;
-                      if (outputTemplateIndex < baseArgs.length) {
-                          const template = baseArgs[outputTemplateIndex];
-                        if (template.includes('%(ext)s')) {
-                            const globPattern = template.replace(/%\([^)]+\)s/g, '*');
-                               try {
-                                  const glob = require('glob');
-                                  const files = glob.sync(path.basename(globPattern), { cwd: path.dirname(template), absolute: true });
-                                if (files.length === 1) {
-                                      destinationPath = files[0];
-                                  } else if (files.length > 1) {
-                                    console.warn(`[${itemId}] Glob matched multiple files for ${globPattern}, cannot determine unique output.`);
-                                  }
-                              } catch (e) { /* console.error(`[${itemId}] Glob error:`, e); */ }
-                        } else if (fs.existsSync(template)) {
-                              destinationPath = template;
-                          }
-                      }
-                  }
-                  resolve({ stdout: stdoutData, stderr: stderrData, actualPath: destinationPath });
-              } else {
-                  const errorMsg = stderrData.split('\n').filter(line => line.toLowerCase().includes('error:')).join('; ') || stderrData.trim() || `yt-dlp exited with code ${code}`;
-                  console.error(`[${itemId}] yt-dlp failed (code ${code}). Error: ${errorMsg}.`);
-                reject(new Error(errorMsg.substring(0, 250)));
-              }
-          });
-      });
-  }
+            if (currentProcInfo?.cancelled) {
+                return reject(new Error(`Download cancelled for item ${itemId}`));
+            }
+            if (code === 0) {
+                if (!destinationPath && stdoutData) {
+                    const mergedPathMatch = stdoutData.match(/Merging formats into "([^"]+)"/);
+                    const downloadedPathMatch = stdoutData.match(/\[download\] (.*?) has already been downloaded/);
+                    const extractAudioMatch = stdoutData.match(/\[ExtractAudio\] Destination: (.*)/);
+                    if (mergedPathMatch && mergedPathMatch[1]) destinationPath = mergedPathMatch[1];
+                    else if (extractAudioMatch && extractAudioMatch[1]) destinationPath = extractAudioMatch[1];
+                    else if (downloadedPathMatch && downloadedPathMatch[1]) destinationPath = downloadedPathMatch[1];
+                }
+                if (!destinationPath && baseArgs.includes('-o')) {
+                    const outputTemplateIndex = baseArgs.indexOf('-o') + 1;
+                    if (outputTemplateIndex < baseArgs.length) {
+                        const template = baseArgs[outputTemplateIndex];
+                      if (template.includes('%(ext)s')) {
+                          const globPattern = template.replace(/%\([^)]+\)s/g, '*');
+                             try {
+                                const glob = require('glob');
+                                const files = glob.sync(path.basename(globPattern), { cwd: path.dirname(template), absolute: true });
+                              if (files.length === 1) {
+                                    destinationPath = files[0];
+                                } else if (files.length > 1) {
+                                  console.warn(`[${itemId}] Glob matched multiple files for ${globPattern}, cannot determine unique output.`);
+                                }
+                            } catch (e) { /* console.error(`[${itemId}] Glob error:`, e); */ }
+                      } else if (fs.existsSync(template)) {
+                            destinationPath = template;
+                        }
+                    }
+                }
+                resolve({ stdout: stdoutData, stderr: stderrData, actualPath: destinationPath });
+            } else {
+                // Enhanced error handling for auth issues
+                let errorMsg = stderrData.split('\n').filter(line => line.toLowerCase().includes('error:')).join('; ') || stderrData.trim() || `yt-dlp exited with code ${code}`;
+                
+                if (errorMsg.includes('403') || errorMsg.includes('Forbidden')) {
+                    if (cookieFilePath) {
+                        errorMsg = `Authentication failed despite cookies. Your cookies may be expired or invalid. Try getting fresh cookies. Original error: ${errorMsg}`;
+                    } else {
+                        errorMsg = `Authentication required (403 Forbidden). This video may require login. Try importing fresh cookies from your browser. Original error: ${errorMsg}`;
+                    }
+                }
+                
+                console.error(`[${itemId}] yt-dlp failed (code ${code}). Error: ${errorMsg}`);
+                reject(new Error(errorMsg.substring(0, 400))); // Longer error message for better error handling
+            }
+        });
+    });
+}
 
-  async function runFFmpegCommand(clientId, ffmpegArgs, itemId, itemProcInfoRef) {
-       return new Promise((resolve, reject) => {
-          const currentProcInfo = itemProcInfoRef || activeProcesses.get(itemId);
-          if (currentProcInfo?.cancelled) {
-              return reject(new Error(`[${itemId}] Conversion cancelled before ffmpeg process start.`));
-          }
+async function runFFmpegCommand(clientId, ffmpegArgs, itemId, itemProcInfoRef) {
+     return new Promise((resolve, reject) => {
+        const currentProcInfo = itemProcInfoRef || activeProcesses.get(itemId);
+        if (currentProcInfo?.cancelled) {
+            return reject(new Error(`[${itemId}] Conversion cancelled before ffmpeg process start.`));
+        }
 
-          sendMessageToClient(clientId, { type: 'status', message: 'Starting conversion...', itemId });
-          // console.log(`[${itemId}] Spawning ffmpeg (${ffmpegExecutable}) with args: ${ffmpegArgs.join(' ')}`);
-          const ffmpegProc = spawn(ffmpegExecutable, ffmpegArgs, { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
-
-
-          if (currentProcInfo) currentProcInfo.ffmpegProc = ffmpegProc;
-          else if (itemProcInfoRef && typeof itemProcInfoRef === 'object') itemProcInfoRef.ffmpegProc = ffmpegProc;
-          // else activeProcesses.set(itemId, { ytdlpProc: null, ffmpegProc, tempFiles: currentProcInfo?.tempFiles || [], cancelled: false });
-
-
-          let ffmpegStderr = '';
-          ffmpegProc.stderr.setEncoding('utf8');
-          ffmpegProc.stderr.on('data', (data) => {
-              ffmpegStderr += data;
-              // console.log(`[${itemId}] FFMPEG STDERR CHUNK: ${data.substring(0,100)}`);
-          });
-
-          ffmpegProc.on('error', (error) => {
-              console.error(`[${itemId}] ffmpeg spawn error using ${ffmpegExecutable}: ${error.message}`);
-              if (currentProcInfo) currentProcInfo.ffmpegProc = null;
-              if(!itemProcInfoRef) activeProcesses.delete(itemId);
-              reject(new Error(`ffmpeg process failed to start (${ffmpegExecutable}): ${error.message}`));
-          });
-
-          ffmpegProc.on('close', (code) => {
-              // console.log(`[${itemId}] ffmpeg process closed with code ${code}`);
-              if (currentProcInfo) currentProcInfo.ffmpegProc = null;
-
-              if (currentProcInfo?.cancelled) {
-                  // console.log(`[${itemId}] ffmpeg process was cancelled (detected on close).`);
-                  return reject(new Error(`Conversion cancelled for item ${itemId}`));
-              }
-              if (code === 0) {
-                  sendMessageToClient(clientId, { type: 'status', message: 'Conversion complete.', itemId });
-                  resolve();
-              } else {
-                  console.error(`[${itemId}] ffmpeg exited with code ${code}. Full stderr:\n${ffmpegStderr}`);
-                  reject(new Error(`ffmpeg conversion failed (code ${code}). Details: ${ffmpegStderr.substring(0, 200)}`));
-              }
-          });
-      });
-  }
+        sendMessageToClient(clientId, { type: 'status', message: 'Starting conversion...', itemId });
+        // console.log(`[${itemId}] Spawning ffmpeg (${ffmpegExecutable}) with args: ${ffmpegArgs.join(' ')}`);
+        const ffmpegProc = spawn(ffmpegExecutable, ffmpegArgs, { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
 
 
-  // --- HTTP Routes ---
-  app.get('/', (req, res) => {
-      res.sendFile(path.join(__dirname, 'index.html'));
-  });
-
-  // Enhanced /video-info route to accept quality and return availableQualities
-  app.post('/video-info', async (req, res) => {
-      const { url: videoUrl, clientId, source, quality = 'highest' } = req.body;
-      if (!videoUrl || !clientId || !source) {
-          return res.status(400).json({ error: 'URL, Client ID, and Source are required.' });
-      }
-      const tempItemId = `info_${source}_${Date.now()}`;
-      try {
-          const info = await getVideoInfo(clientId, videoUrl, tempItemId, quality);
-          res.json({
-              title: info.title,
-              fileSize: info.fileSize ? formatBytes(info.fileSize) : 'N/A',
-              thumbnail: info.thumbnail,
-              source,
-              availableQualities: info.availableQualities
-          });
-      } catch (error) {
-          console.error(`Error in /video-info for ${videoUrl} (${source}):`, error);
-          res.status(500).json({ error: error.message || 'Failed to fetch video info.' });
-      }
-  });
-
-  app.post('/shutdown', (req, res) => {
-      res.json({ message: 'Server shutting down...' });
-      setTimeout(() => gracefulShutdown(), 100); // Give response time to send
-  });
+        if (currentProcInfo) currentProcInfo.ffmpegProc = ffmpegProc;
+        else if (itemProcInfoRef && typeof itemProcInfoRef === 'object') itemProcInfoRef.ffmpegProc = ffmpegProc;
+        // else activeProcesses.set(itemId, { ytdlpProc: null, ffmpegProc, tempFiles: currentProcInfo?.tempFiles || [], cancelled: false });
 
 
-  // --- Server Start & Graceful Shutdown ---
-  server.listen(PORT, async () => {
-      console.log(`Backend server running on http://localhost:${PORT}`);
-      console.log(`Downloads will be saved to: ${DOWNLOAD_DIR}`);
-      
-      // Send server ready message to parent process (Electron)
-      if (process.send) {
-          console.log('Sending server_ready message to parent process...');
-          process.send({ type: 'server_ready', port: PORT });
-      }
-      
-      // Only open browser if not running under Electron
-      if (!process.versions.electron && !process.env.ELECTRON_RUN_AS_NODE) {
-        await open(`http://localhost:${PORT}`);
-      }
-      
-      // Wait a bit for WebSocket server to be fully ready
-      setTimeout(() => {
-          console.log('WebSocket server should be ready now');
-          if (!pLimit) console.warn("p-limit module not loaded yet. Concurrency limiters will be initialized once it loads.");
-          else {
-              console.log(`Using yt-dlp executable: ${ytdlpExecutable}`);
-              console.log(`Using ffmpeg executable: ${ffmpegExecutable}`);
-          }
-          
-          // Send 'ready' message to all connected clients
-          wss.clients.forEach(client => {
-              if (client.readyState === WebSocket.OPEN) {
-                  console.log('Sending ready message to client');
-                  client.send(JSON.stringify({ type: 'ready', message: 'Backend server is ready.' }));
-              }
-          });
-      }, 500); // 500ms delay to ensure everything is set up
-  });
+        let ffmpegStderr = '';
+        ffmpegProc.stderr.setEncoding('utf8');
+        ffmpegProc.stderr.on('data', (data) => {
+            ffmpegStderr += data;
+            // console.log(`[${itemId}] FFMPEG STDERR CHUNK: ${data.substring(0,100)}`);
+        });
 
-  process.on('SIGINT', gracefulShutdown);
-  process.on('SIGTERM', gracefulShutdown);
+        ffmpegProc.on('error', (error) => {
+            console.error(`[${itemId}] ffmpeg spawn error using ${ffmpegExecutable}: ${error.message}`);
+            if (currentProcInfo) currentProcInfo.ffmpegProc = null;
+            if(!itemProcInfoRef) activeProcesses.delete(itemId);
+            reject(new Error(`ffmpeg process failed to start (${ffmpegExecutable}): ${error.message}`));
+        });
 
-  function gracefulShutdown() {
-      console.log('Received shutdown signal. Closing server and cleaning up...');
-      wss.clients.forEach(clientWs => {
-          const clientEntry = Array.from(clients.entries()).find(([id, cws]) => cws === clientWs);
-          if (clientEntry) {
-              sendMessageToClient(clientEntry[0], { type: 'status', message: 'Server is shutting down...' });
-          }
-          clientWs.terminate();
-      });
+        ffmpegProc.on('close', (code) => {
+            // console.log(`[${itemId}] ffmpeg process closed with code ${code}`);
+            if (currentProcInfo) currentProcInfo.ffmpegProc = null;
 
-      server.close(() => {
-          console.log('HTTP server closed.');
-          activeProcesses.forEach((procInfo, itemId) => {
-              console.log(`Terminating active processes for item: ${itemId} during shutdown.`);
-              procInfo.cancelled = true;
-              if (procInfo.ytdlpProc && procInfo.ytdlpProc.pid && !procInfo.ytdlpProc.killed) {
-                  terminateProcessTree(procInfo.ytdlpProc.pid);
-              }
-              if (procInfo.ffmpegProc && procInfo.ffmpegProc.pid && !procInfo.ffmpegProc.killed) {
-                  terminateProcessTree(procInfo.ffmpegProc.pid);
-              }
-          });
-          console.log("Cleanup complete. Exiting.");
-          process.exit(0);
-      });
+            if (currentProcInfo?.cancelled) {
+                // console.log(`[${itemId}] ffmpeg process was cancelled (detected on close).`);
+                return reject(new Error(`Conversion cancelled for item ${itemId}`));
+            }
+            if (code === 0) {
+                sendMessageToClient(clientId, { type: 'status', message: 'Conversion complete.', itemId });
+                resolve();
+            } else {
+                console.error(`[${itemId}] ffmpeg exited with code ${code}. Full stderr:\n${ffmpegStderr}`);
+                reject(new Error(`ffmpeg conversion failed (code ${code}). Details: ${ffmpegStderr.substring(0, 200)}`));
+            }
+        });
+    });
+}
 
-      setTimeout(() => {
-          console.error("Graceful shutdown timed out. Forcing exit.");
-          process.exit(1);
-      }, 10000);
-  }
 
-  // Helper to get playlist title using yt-dlp
-  async function getPlaylistTitle(clientId, playlistUrl, playlistMetaId) {
-      const args = ['--flat-playlist', '--print', '%(playlist_title)s', playlistUrl];
-      try {
-          const { stdout } = await runYtDlpCommand(clientId, args, `playlist_title_${playlistMetaId}`, true);
-          const title = stdout.trim().split('\n')[0];
-          return title || null;
-      } catch (error) {
-          console.error(`[${playlistMetaId}] Error fetching playlist title: ${error.message}`);
-          return null;
-      }
-  }
+// --- HTTP Routes ---
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
+
+// Enhanced /video-info route to accept quality and return availableQualities
+app.post('/video-info', async (req, res) => {
+    const { url: videoUrl, clientId, source, quality = 'highest' } = req.body;
+    if (!videoUrl || !clientId || !source) {
+        return res.status(400).json({ error: 'URL, Client ID, and Source are required.' });
+    }
+    const tempItemId = `info_${source}_${Date.now()}`;
+    try {
+        const info = await getVideoInfo(clientId, videoUrl, tempItemId, quality);
+        res.json({
+            title: info.title,
+            thumbnail: info.thumbnail,
+            source,
+            availableQualities: info.availableQualities
+        });
+    } catch (error) {
+        console.error(`Error in /video-info for ${videoUrl} (${source}):`, error);
+        res.status(500).json({ error: error.message || 'Failed to fetch video info.' });
+    }
+});
+
+app.post('/shutdown', (req, res) => {
+    res.json({ message: 'Server shutting down...' });
+    setTimeout(() => gracefulShutdown(), 100); // Give response time to send
+});
+
+// Tool update endpoints
+app.post('/update-tools', async (req, res) => {
+    try {
+        console.log('🔄 Manual tool update request received');
+        const result = await checkAndUpdateTools();
+        res.json(result);
+    } catch (error) {
+        console.error('❌ Error in manual update endpoint:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.get('/tools-status', async (req, res) => {
+    try {
+        const ytdlpVersion = await getToolVersion(ytdlpExecutable);
+        const ffmpegVersion = await getToolVersion(ffmpegExecutable);
+        
+        const ytdlpLastCheck = getLastUpdateCheck('ytdlp');
+        const ffmpegLastCheck = getLastUpdateCheck('ffmpeg');
+        
+        res.json({
+            ytdlp: {
+                version: ytdlpVersion,
+                lastUpdateCheck: ytdlpLastCheck,
+                daysSinceLastCheck: Math.round((Date.now() - ytdlpLastCheck) / (1000 * 60 * 60 * 24))
+            },
+            ffmpeg: {
+                version: ffmpegVersion,
+                lastUpdateCheck: ffmpegLastCheck,
+                daysSinceLastCheck: Math.round((Date.now() - ffmpegLastCheck) / (1000 * 60 * 60 * 24))
+            }
+        });
+    } catch (error) {
+        console.error('❌ Error getting tools status:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.post('/force-update-tools', async (req, res) => {
+    try {
+        console.log('🔄 Force update request received');
+        
+        // Clear last update check timestamps to force update
+        setLastUpdateCheck('ytdlp'); // Set to current time to reset
+        setLastUpdateCheck('ffmpeg'); // Set to current time to reset
+        
+        // Force update both tools
+        const result = await checkAndUpdateTools();
+        res.json(result);
+    } catch (error) {
+        console.error('❌ Error in force update endpoint:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+
+
+
+
+
+
+
+// --- Server Start & Graceful Shutdown ---
+server.listen(PORT, async () => {
+    console.log(`Backend server running on http://localhost:${PORT}`);
+    console.log(`Downloads will be saved to: ${DOWNLOAD_DIR}`);
+    
+    // Auto-check for tool updates on server start (non-blocking)
+    setTimeout(async () => {
+        try {
+            console.log('🚀 Server started, checking for tool updates...');
+            await checkAndUpdateTools();
+        } catch (error) {
+            console.error('❌ Error during startup tool check:', error);
+        }
+    }, 5000); // Wait 5 seconds after server start
+    
+    // Send server ready message to parent process (Electron)
+    if (process.send) {
+        console.log('Sending server_ready message to parent process...');
+        process.send({ type: 'server_ready', port: PORT });
+    }
+    
+    // Only open browser if not running under Electron
+    if (!process.versions.electron && !process.env.ELECTRON_RUN_AS_NODE) {
+      await open(`http://localhost:${PORT}`);
+    }
+    
+    // Wait a bit for WebSocket server to be fully ready
+    setTimeout(() => {
+        console.log('WebSocket server should be ready now');
+        if (!pLimit) console.warn("p-limit module not loaded yet. Concurrency limiters will be initialized once it loads.");
+        else {
+            console.log(`Using yt-dlp executable: ${ytdlpExecutable}`);
+            console.log(`Using ffmpeg executable: ${ffmpegExecutable}`);
+        }
+        
+        // Send 'ready' message to all connected clients
+        wss.clients.forEach(client => {
+            if (client.readyState === WebSocket.OPEN) {
+                console.log('Sending ready message to client');
+                client.send(JSON.stringify({ type: 'ready', message: 'Backend server is ready.' }));
+            }
+        });
+    }, 500); // 500ms delay to ensure everything is set up
+});
+
+process.on('SIGINT', gracefulShutdown);
+process.on('SIGTERM', gracefulShutdown);
+
+function gracefulShutdown() {
+    console.log('Received shutdown signal. Closing server and cleaning up...');
+    wss.clients.forEach(clientWs => {
+        const clientEntry = Array.from(clients.entries()).find(([id, cws]) => cws === clientWs);
+        if (clientEntry) {
+            sendMessageToClient(clientEntry[0], { type: 'status', message: 'Server is shutting down...' });
+        }
+        clientWs.terminate();
+    });
+
+    server.close(() => {
+        console.log('HTTP server closed.');
+        activeProcesses.forEach((procInfo, itemId) => {
+            console.log(`Terminating active processes for item: ${itemId} during shutdown.`);
+            procInfo.cancelled = true;
+            if (procInfo.ytdlpProc && procInfo.ytdlpProc.pid && !procInfo.ytdlpProc.killed) {
+                terminateProcessTree(procInfo.ytdlpProc.pid);
+            }
+            if (procInfo.ffmpegProc && procInfo.ffmpegProc.pid && !procInfo.ffmpegProc.killed) {
+                terminateProcessTree(procInfo.ffmpegProc.pid);
+            }
+        });
+        console.log("Cleanup complete. Exiting.");
+        process.exit(0);
+    });
+
+    setTimeout(() => {
+        console.error("Graceful shutdown timed out. Forcing exit.");
+        process.exit(1);
+    }, 10000);
+}
+
+// Helper to get playlist title using yt-dlp
+async function getPlaylistTitle(clientId, playlistUrl, playlistMetaId) {
+    const args = ['--flat-playlist', '--print', '%(playlist_title)s', playlistUrl];
+    try {
+        const { stdout } = await runYtDlpCommand(clientId, args, `playlist_title_${playlistMetaId}`, true);
+        const title = stdout.trim().split('\n')[0];
+        return title || null;
+    } catch (error) {
+        console.error(`[${playlistMetaId}] Error fetching playlist title: ${error.message}`);
+        return null;
+    }
+}
 })();
