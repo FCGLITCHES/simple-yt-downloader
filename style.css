@@ -515,57 +515,180 @@ body {
     margin-left: 0;
 }
 
+
+
+/* Enhanced Download Item Buttons Layout */
 .item-buttons {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 0.5rem; /* Space between buttons */
-    margin-left: 0.5rem;
+    gap: 0.6rem;
+    margin-left: 0.8rem;
     padding-top: 0.2rem;
+    min-width: 110px; /* Ensure consistent width */
+}
+
+.item-control-buttons {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    justify-content: center;
+}
+
+.item-control-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: 0.3rem;
+    border: none;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85rem;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 4px var(--shadow-color);
+}
+
+.item-pause-play-btn {
+    background-color: #f39c12;
+    color: #fff;
+}
+
+.item-pause-play-btn:hover {
+    background-color: #e67e22;
+    transform: scale(1.1);
+}
+
+/* When paused (showing play icon), use green color */
+.item-pause-play-btn[title*="Resume"] {
+    background-color: #27ae60;
+}
+
+.item-pause-play-btn[title*="Resume"]:hover {
+    background-color: #229954;
+}
+
+.item-remove-btn {
+    background-color: var(--error-color);
+    color: #fff;
+}
+
+.item-remove-btn:hover {
+    background-color: #b71c1c;
+    transform: scale(1.1);
+    filter: brightness(1.05);
 }
 
 .item-cancel-btn {
     font-size: 0.85rem;
-    padding: 0.35rem 0.7rem;
+    padding: 0.4rem 0.8rem;
     border-radius: 0.4rem;
     cursor: pointer;
-    transition: background-color 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
+    transition: all 0.2s ease;
     border: none;
     white-space: nowrap;
-}
-
-.item-cancel-btn {
     background-color: var(--secondary-color);
     color: var(--header-text);
+    min-width: 80px;
 }
+
 .item-cancel-btn:hover {
     background-color: var(--primary-color);
-    transform: scale(1.05);
-    filter: brightness(1.1);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px var(--shadow-color);
 }
+
 .item-cancel-btn:disabled {
     background-color: var(--border-color);
     color: var(--text-color);
     opacity: 0.6;
     cursor: not-allowed;
     transform: none;
-    filter: none;
+    box-shadow: none;
 }
 
-.item-remove-btn {
-    background-color: var(--error-color);
-    color: #fff;
+/* Compact folder button for completed downloads */
+.compact-folder-btn {
+    background: linear-gradient(135deg, #00b894, #00a085);
+    color: white;
     border: none;
-    padding: 0.3rem 0.6rem; /* slightly smaller */
+    padding: 0.5rem 1rem;
     border-radius: 0.4rem;
+    font-size: 0.85rem;
+    font-weight: 600;
     cursor: pointer;
-    font-size: 0.8rem; /* slightly smaller, maintains ratio */
-    transition: background-color 0.2s ease, transform 0.2s ease, filter 0.2s ease;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    box-shadow: 0 2px 6px rgba(0, 184, 148, 0.3);
+    margin-top: 0.3rem;
+    width: fit-content;
 }
-.item-remove-btn:hover {
-    background-color: #b71c1c;
-    transform: scale(1.05);
-    filter: brightness(1.05);
+
+.compact-folder-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 184, 148, 0.4);
+    background: linear-gradient(135deg, #00a085, #00b894);
+}
+
+.compact-folder-btn:active {
+    transform: translateY(0);
+}
+
+/* Ensure download complete status has proper styling */
+.item-status.success-text {
+    color: var(--success-color);
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+/* Compact mode adjustments */
+body.compact-mode .item-buttons {
+    gap: 0.4rem !important;
+    min-width: 90px !important;
+}
+
+body.compact-mode .item-control-buttons {
+    gap: 0.25rem !important;
+}
+
+body.compact-mode .item-control-btn {
+    width: 24px !important;
+    height: 24px !important;
+    font-size: 0.75rem !important;
+}
+
+body.compact-mode .item-cancel-btn {
+    padding: 0.3rem 0.6rem !important;
+    font-size: 0.8rem !important;
+    min-width: 70px !important;
+}
+
+body.compact-mode .compact-folder-btn {
+    padding: 0.4rem 0.8rem !important;
+    font-size: 0.8rem !important;
+    margin-top: 0.2rem !important;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .item-buttons {
+        min-width: 90px;
+        margin-left: 0.5rem;
+    }
+    
+    .item-control-btn {
+        width: 26px;
+        height: 26px;
+        font-size: 0.8rem;
+    }
+    
+    .item-cancel-btn {
+        font-size: 0.8rem;
+        padding: 0.35rem 0.7rem;
+        min-width: 70px;
+    }
 }
 
 .download-links-container::-webkit-scrollbar { width: 8px; }

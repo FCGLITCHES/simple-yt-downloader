@@ -1193,7 +1193,9 @@ console.log("[server.js] Received FFMPEG_PATH from env: ", process.env.FFMPEG_PA
       }
   }
 
-  // Add cookies file validation (RELAXED VERSION)
+
+
+  // Simple cookie validation without test video
   async function validateCookiesFile(filePath) {
       try {
           const content = fs.readFileSync(filePath, 'utf8').trim();
@@ -1204,7 +1206,7 @@ console.log("[server.js] Received FFMPEG_PATH from env: ", process.env.FFMPEG_PA
               return false;
           }
           
-          // Much more lenient validation - just check if it has some cookie-like content
+          // Basic validation - check if it has cookie-like content
           const lines = content.split('\n');
           const nonCommentLines = lines.filter(line => {
               const trimmed = line.trim();
@@ -1216,14 +1218,14 @@ console.log("[server.js] Received FFMPEG_PATH from env: ", process.env.FFMPEG_PA
               return false;
           }
           
-          // Very basic check - if ANY line contains common cookie indicators, consider it valid
-          const hasAnyValidIndicator = content.toLowerCase().includes('youtube') || 
-                                     content.toLowerCase().includes('google') || 
-                                     content.includes('\t') || 
-                                     content.includes('.com') ||
-                                     nonCommentLines.length >= 3; // Or just has multiple lines
+          // Basic check - if ANY line contains common cookie indicators, consider it valid
+          const hasValidIndicator = content.toLowerCase().includes('youtube') || 
+                                   content.toLowerCase().includes('google') || 
+                                   content.includes('\t') || 
+                                   content.includes('.com') ||
+                                   nonCommentLines.length >= 3;
           
-          if (!hasAnyValidIndicator) {
+          if (!hasValidIndicator) {
               console.log(`[validateCookiesFile] No recognizable cookie patterns: ${filePath}`);
               return false;
           }
@@ -1234,100 +1236,6 @@ console.log("[server.js] Received FFMPEG_PATH from env: ", process.env.FFMPEG_PA
       } catch (e) {
           console.error(`[validateCookiesFile] Error validating ${filePath}:`, e.message);
           return false;
-      }
-  }
-
-  // Enhanced cookie testing function (Fixed - removed unsupported --timeout argument)
-  async function testCookieValidity(cookieFilePath, clientId, itemId) {
-      if (!cookieFilePath || !fs.existsSync(cookieFilePath)) {
-          console.log(`[${itemId}] ❌ No cookies file found at: ${cookieFilePath}`);
-          return { valid: false, reason: 'No cookies file' };
-      }
-      
-      try {
-          console.log(`[${itemId}] 🧪 Testing cookie validity with file: ${cookieFilePath}`);
-          
-          // Simple test: just get basic info without downloading - REMOVED --timeout argument
-          const testArgs = [
-              '--cookies', cookieFilePath,
-              '--no-download',
-              '--print', '%(title)s',
-              '--no-warnings',
-              'https://www.youtube.com/watch?v=dQw4w9WgXcQ'
-          ];
-          
-          console.log(`[${itemId}] 🔧 Running simplified test...`);
-          
-          const testResult = await new Promise((resolve) => {
-              const testProc = spawn(ytdlpExecutable, testArgs, { 
-                  stdio: ['ignore', 'pipe', 'pipe']
-              });
-              
-              let stdout = '';
-              let stderr = '';
-              let resolved = false;
-              
-              testProc.stdout.on('data', (data) => {
-                  stdout += data;
-                  console.log(`[${itemId}] 📝 Test stdout: ${data.toString().trim()}`);
-              });
-              
-              testProc.stderr.on('data', (data) => {
-                  stderr += data;
-                  console.log(`[${itemId}] ⚠️ Test stderr: ${data.toString().trim()}`);
-              });
-              
-              testProc.on('close', (code, signal) => {
-                  if (!resolved) {
-                      resolved = true;
-                      console.log(`[${itemId}] 🏁 Test process closed with code: ${code}, signal: ${signal}`);
-                      resolve({ code, stdout: stdout.trim(), stderr: stderr.trim(), signal });
-                  }
-              });
-              
-              testProc.on('error', (error) => {
-                  if (!resolved) {
-                      resolved = true;
-                      console.error(`[${itemId}] 💥 Test process error: ${error.message}`);
-                      resolve({ code: -1, stdout: '', stderr: error.message, error: true });
-                  }
-              });
-              
-              // Manual timeout handling (15 seconds)
-              setTimeout(() => {
-                  if (!resolved) {
-                      resolved = true;
-                      console.log(`[${itemId}] ⏰ Test process timed out, killing...`);
-                      testProc.kill('SIGTERM');
-                      resolve({ code: -1, stdout: stdout.trim(), stderr: 'Process timeout', timeout: true });
-                  }
-              }, 15000);
-          });
-          
-          console.log(`[${itemId}] 📊 Simplified test result - Code: ${testResult.code}, Has output: ${!!testResult.stdout}`);
-          
-          if (testResult.code === 0 && testResult.stdout) {
-              console.log(`[${itemId}] ✅ Cookies are valid! Video title: "${testResult.stdout}"`);
-              return { valid: true, title: testResult.stdout };
-          } else {
-              console.log(`[${itemId}] ❌ Cookie test failed - proceeding without cookies`);
-              if (testResult.stderr) {
-                  console.log(`[${itemId}] 🔍 STDERR details: ${testResult.stderr}`);
-              }
-              if (testResult.timeout) {
-                  console.log(`[${itemId}] ⏰ Test timed out - this might indicate network issues or invalid cookies`);
-              }
-              return { 
-                  valid: false, 
-                  reason: testResult.stderr || testResult.timeout ? 'Timeout' : 'Unknown auth error',
-                  details: testResult
-              };
-          }
-          
-      } catch (error) {
-          console.error(`[${itemId}] 💀 Cookie test exception:`, error.message);
-          console.error(`[${itemId}] Stack trace:`, error.stack);
-          return { valid: false, reason: error.message };
       }
   }
 
@@ -1342,13 +1250,11 @@ console.log("[server.js] Received FFMPEG_PATH from env: ", process.env.FFMPEG_PA
             const stats = fs.statSync(cookieFilePath);
             console.log(`[${itemId}] 📁 Found cookies file: ${cookieFilePath} (${stats.size} bytes)`);
             
-            // FORCE the cookie test to run and wait for it
-            console.log(`[${itemId}] 🔬 Starting mandatory cookie validity test...`);
-            const cookieTest = await testCookieValidity(cookieFilePath, clientId, itemId);
-            console.log(`[${itemId}] 📊 Cookie test completed:`, cookieTest);
+            // Simple validation without test video
+            const isValid = await validateCookiesFile(cookieFilePath);
             
-            if (cookieTest.valid) {
-                console.log(`[${itemId}] ✅ Cookies are valid and working! Using authenticated requests.`);
+            if (isValid) {
+                console.log(`[${itemId}] ✅ Using cookies for enhanced access`);
                 cookieArgs = [
                     '--cookies', cookieFilePath,
                     '--extractor-retries', '5',
@@ -1358,17 +1264,14 @@ console.log("[server.js] Received FFMPEG_PATH from env: ", process.env.FFMPEG_PA
                 // Send success message to client
                 sendMessageToClient(clientId, {
                     type: 'status',
-                    message: '✅ Using authenticated cookies for enhanced access',
+                    message: '🍪 Using cookies for enhanced access',
                     itemId
                 });
             } else {
-                console.log(`[${itemId}] ⚠️ Cookies found but not working: ${cookieTest.reason}`);
-                console.log(`[${itemId}] 🔄 Proceeding without cookies (may have limited access)`);
-                
-                // Send warning message to client
+                console.log(`[${itemId}] ⚠️ Cookies file found but appears invalid format`);
                 sendMessageToClient(clientId, {
                     type: 'status',
-                    message: `⚠️ Cookies invalid (${cookieTest.reason}). Trying without authentication...`,
+                    message: '⚠️ Cookies found but invalid format. Using standard access...',
                     itemId
                 });
             }
@@ -1381,10 +1284,11 @@ console.log("[server.js] Received FFMPEG_PATH from env: ", process.env.FFMPEG_PA
             });
         }
     } else {
-        console.log(`[${itemId}] ℹ️ No cookies file found - using unauthenticated requests`);
+        console.log(`[${itemId}] ℹ️ No cookies file found - using standard requests`);
+        // Add warning for no cookies
         sendMessageToClient(clientId, {
             type: 'status',
-            message: 'ℹ️ No cookies found - using unauthenticated access',
+            message: 'ℹ️ No cookies found - add cookies for enhanced access',
             itemId
         });
     }
@@ -1413,7 +1317,7 @@ console.log("[server.js] Received FFMPEG_PATH from env: ", process.env.FFMPEG_PA
             return reject(new Error(`[${itemId}] Download cancelled before yt-dlp process start.`));
         }
 
-        console.log(`[${itemId}] 🚀 Starting yt-dlp with enhanced auth handling...`);
+        console.log(`[${itemId}] 🚀 Starting yt-dlp...`);
         const ytdlpProc = spawn(ytdlpExecutable, finalArgs, { 
             detached: os.platform() !== 'win32', 
             stdio: ['ignore', 'pipe', 'pipe'], 

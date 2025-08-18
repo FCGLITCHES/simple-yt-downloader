@@ -196,12 +196,28 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'queued':
                 createDownloadItemStructure(itemId, title || 'Processing...', source, isPlaylistItem);
                 updateDownloadItemStatus(itemId, message || 'Queued...', source);
+                // Show pause/play button and remove button immediately for queued items
+                const queuedItemDiv = document.getElementById(`item-${itemId}`);
+                if (queuedItemDiv) {
+                    const pausePlayBtn = queuedItemDiv.querySelector('.item-pause-play-btn');
+                    const removeBtn = queuedItemDiv.querySelector('.item-remove-btn');
+                    if (pausePlayBtn) pausePlayBtn.style.display = 'inline-flex';
+                    if (removeBtn) removeBtn.style.display = 'inline-flex';
+                }
                 if (currentItemState) currentItemState.status = 'queued';
                 updateDownloadStats();
                 break;
             case 'item_info':
                 if (!downloadItemsState.has(itemId)) {
                     createDownloadItemStructure(itemId, title || 'Fetching info...', source, isPlaylistItem);
+                    // Show pause/play button and remove button for new items
+                    const newItemDiv = document.getElementById(`item-${itemId}`);
+                    if (newItemDiv) {
+                        const pausePlayBtn = newItemDiv.querySelector('.item-pause-play-btn');
+                        const removeBtn = newItemDiv.querySelector('.item-remove-btn');
+                        if (pausePlayBtn) pausePlayBtn.style.display = 'inline-flex';
+                        if (removeBtn) removeBtn.style.display = 'inline-flex';
+                    }
                 }
                 updateDownloadItemTitle(itemId, title, source);
                 if (thumbnail) updateDownloadItemThumbnail(itemId, thumbnail);
@@ -262,6 +278,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 const statusDivForGeneral = source === 'youtube' ? youtubeStatusDiv : instagramStatusDiv;
                 if (statusDivForGeneral) {
                     showStatus(message, source, 'info');
+                }
+                // If this is a download status message, show the pause/play button and remove button
+                if (message && message.includes('Downloading') && itemId) {
+                    const itemDiv = document.getElementById(`item-${itemId}`);
+                    if (itemDiv) {
+                        const pausePlayBtn = itemDiv.querySelector('.item-pause-play-btn');
+                        const removeBtn = itemDiv.querySelector('.item-remove-btn');
+                        if (pausePlayBtn) pausePlayBtn.style.display = 'inline-flex';
+                        if (removeBtn) removeBtn.style.display = 'inline-flex';
+                    }
                 }
                 break;
             case 'playlist_complete':
@@ -337,19 +363,34 @@ document.addEventListener('DOMContentLoaded', () => {
         const buttonsDiv = document.createElement('div');
         buttonsDiv.className = 'item-buttons';
 
+        // Control buttons row (pause, play, remove)
+        const controlButtonsDiv = document.createElement('div');
+        controlButtonsDiv.className = 'item-control-buttons';
+
+        const pausePlayBtn = document.createElement('button');
+        pausePlayBtn.className = 'item-control-btn item-pause-play-btn';
+        pausePlayBtn.innerHTML = '<i class="fas fa-pause"></i>';
+        pausePlayBtn.title = 'Pause download';
+        pausePlayBtn.style.display = 'none';
+        pausePlayBtn.onclick = () => handlePausePlayToggle(itemId, source);
+        controlButtonsDiv.appendChild(pausePlayBtn);
+
+        const removeBtn = document.createElement('button');
+        removeBtn.className = 'item-control-btn item-remove-btn';
+        removeBtn.innerHTML = '<i class="fas fa-times"></i>';
+        removeBtn.title = 'Remove this item';
+        removeBtn.style.display = 'none';
+        removeBtn.onclick = () => handleRemoveDownloadItem(itemId, source);
+        controlButtonsDiv.appendChild(removeBtn);
+
+        buttonsDiv.appendChild(controlButtonsDiv);
+
+        // Cancel button (below control buttons)
         const cancelBtn = document.createElement('button');
         cancelBtn.className = 'item-cancel-btn';
         cancelBtn.textContent = 'Cancel';
         cancelBtn.onclick = () => handleCancelDownload(itemId, source);
         buttonsDiv.appendChild(cancelBtn);
-
-        const removeBtn = document.createElement('button');
-        removeBtn.className = 'item-remove-btn';
-        removeBtn.innerHTML = '<i class="fas fa-times"></i>';
-        removeBtn.title = 'Remove this item';
-        removeBtn.style.display = 'none';
-        removeBtn.onclick = () => handleRemoveDownloadItem(itemId, source);
-        buttonsDiv.appendChild(removeBtn);
 
         itemDiv.appendChild(buttonsDiv);
         linksArea.prepend(itemDiv);
@@ -462,23 +503,30 @@ document.addEventListener('DOMContentLoaded', () => {
             if (progressBar && typeof percent === 'number' && !isNaN(percent)) {
                 progressBar.style.width = `${Math.max(0, Math.min(100, percent))}%`;
             }
+            
+            // Show pause/play button and remove button when download starts (when progress > 0)
+            if (typeof percent === 'number' && percent > 0) {
+                const pausePlayBtn = itemDiv.querySelector('.item-pause-play-btn');
+                const removeBtn = itemDiv.querySelector('.item-remove-btn');
+                if (pausePlayBtn) pausePlayBtn.style.display = 'inline-flex';
+                if (removeBtn) removeBtn.style.display = 'inline-flex';
+            }
         }
     }
 
     function updateDownloadItemComplete(itemId, message, downloadUrl, filename, actualSize, source, fullPath, thumb) {
         const itemDiv = document.getElementById(`item-${itemId}`);
         if (itemDiv) {
-            updateDownloadItemStatus(itemId, message || `Complete: ${filename}`, source, 'success');
+            // Compact status message: "Download complete • filesize"
+            const statusText = `Download complete${actualSize ? ' • ' + actualSize : ''}`;
+            updateDownloadItemStatus(itemId, statusText, source, 'success');
+            
             const linkEl = itemDiv.querySelector('.item-link');
             if (linkEl && downloadUrl && filename) {
                 linkEl.innerHTML = '';
-                const infoSpan = document.createElement('span');
-                infoSpan.className = 'download-complete-label';
-                infoSpan.textContent = `Download complete${actualSize ? ' • ' + actualSize : ''}`;
-                linkEl.appendChild(infoSpan);
-
+                
                 const openFolderBtn = document.createElement('button');
-                openFolderBtn.className = 'modern-folder-btn align-with-complete';
+                openFolderBtn.className = 'modern-folder-btn compact-folder-btn';
                 openFolderBtn.title = 'Open containing folder';
                 openFolderBtn.innerHTML = '<i class="fas fa-folder-open"></i> Open Folder';
                 openFolderBtn.onclick = async () => {
@@ -507,8 +555,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             if (thumb) updateDownloadItemThumbnail(itemId, thumb);
             disableCancelButton(itemId, source);
-            const removeBtn = itemDiv.querySelector('.item-remove-btn');
-            if (removeBtn) removeBtn.style.display = 'inline-block';
+            showActionButtons(itemId);
         }
     }
 
@@ -517,8 +564,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (itemDiv) {
             updateDownloadItemStatus(itemId, `Error: ${errorMessage}`, source, 'error');
             disableCancelButton(itemId, source);
-            const removeBtn = itemDiv.querySelector('.item-remove-btn');
-            if (removeBtn) removeBtn.style.display = 'inline-block';
+            showActionButtons(itemId);
         }
     }
 
@@ -552,6 +598,39 @@ document.addEventListener('DOMContentLoaded', () => {
         downloadItemsState.delete(itemId);
         updateDownloadStats();
         console.log(`Removed item ${itemId} from UI and state.`);
+    }
+
+    function showActionButtons(itemId) {
+        const itemDiv = document.getElementById(`item-${itemId}`);
+        if (itemDiv) {
+            const removeBtn = itemDiv.querySelector('.item-remove-btn');
+            if (removeBtn) removeBtn.style.display = 'inline-flex';
+        }
+    }
+
+    // Dynamic pause/play toggle function
+    function handlePausePlayToggle(itemId, source) {
+        const itemDiv = document.getElementById(`item-${itemId}`);
+        if (itemDiv) {
+            const pausePlayBtn = itemDiv.querySelector('.item-pause-play-btn');
+            if (pausePlayBtn) {
+                const isPaused = pausePlayBtn.innerHTML.includes('fa-play');
+                
+                if (isPaused) {
+                    // Currently paused, resume download
+                    console.log(`[Placeholder] Resuming download for item: ${itemId}, source: ${source}`);
+                    pausePlayBtn.innerHTML = '<i class="fas fa-pause"></i>';
+                    pausePlayBtn.title = 'Pause download';
+                    updateDownloadItemStatus(itemId, 'Resuming...', source);
+                } else {
+                    // Currently downloading, pause download
+                    console.log(`[Placeholder] Pausing download for item: ${itemId}, source: ${source}`);
+                    pausePlayBtn.innerHTML = '<i class="fas fa-play"></i>';
+                    pausePlayBtn.title = 'Resume download';
+                    updateDownloadItemStatus(itemId, 'Paused', source);
+                }
+            }
+        }
     }
 
     // --- Download Initiation ---
