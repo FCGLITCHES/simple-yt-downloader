@@ -1,26 +1,39 @@
-# Dependency and build folders
-node_modules/
-dist/
-downloads/
-bin/
-
-# Large binaries and build artifacts
-*.exe
-*.asar
-*.dll
-*.pak
-*.mp4
-*.zip
-*.bin
-*.dat
-*.blob
+# Hide source code from public view
+*.js
 *.html
+*.css
+*.json
+*.md
+*.ps1
+*.bat
+
+# Dependency folders
+node_modules/
+downloads/
+
+# Build output and large files (exclude from Git, keep locally)
+dist/
+*.exe
+*.zip
+
+# Source control and temporary files
+*.log
+*.tmp
+*.temp
+
+# Media files
+*.mp4
+*.mp3
 *.ico
 *.png
-*.mp3
 
 # Locales and build output
 locales/
 
 # Cookies directory (contains sensitive authentication data)
 cookies/
+
+# Keep only essential binaries for functionality
+!bin/ffmpeg.dll
+!bin/ffmpeg.exe
+!bin/*.dll
