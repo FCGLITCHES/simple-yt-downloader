@@ -1,4 +1,4 @@
-# Hide source code from public view
+# Hide source code from public view (CLOSED SOURCE)
 *.js
 *.html
 *.css
@@ -6,6 +6,16 @@
 *.md
 *.ps1
 *.bat
+
+# Main application source files (CLOSED SOURCE)
+script.js
+server.js
+style.css
+electron-main.js
+preload.js
+index.html
+package.json
+package-lock.json
 
 # Dependency folders
 node_modules/
@@ -37,3 +47,59 @@ cookies/
 !bin/ffmpeg.dll
 !bin/ffmpeg.exe
 !bin/*.dll
+
+# Additional source code patterns (CLOSED SOURCE)
+*.ts
+*.jsx
+*.tsx
+*.vue
+*.svelte
+*.py
+*.java
+*.cpp
+*.c
+*.h
+*.cs
+*.php
+*.rb
+*.go
+*.rs
+*.swift
+*.kt
+*.scala
+*.clj
+*.hs
+*.ml
+*.fs
+*.v
+*.nim
+*.zig
+*.d
+*.pas
+*.bas
+*.asm
+*.s
+*.sh
+*.bash
+*.zsh
+*.fish
+*.ps1
+*.cmd
+*.bat
+*.vbs
+*.js
+*.html
+*.css
+*.xml
+*.yaml
+*.yml
+*.toml
+*.ini
+*.cfg
+*.conf
+*.config
+*.env
+*.env.local
+*.env.development
+*.env.production
+*.env.test
