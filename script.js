@@ -956,11 +956,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (settingsBtn) {
-        settingsBtn.onclick = async () => {
+        settingsBtn.onclick = () => {
             populateSettingsModal();
             if (settingsModal) settingsModal.style.display = 'flex';
-            // Check tools version when settings modal opens
-            await window.checkToolsVersion();
         };
     }
     if (closeSettingsBtn) {
@@ -1334,74 +1332,41 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    window.checkToolsVersion = async function() {
-        try {
-            const response = await fetch('/check-tools-version');
-            const result = await response.json();
-            
-            console.log('📊 Tools Version:', result);
-            
-            // Show version section
-            const versionSection = document.getElementById('toolsVersionSection');
-            if (versionSection) {
-                versionSection.style.display = 'block';
-            }
-            
-            // Update yt-dlp version
-            const ytdlpVersionEl = document.getElementById('ytdlpVersion');
-            if (result.ytdlp && result.ytdlp.installed) {
-                ytdlpVersionEl.textContent = result.ytdlp.version || 'Unknown';
-                ytdlpVersionEl.style.color = 'var(--success-color)';
-            } else {
-                ytdlpVersionEl.textContent = 'Not installed';
-                ytdlpVersionEl.style.color = 'var(--error-color)';
-            }
-            
-            // Update ffmpeg version
-            const ffmpegVersionEl = document.getElementById('ffmpegVersion');
-            if (result.ffmpeg && result.ffmpeg.installed) {
-                ffmpegVersionEl.textContent = result.ffmpeg.version || 'Unknown';
-                ffmpegVersionEl.style.color = 'var(--success-color)';
-            } else {
-                ffmpegVersionEl.textContent = 'Not installed';
-                ffmpegVersionEl.style.color = 'var(--error-color)';
-            }
-            
-            return result;
-        } catch (error) {
-            console.error('❌ Error checking tools version:', error);
-            return null;
-        }
-    };
-
     window.updateTools = async function() {
         console.log('=== Updating Tools ===');
         try {
             console.log('🔄 Starting tool updates...');
             
-            const response = await fetch('/update-tools', { 
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ platform: navigator.platform.toLowerCase().indexOf('win') !== -1 ? 'win32' : 'os.platform()' })
-            });
+            const response = await fetch('/update-tools', { method: 'POST' });
             const result = await response.json();
             
             console.log('📊 Update Results:', result);
             
-            if (result.success) {
-                console.log('✅ Tools update process started successfully');
-                alert('Tools are being updated in the background. Please check the terminal for progress.');
-                // Refresh version info after a delay
-                setTimeout(() => window.checkToolsVersion(), 3000);
-            } else {
-                console.error('❌ Update failed:', result.error);
-                alert('Failed to start update process: ' + result.error);
+            // Display results
+            if (result.ytdlp) {
+                if (result.ytdlp.updated) {
+                    console.log(`✅ yt-dlp updated: ${result.ytdlp.oldVersion} → ${result.ytdlp.newVersion}`);
+                } else {
+                    console.log(`ℹ️ yt-dlp: ${result.ytdlp.reason || result.ytdlp.error || 'No update needed'}`);
+                }
+            }
+            
+            if (result.ffmpeg) {
+                if (result.ffmpeg.hasUpdate) {
+                    console.log(`🔄 FFmpeg update available: ${result.ffmpeg.latestVersion}`);
+                    console.log(`💡 Note: FFmpeg requires manual download from https://ffmpeg.org/download.html`);
+                } else {
+                    console.log(`ℹ️ FFmpeg: ${result.ffmpeg.reason || 'No update needed'}`);
+                }
+            }
+            
+            if (result.error) {
+                console.error('❌ Update error:', result.error);
             }
             
             return result;
         } catch (error) {
             console.error('❌ Error updating tools:', error);
-            alert('Error updating tools. Check console for details.');
             return null;
         }
     };

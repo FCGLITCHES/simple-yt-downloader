@@ -1,7 +1,7 @@
 {
-  "name": "video-downloader-gemini",
+  "name": "simply-ytd",
   "version": "1.0.0",
-  "description": "Desktop application for video downloading and conversion",
+  "description": "SimplyYTD - Desktop application for video downloading and conversion",
   "main": "electron-main.js",
   "scripts": {
     "start": "node server.js",
@@ -9,9 +9,13 @@
     "electron:dev": "cross-env NODE_ENV=development electron .",
     "electron": "cross-env NODE_ENV=production electron .",
     "build": "npm run build:win",
-    "build:win": "electron-packager . \"Video Downloader Gemini\" --platform=win32 --arch=x64 --out=dist --prune=true --asar --icon=./public/Logo_1.ico --extra-resource=./bin --extra-resource=./assets --extra-resource=./public"
+    "build:win": "electron-packager . \"SimplyYTD\" --platform=win32 --arch=x64 --out=dist --prune=true --asar --asarUnpack=\"{cookies/**,*.json}\" --icon=./public/Logo_1.ico --extra-resource=./bin --extra-resource=./assets --extra-resource=./public",
+    "build:mac": "electron-packager . \"SimplyYTD\" --platform=darwin --arch=x64 --out=dist --prune=true --asar --asarUnpack=\"{cookies/**,*.json}\" --icon=./public/Logo_1.ico --extra-resource=./bin --extra-resource=./assets --extra-resource=./public",
+    "build:linux": "electron-packager . \"SimplyYTD\" --platform=linux --arch=x64 --out=dist --prune=true --asar --asarUnpack=\"{cookies/**,*.json}\" --icon=./public/Logo_1.ico --extra-resource=./bin --extra-resource=./assets --extra-resource=./public"
   },
   "keywords": [
+    "simplyytd",
+    "simply-ytd",
     "video",
     "downloader",
     "converter",
@@ -22,6 +26,7 @@
   "author": "FCGLITCHES",
   "license": "ISC",
   "dependencies": {
+    "adm-zip": "^0.5.16",
     "cors": "^2.8.5",
     "express": "^4.19.2",
     "get-port": "^7.1.0",

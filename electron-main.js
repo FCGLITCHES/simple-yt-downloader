@@ -1,5 +1,8 @@
 // electron-main.js - Main process for Electron application
-const { app, BrowserWindow, ipcMain, dialog, shell, clipboard } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, clipboard, powerSaveBlocker } = require('electron');
+
+// Set application name
+app.setName('SimplyYTD');
 const path = require('path');
 const { fork } = require('child_process');
 const fs = require('fs');
@@ -8,7 +11,7 @@ const net = require('net'); // Required for server readiness check
 
 let mainWindow;
 let serverProcess;
-let serverPort = 9875; // Fixed port as requested
+let serverPort = process.env.PORT || 9875; // Will be updated when server starts
 
 // --- Determine Paths for Packaged App ---
 const isDev = process.env.NODE_ENV !== 'production';
@@ -103,6 +106,7 @@ async function createWindow() {
     mainWindow = new BrowserWindow({
       width: lastState.width,
       height: lastState.height,
+      title: 'SimplyYTD - Video Downloader',
       show: false, // Don't show until ready
       webPreferences: {
         nodeIntegration: false,
@@ -213,9 +217,6 @@ function startServer() {
       }
     );
 
-    // Set up server exit handler immediately
-    serverProcess.on('exit', handleServerExit);
-
     // Wait for server to be ready
     serverProcess.on('message', (msg) => {
       console.log('Message from server process:', msg);
@@ -239,13 +240,9 @@ function startServer() {
   });
 }
 
-// Enhanced server exit handler with cleanup
-function handleServerExit(code, signal) {
+// Add server exit handler
+serverProcess?.on('exit', (code, signal) => {
   console.log(`Server process exited with code ${code} and signal ${signal}`);
-  
-  // Clean up any remaining child processes
-  cleanupAllProcesses();
-  
   if (code !== 0 && !serverProcess?.killed) {
     dialog.showMessageBox(mainWindow || null, {
       type: 'warning',
@@ -254,51 +251,7 @@ function handleServerExit(code, signal) {
     });
   }
   serverProcess = null;
-}
-
-// Function to cleanup all related processes
-function cleanupAllProcesses() {
-  console.log('Cleaning up all related processes...');
-  
-  // Kill any remaining yt-dlp processes
-  try {
-    if (os.platform() === 'win32') {
-      require('child_process').exec('taskkill /f /im yt-dlp.exe', (error) => {
-        if (error && !error.message.includes('not found')) {
-          console.error('Error killing yt-dlp processes:', error);
-        }
-      });
-    } else {
-      require('child_process').exec('pkill -f yt-dlp', (error) => {
-        if (error && !error.message.includes('No matching processes')) {
-          console.error('Error killing yt-dlp processes:', error);
-        }
-      });
-    }
-  } catch (e) {
-    console.error('Error in yt-dlp cleanup:', e);
-  }
-  
-  // Kill any remaining ffmpeg processes
-  try {
-    if (os.platform() === 'win32') {
-      require('child_process').exec('taskkill /f /im ffmpeg.exe', (error) => {
-        if (error && !error.message.includes('not found')) {
-          console.error('Error killing ffmpeg processes:', error);
-        }
-      });
-    } else {
-      require('child_process').exec('pkill -f ffmpeg', (error) => {
-        if (error && !error.message.includes('No matching processes')) {
-          console.error('Error killing ffmpeg processes:', error);
-        }
-      });
-    }
-  } catch (e) {
-    console.error('Error in ffmpeg cleanup:', e);
-  }
-}
-
+});
 
 app.on('ready', async () => {
   try {
@@ -310,9 +263,6 @@ app.on('ready', async () => {
 });
 
 app.on('window-all-closed', () => {
-  console.log('All windows closed. Cleaning up processes...');
-  cleanupAllProcesses();
-  
   if (process.platform !== 'darwin') {
     app.quit();
   }
@@ -322,33 +272,13 @@ app.on('before-quit', (event) => {
   console.log('App before-quit event triggered.');
   if (serverProcess && !serverProcess.killed) {
     console.log('Attempting to kill server process...');
-    
-    // First try graceful shutdown
     const killed = serverProcess.kill('SIGTERM');
     if (killed) {
-      console.log('Sent SIGTERM to server process. Waiting for graceful shutdown...');
-      
-      // Wait for graceful shutdown with timeout
-      const shutdownTimeout = setTimeout(() => {
-        if (serverProcess && !serverProcess.killed) {
-          console.log('Graceful shutdown timeout. Force killing server process...');
-          try {
-            serverProcess.kill('SIGKILL');
-          } catch (e) {
-            console.error('Error force killing server process:', e);
-          }
-        }
-      }, 3000); // 3 second timeout for graceful shutdown
-      
-      serverProcess.on('exit', () => {
-        clearTimeout(shutdownTimeout);
-        console.log('Server process exited gracefully.');
-        serverProcess = null;
-      });
+      console.log('Sent SIGTERM to server process. Waiting for exit...');
     } else {
       console.log('Failed to send SIGTERM or process already exited.');
-      serverProcess = null;
     }
+    serverProcess = null;
   }
 });
 
@@ -391,50 +321,61 @@ ipcMain.handle('get-userdata-path', async () => {
     return app.getPath('userData');
 });
 
-// Update the save-cookies-txt handler
+// Update the save-cookies-txt handler (Using userData directory)
 ipcMain.handle('save-cookies-txt', async (event, content) => {
-  try {
-        // Save cookies to project directory only for easy access
-        const projectFilePath = path.join(__dirname, 'cookies.txt');
+    try {
+        // Save to userData directory for runtime modification
+        const userDataPath = app.getPath('userData');
+        const cookiesDir = path.join(userDataPath, 'cookies');
+        const cookiesPath = path.join(cookiesDir, 'cookies.txt');
         
-        // In production (packaged app), __dirname points to app.asar
-        // We need to save to resources folder instead
-        let cookieFilePath;
-        if (app.isPackaged) {
-            // When packaged, save to resources folder (outside app.asar)
-            cookieFilePath = path.join(process.resourcesPath, 'cookies.txt');
-        } else {
-            // Development mode - save to project directory
-            cookieFilePath = path.join(__dirname, 'cookies.txt');
+        // Ensure cookies directory exists
+        if (!fs.existsSync(cookiesDir)) {
+            fs.mkdirSync(cookiesDir, { recursive: true });
+            console.log(`[save-cookies-txt] Created cookies directory: ${cookiesDir}`);
         }
         
-        console.log(`[save-cookies-txt] Saving cookies to: ${cookieFilePath}`);
-        fs.writeFileSync(cookieFilePath, content, 'utf8');
+        console.log(`[save-cookies-txt] Saving cookies to: ${cookiesPath}`);
+        fs.writeFileSync(cookiesPath, content, 'utf8');
         
-    return { success: true, path: cookieFilePath };
-  } catch (err) {
-    console.error('Failed to save cookies.txt:', err);
-    return { success: false, error: err.message };
-  }
+        return { success: true, path: cookiesPath };
+    } catch (err) {
+        console.error('Failed to save cookies.txt:', err);
+        return { success: false, error: err.message };
+    }
 });
 
-// Add handler to get cookies content (for the cookies helper)
+// Add handler to get cookies content (for the cookies helper) (Using userData directory)
 ipcMain.handle('get-cookies-txt', async () => {
     try {
-        // Get cookies from project directory or resources folder
-        let cookieFilePath;
-        if (app.isPackaged) {
-            // When packaged, read from resources folder (outside app.asar)
-            cookieFilePath = path.join(process.resourcesPath, 'cookies.txt');
-        } else {
-            // Development mode - read from project directory
-            cookieFilePath = path.join(__dirname, 'cookies.txt');
+        const userDataPath = app.getPath('userData');
+        const cookiesDir = path.join(userDataPath, 'cookies');
+        const cookiesPath = path.join(cookiesDir, 'cookies.txt');
+        
+        // Ensure cookies directory exists
+        if (!fs.existsSync(cookiesDir)) {
+            fs.mkdirSync(cookiesDir, { recursive: true });
         }
         
-        if (fs.existsSync(cookieFilePath)) {
-            const content = fs.readFileSync(cookieFilePath, 'utf8');
-            return { success: true, content, path: cookieFilePath };
+        if (fs.existsSync(cookiesPath)) {
+            const content = fs.readFileSync(cookiesPath, 'utf8');
+            return { success: true, content, path: cookiesPath };
         } else {
+            // Check for migration from old project directory
+            const oldCookiesPath = path.join(__dirname, 'cookies', 'cookies.txt');
+            if (fs.existsSync(oldCookiesPath)) {
+                console.log(`[get-cookies-txt] 🔄 Migrating cookies from old location: ${oldCookiesPath}`);
+                try {
+                    const content = fs.readFileSync(oldCookiesPath, 'utf8');
+                    if (content.length > 50) {
+                        fs.writeFileSync(cookiesPath, content, 'utf8');
+                        console.log(`[get-cookies-txt] ✅ Successfully migrated cookies to: ${cookiesPath}`);
+                        return { success: true, content, path: cookiesPath };
+                    }
+                } catch (err) {
+                    console.error(`[get-cookies-txt] ❌ Failed to migrate cookies:`, err);
+                }
+            }
             return { success: false, error: 'Cookies file not found' };
         }
     } catch (err) {
@@ -478,29 +419,29 @@ function saveCookieWindowState(win) {
 // Enhanced cookie helper with window state persistence
 ipcMain.handle('open-cookies-helper', async () => {
     const savedState = loadCookieWindowState();
-    const win = new BrowserWindow({
+  const win = new BrowserWindow({
         width: savedState.width,
         height: savedState.height,
         x: savedState.x,
         y: savedState.y,
-        webPreferences: {
-            nodeIntegration: false,
-            contextIsolation: true,
-            preload: path.join(__dirname, 'preload.js')
-        },
-        parent: mainWindow,
-        modal: false,
-        show: true,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      preload: path.join(__dirname, 'preload.js')
+    },
+    parent: mainWindow,
+    modal: false,
+    show: true,
         title: 'Import YouTube Cookies',
         minWidth: 320,
         minHeight: 200,
         resizable: true
-    });
-    win.setMenuBarVisibility(false);
+  });
+  win.setMenuBarVisibility(false);
     win.on('resize', () => saveCookieWindowState(win));
     win.on('move', () => saveCookieWindowState(win));
-    win.loadFile(path.join(__dirname, 'public', 'cookies.html'));
-    return true;
+  win.loadFile(path.join(__dirname, 'public', 'cookies.html'));
+  return true;
 });
 
 // Add file upload handler for cookies
@@ -621,3 +562,56 @@ ipcMain.handle('normalize-path', async (event, filePath) => {
         return filePath; // Return original if normalization fails
     }
 });
+
+// Power Save Blocker handlers
+let powerSaveBlockerId = null;
+
+ipcMain.handle('start-power-save-blocker', async () => {
+    try {
+        // If we have no ID or the blocker with current ID isn't running
+        if (powerSaveBlockerId === null || !powerSaveBlocker.isStarted(powerSaveBlockerId)) {
+            // Stop any existing blocker just in case
+            if (powerSaveBlockerId !== null) {
+                try {
+                    powerSaveBlocker.stop(powerSaveBlockerId);
+                } catch (e) {
+                    // Ignore errors when stopping
+                }
+            }
+            
+            // Start fresh
+            powerSaveBlockerId = powerSaveBlocker.start('prevent-app-suspension');
+            console.log('Power save blocker started:', powerSaveBlockerId);
+            return { success: true, id: powerSaveBlockerId };
+        } else {
+            // Already running
+            console.log('Power save blocker already active:', powerSaveBlockerId);
+            return { success: true, id: powerSaveBlockerId }; // Return success, not failure!
+        }
+    } catch (error) {
+        console.error('Error starting power save blocker:', error);
+        powerSaveBlockerId = null;
+        return { success: false, error: error.message };
+    }
+});
+
+ipcMain.handle('stop-power-save-blocker', async () => {
+    try {
+        if (powerSaveBlockerId !== null && powerSaveBlocker.isStarted(powerSaveBlockerId)) {
+            powerSaveBlocker.stop(powerSaveBlockerId);
+            console.log('Power save blocker stopped:', powerSaveBlockerId);
+            powerSaveBlockerId = null;
+            return { success: true };
+        } else {
+            console.log('No active power save blocker to stop');
+            powerSaveBlockerId = null; // Reset state
+            return { success: true }; // Return success, not failure!
+        }
+    } catch (error) {
+        console.error('Error stopping power save blocker:', error);
+        powerSaveBlockerId = null;
+        return { success: false, error: error.message };
+    }
+});
+
+
