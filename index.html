@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy"
+          content="default-src 'self';
+                   script-src 'self';
+                   style-src 'self' https://cdnjs.cloudflare.com 'unsafe-inline';
+                   font-src 'self' https://cdnjs.cloudflare.com;
+                   img-src 'self' data: https:;
+                   connect-src 'self' http://localhost:* ws://localhost:*;">
+    <title>SimplyYTD - Video Downloader</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" xintegrity="sha512-9usAa10IRO0HhonpyAIVpjrylPvoDwiPUiKdWk5t3PyolY1cOd4DSE0Ga+ri4AuTroPR5aQvXU9xC6qOPnzFeg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <link rel="icon" type="image/png" href="./assets/Logo 1.png">
+</head>
+<body>
+    <div class="background-shapes">
+        <div class="shape s1"></div>
+        <div class="shape s2"></div>
+        <div class="shape s3"></div>
+        <div class="shape s4"></div>
+        <div class="shape s5"></div>
+        <div class="shape s6"></div>
+        <div class="shape s7"></div>
+    </div>
+
+    <header class="header">
+        <div class="logo-container">
+            <img src="./assets/Logo 1.png" alt="Simple YTD Logo" class="logo">
+            <span class="logo-text">Simple YT Downloader</span>
+        </div>
+        <div class="header-buttons">
+            <!-- Enhanced Mini Widgets -->
+            <div class="header-widget speed-widget">
+                <label for="headerSpeedSlider">Speed:</label>
+                <input type="range" id="headerSpeedSlider" min="0" max="5000" step="100" value="0">
+                <output id="speedValue">∞</output>
+            </div>
+            <div class="header-widget theme-widget">
+                <select id="headerThemeSelect" class="quick-theme-select">
+                    <option value="light">Light</option>
+                    <option value="dark">Dark</option>
+                    <option value="minimal">Minimal</option>
+                    <option value="vibrant">Vibrant</option>
+                </select>
+            </div>
+            <div class="header-widget download-stats">
+                <div class="stat-item">
+                    <span class="stat-label">Queued:</span>
+                    <span id="queuedCount" class="stat-value">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Downloading:</span>
+                    <span id="downloadingCount" class="stat-value">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Downloaded:</span>
+                    <span id="downloadedCount" class="stat-value">0</span>
+                </div>
+            </div>
+            <button id="settingsBtn" class="settings-btn" aria-label="Open settings" title="Open settings">
+                <i class="fas fa-cog"></i>
+            </button>
+        </div>
+    </header>
+
+    <nav class="navigation main-nav">
+      <a href="#" id="youtubeTab" class="nav-link active">Video</a>
+      <a href="#" id="instagramTab" class="nav-link">Instagram</a>
+      <a href="#" id="historyTab" class="nav-link">History</a>
+    </nav>
+
+    <main class="container">
+        <div id="youtubeDownloader">
+            <div class="downloader-layout">
+                <div class="card main-downloader">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <h2><i class="fab fa-youtube downloader-icon video-icon"></i> Download Videos</h2>
+                    </div>
+                    <p class="subtitle">Convert videos to MP4 or MP3 format quickly.</p>
+                    <!-- 1. YouTube URL input with paste button inside (input adornment) -->
+                    <div class="form-group" style="position: relative; width: 100%;">
+                        <label for="youtubeUrl" class="visually-hidden">Video URL</label>
+                        <input type="url" id="youtubeUrl" placeholder="Paste video URL here" class="input-field" style="width: 100%; padding-right: 40px;" />
+                        <button id="pasteYoutubeUrlBtn" class="input-adornment-btn" type="button" title="Paste from clipboard" style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%);">
+                            <i class="fas fa-paste"></i>
+                        </button>
+                    </div>
+
+                    <div class="options-grid">
+                        <div class="form-group">
+                            <label for="format">Format:</label>
+                            <select id="format" class="select-field" aria-label="Select download format">
+                                <option value="mp4">MP4 Video</option>
+                                <option value="mp3">MP3 Audio</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="quality">Quality:</label>
+                            <select id="quality" class="select-field" aria-label="Select download quality"></select>
+                        </div>
+                    </div>
+
+                    <div class="form-group single-concurrency-options">
+                        <label>Single Video Downloads:</label>
+                         <div class="radio-group">
+                             <input type="radio" id="singleConcurrency1" name="singleConcurrency" value="1" checked>
+                             <label for="singleConcurrency1">1 at a time</label>
+                             <input type="radio" id="singleConcurrency3" name="singleConcurrency" value="3">
+                             <label for="singleConcurrency3">3 at a time</label>
+                         </div>
+                    </div>
+
+                    <div id="playlistOptions" class="playlist-options" style="display: none;">
+                        <h4>Playlist Detected</h4>
+                        <p>This URL contains multiple videos. Choose how to proceed:</p>
+                        <div class="form-group">
+                            <label for="playlistAction">Action:</label>
+                            <select id="playlistAction" class="select-field" aria-label="Playlist download action">
+                                <option value="single">Download Only This Video</option>
+                                <option value="full">Download Entire Playlist</option>
+                            </select>
+                        </div>
+                        <div class="form-group" id="concurrencyGroup" style="display: none;">
+                            <label for="concurrency">Playlist Concurrent Downloads:</label>
+                             <select id="concurrency" class="select-field" aria-label="Playlist concurrent downloads">
+                                <option value="1">1 at a time</option>
+                                <option value="3" selected>3 at a time</option>
+                                <option value="5">5 at a time</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <button id="startYoutubeDownloadBtn" class="download-btn">
+                        <i class="fas fa-download"></i>
+                        <span class="btn-text">Download Now</span>
+                    </button>
+                    <div id="status" class="status-message" role="status" aria-live="polite"></div>
+                </div>
+                <div id="downloadLinksArea" class="download-links-container" style="padding-top: 0.5rem;">
+                    <button id="clearYoutubeDownloadsBtn" class="download-btn danger-btn" type="button" title="Delete all downloads" style="position:sticky;top:0.25rem;z-index:2;"><i class="fas fa-trash"></i> Delete All</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="instagramDownloader" style="display: none;">
+            <div class="downloader-layout">
+                <div class="card instagram-downloader">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <h2><i class="fab fa-instagram downloader-icon instagram-icon"></i> Download Instagram Videos</h2>
+                    </div>
+                    <p class="subtitle instagram-subtitle">Download Instagram videos and reels in MP4 format.</p>
+                    <!-- 1. Instagram URL input with paste button inside (input adornment) -->
+                    <div class="form-group" style="position: relative; width: 100%;">
+                        <label for="instagramUrl" class="visually-hidden">Instagram URL</label>
+                        <input type="url" id="instagramUrl" placeholder="Paste Instagram URL here" class="input-field" style="width: 100%; padding-right: 40px;" />
+                        <button id="pasteInstagramUrlBtn" class="input-adornment-btn" type="button" title="Paste from clipboard" style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%);">
+                            <i class="fas fa-paste"></i>
+                        </button>
+                    </div>
+                    <div class="options-grid"> <div class="form-group">
+                             <label for="instagramQuality">Quality:</label>
+                             <select id="instagramQuality" class="select-field" aria-label="Select Instagram video quality"></select>
+                         </div>
+                         <div></div> </div>
+                    <button id="startInstagramDownloadBtn" class="download-btn">
+                        <span class="btn-text">Download Video</span>
+                        <i class="fas fa-download"></i>
+                    </button>
+                    <div id="instagramStatus" class="status-message" role="status" aria-live="polite"></div>
+                </div>
+                <div id="instagramDownloadLinksArea" class="download-links-container" style="padding-top: 0.5rem;">
+                    <button id="clearInstagramDownloadsBtn" class="download-btn danger-btn" type="button" title="Delete all downloads" style="position:sticky;top:0.25rem;z-index:2;"><i class="fas fa-trash"></i> Delete All</button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- ===== HISTORY PANEL ===== -->
+    <div id="historyPanel" style="display:none;">
+        <div class="history-layout">
+            <aside class="history-sidebar">
+                <ul class="history-tabs">
+                    <li><button class="history-tab active" data-history="youtubeSingles">Video Singles</button></li>
+                    <li><button class="history-tab" data-history="youtubePlaylists">Video Playlists</button></li>
+                    <li><button class="history-tab" data-history="instagram">Instagram</button></li>
+                </ul>
+                <div class="sidebar-actions-container">
+                    <button id="bulkSelectBtn" class="download-btn sidebar-btn">
+                        <i class="fas fa-check-square"></i>
+                        <span class="btn-text">Bulk Select</span>
+                    </button>
+                    <button id="clearHistoryBtn" class="download-btn danger-btn sidebar-btn">
+                        <i class="fas fa-trash"></i>
+                        <span class="btn-text">Clear All</span>
+                    </button>
+                </div>
+            </aside>
+            <section class="history-content">
+                <div class="history-header">
+                    <!-- Search Bar -->
+                    <div class="history-search-group">
+                        <div class="search-input-wrapper">
+                            <input type="text" id="historySearch" placeholder="Search by title or filename..." class="input-field history-search-input">
+                            <button id="clearSearchBtn" class="clear-search-btn" title="Clear search">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <!-- Filters -->
+                    <div class="history-filters-row">
+                        <div class="filter-group">
+                            <label for="timeFilter">Show:</label>
+                            <select id="timeFilter" class="select-field time-filter-select">
+                                <option value="all">All Time</option>
+                                <option value="today">Today</option>
+                                <option value="week">Last 7 Days</option>
+                                <option value="month">Last 30 Days</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label for="sortBy">Sort by:</label>
+                            <select id="sortBy" class="select-field sort-select">
+                                <option value="newest">Newest First</option>
+                                <option value="oldest">Oldest First</option>
+                                <option value="name">Name A-Z</option>
+                                <option value="size">File Size</option>
+                            </select>
+                        </div>
+                        <div class="item-count-group">
+                            <span id="itemCount" class="item-count">0 items</span>
+                        </div>
+                    </div>
+                </div>
+                <!-- Bulk Actions (separate row, hidden by default) -->
+                <div id="historyBulkActions" class="history-bulk-actions-row" style="display: none;">
+                    <div class="bulk-actions-container">
+                        <button id="selectAllHistoryBtn" class="bulk-action-btn">
+                            <i class="fas fa-check-square"></i> Select All
+                        </button>
+                        <button id="deselectAllHistoryBtn" class="bulk-action-btn">
+                            <i class="fas fa-square"></i> Deselect All
+                        </button>
+                        <button id="deleteSelectedBtn" class="bulk-action-btn danger">
+                            <i class="fas fa-trash"></i> Delete Selected
+                        </button>
+                        <button id="cancelSelectionBtn" class="bulk-action-btn secondary">
+                            <i class="fas fa-times"></i> Cancel
+                        </button>
+                        <span id="selectedCount" class="selected-count">0 selected</span>
+                    </div>
+                </div>
+                <!-- History Lists -->
+                <div class="history-lists-container">
+                    <div id="historyYoutubePlaylists" class="history-list active"></div>
+                    <div id="historyYoutubeSingles" class="history-list"></div>
+                    <div id="historyInstagram" class="history-list"></div>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <!-- Removed: How to Use and Features sections -->
+
+    <footer class="footer">
+        <div class="container">
+            <p>&copy; 2024-2025 Simple YTD. All rights reserved.</p>
+            <p>
+                <a href="public/contact.html">Contact Us</a>
+                &nbsp;•&nbsp;
+                <a href="https://fcglitches.github.io/Website-Simple-YTD/#support" target="_blank" class="support-btn" rel="noopener noreferrer">❤️ Support Me</a>
+            </p>
+        </div>
+    </footer>
+
+    <div id="settingsModal" class="modal" style="display: none;">
+        <div class="modal-content settings-modal">
+            <button id="closeSettingsBtn" class="modal-close-btn" aria-label="Close settings" title="Close settings">&times;</button>
+            <h2><i class="fas fa-cog"></i> Settings</h2>
+            
+            <div class="settings-layout">
+                <!-- Left Column -->
+                <div class="settings-column">
+                    <div class="settings-section">
+                        <h3>Performance</h3>
+                        <div class="setting-item">
+                            <label for="maxSpeed">Download Speed (KB/s):</label>
+                            <div class="speed-input-group">
+                                <input type="number" id="maxSpeed" name="maxSpeed" min="0" value="0" class="input-field">
+                                <button id="resetSpeedBtn" class="reset-btn" type="button">∞</button>
+                            </div>
+                        </div>
+                        
+                        <div class="setting-item">
+                            <label for="speedUnitDisplay">Speed Unit:</label>
+                            <select id="speedUnitDisplay" class="select-field">
+                                <option value="MBps">MB/s</option>
+                                <option value="Mbps">Mbps</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="settings-section">
+                        <h3>Appearance</h3>
+                        <div class="setting-item">
+                            <label for="themePreset">Theme:</label>
+                            <select id="themePreset" class="select-field">
+                                <option value="light">Light</option>
+                                <option value="dark">Dark</option>
+                                <option value="minimal">Minimal</option>
+                                <option value="vibrant">Vibrant</option>
+                            </select>
+                        </div>
+                        
+                        <!-- Add UI Scale setting -->
+                        <div class="setting-item">
+                            <label for="uiScale">UI Scale:</label>
+                            <div class="scale-input-group">
+                                <input type="range" id="uiScale" name="uiScale" min="0.6" max="2.0" step="0.1" value="1.0" class="scale-slider">
+                                <output id="uiScaleValue" class="scale-value">100%</output>
+                            </div>
+                        </div>
+                        
+                        <div class="setting-item checkbox-group">
+                            <input type="checkbox" id="compactMode" name="compactMode">
+                            <label for="compactMode">Compact mode</label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Column -->
+                <div class="settings-column">
+                    <div class="settings-section">
+                        <h3>Download Options</h3>
+                        <div class="setting-item checkbox-group">
+                            <input type="checkbox" id="numerateFiles" name="numerateFiles">
+                            <label for="numerateFiles">Number playlist files</label>
+                        </div>
+                        
+                        <div class="setting-item checkbox-group">
+                            <input type="checkbox" id="skipDuplicates" name="skipDuplicates">
+                            <label for="skipDuplicates">Skip duplicates</label>
+                        </div>
+                        
+                        <div class="setting-item checkbox-group">
+                            <input type="checkbox" id="searchTags" name="searchTags">
+                            <label for="searchTags">Embed metadata (MP3)</label>
+                        </div>
+                        <div class="setting-item">
+                            <small>💡 Tip: For best playback (especially Opus audio), we recommend 
+                                <a href="https://mpc-hc.org/" target="_blank" rel="noopener noreferrer">Media Player Classic</a>.
+                            </small>
+                        </div>
+                    </div>
+
+                    <div class="settings-section">
+                        <h3>Notifications</h3>
+                        <div class="setting-item checkbox-group">
+                            <input type="checkbox" id="notificationSound" name="notificationSound">
+                            <label for="notificationSound">Sound alerts</label>
+                        </div>
+                        
+                        <div class="setting-item checkbox-group">
+                            <input type="checkbox" id="notificationPopup" name="notificationPopup">
+                            <label for="notificationPopup">Desktop notifications</label>
+                        </div>
+                        
+                        <div class="setting-item checkbox-group">
+                            <input type="checkbox" id="keepPcAwake" name="keepPcAwake">
+                            <label for="keepPcAwake">Keep PC awake during downloads</label>
+                        </div>
+                        
+                        <div class="setting-item checkbox-group">
+                            <input type="checkbox" id="removeCompleted" name="removeCompleted">
+                            <label for="removeCompleted">Auto-remove completed</label>
+                        </div>
+                        
+                        <div class="setting-item checkbox-group">
+                            <input type="checkbox" id="skipDeleteConfirmation" name="skipDeleteConfirmation">
+                            <label for="skipDeleteConfirmation">Skip confirmations</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Download Folder Section (Full Width) -->
+            <div class="settings-section folder-section">
+                <h3>Download Location</h3>
+                <div class="setting-item">
+                    <input type="text" id="downloadFolder" class="input-field folder-input" readonly placeholder="SimplyYTD Downloads folder" />
+                </div>
+                <div class="folder-actions">
+                    <button id="defaultFolderBtn" class="action-btn" type="button">
+                        <i class="fas fa-home"></i> Default
+                    </button>
+                    <button id="chooseFolderBtn" class="action-btn" type="button">
+                        <i class="fas fa-folder-open"></i> Choose
+                    </button>
+                    <button id="openFolderBtn" class="action-btn" type="button">
+                        <i class="fas fa-external-link-alt"></i> Open
+                    </button>
+                </div>
+            </div>
+
+            <!-- Tools Version Info -->
+            <div class="settings-section" id="toolsVersionSection" style="display: none;">
+                <h3>Tools Version</h3>
+                <div class="setting-item">
+                    <div id="ytdlpVersionInfo" style="margin-bottom: 0.5rem;">
+                        <strong>yt-dlp:</strong> <span id="ytdlpVersion">Loading...</span>
+                    </div>
+                    <div id="ffmpegVersionInfo" style="margin-bottom: 0.5rem;">
+                        <strong>ffmpeg:</strong> <span id="ffmpegVersion">Loading...</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="settings-actions">
+                <button id="importCookiesBtn" class="action-btn secondary">
+                    <i class="fas fa-cookie-bite"></i> Import Cookies
+                </button>
+                <button id="updateToolsBtn" class="action-btn secondary">
+                    <i class="fas fa-download"></i> Update Tools
+                </button>
+                <button id="saveSettingsBtn" class="action-btn primary">
+                    <i class="fas fa-save"></i> Save Settings
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <audio id="completionSound" src="./assets/notification.mp3" preload="auto"></audio>
+
+    <script src="script.js"></script>
+</body>
+</html>

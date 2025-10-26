@@ -1182,6 +1182,98 @@ console.log(`Using ffmpeg: ${ffmpegExecutable}`);
       setTimeout(() => gracefulShutdown(), 100); // Give response time to send
   });
 
+  // Check tools version endpoint
+  app.get('/check-tools-version', async (req, res) => {
+      try {
+          const binDir = path.join(__dirname, 'bin');
+          const platform = os.platform();
+          const ytdlpPath = path.join(binDir, platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp');
+          const ffmpegPath = path.join(binDir, platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg');
+          
+          const versions = {
+              ytdlp: await getYtDlpVersion(ytdlpPath),
+              ffmpeg: await getFfmpegVersion(ffmpegPath),
+              platform
+          };
+          
+          res.json(versions);
+      } catch (error) {
+          console.error('[check-tools-version] Error:', error);
+          res.status(500).json({ error: error.message });
+      }
+  });
+
+  async function getYtDlpVersion(ytdlpPath) {
+      return new Promise((resolve) => {
+          if (!fs.existsSync(ytdlpPath)) {
+              resolve({ installed: false, version: null, latest: null, needsUpdate: false });
+              return;
+          }
+          
+          const process = spawn(ytdlpPath, ['--version'], { stdio: 'pipe' });
+          let version = '';
+          
+          process.stdout.on('data', (data) => {
+              version += data.toString().trim();
+          });
+          
+          process.on('close', (code) => {
+              if (code === 0) {
+                  resolve({ 
+                      installed: true, 
+                      version: version,
+                      latest: null,
+                      needsUpdate: false // We'd need to check GitHub API for latest
+                  });
+              } else {
+                  resolve({ installed: false, version: null, latest: null, needsUpdate: false });
+              }
+          });
+          
+          process.on('error', () => {
+              resolve({ installed: false, version: null, latest: null, needsUpdate: false });
+          });
+      });
+  }
+
+  async function getFfmpegVersion(ffmpegPath) {
+      return new Promise((resolve) => {
+          if (!fs.existsSync(ffmpegPath)) {
+              resolve({ installed: false, version: null, latest: null, needsUpdate: false });
+              return;
+          }
+          
+          const process = spawn(ffmpegPath, ['-version'], { stdio: 'pipe' });
+          let version = '';
+          
+          process.stdout.on('data', (data) => {
+              const dataStr = data.toString();
+              // Extract version from first line
+              const match = dataStr.match(/ffmpeg version ([\d.]+)/i);
+              if (match) {
+                  version = match[1];
+              }
+          });
+          
+          process.on('close', (code) => {
+              if (code === 0 && version) {
+                  resolve({ 
+                      installed: true, 
+                      version: version,
+                      latest: null,
+                      needsUpdate: false
+                  });
+              } else {
+                  resolve({ installed: false, version: null, latest: null, needsUpdate: false });
+              }
+          });
+          
+          process.on('error', () => {
+              resolve({ installed: false, version: null, latest: null, needsUpdate: false });
+          });
+      });
+  }
+
   // Update tools endpoint
   app.post('/update-tools', async (req, res) => {
       const { platform = os.platform() } = req.body;
