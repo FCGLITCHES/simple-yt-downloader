@@ -394,26 +394,24 @@ ipcMain.handle('get-userdata-path', async () => {
 // Update the save-cookies-txt handler
 ipcMain.handle('save-cookies-txt', async (event, content) => {
   try {
-        const userDataPath = app.getPath('userData');
-        const userDataFilePath = path.join(userDataPath, 'cookies.txt');
-        
-        // Also save to project directory for easy access
+        // Save cookies to project directory only for easy access
         const projectFilePath = path.join(__dirname, 'cookies.txt');
         
-        // Ensure the userData directory exists
-        if (!fs.existsSync(userDataPath)) {
-            fs.mkdirSync(userDataPath, { recursive: true });
-            console.log(`[save-cookies-txt] Created userData directory: ${userDataPath}`);
+        // In production (packaged app), __dirname points to app.asar
+        // We need to save to resources folder instead
+        let cookieFilePath;
+        if (app.isPackaged) {
+            // When packaged, save to resources folder (outside app.asar)
+            cookieFilePath = path.join(process.resourcesPath, 'cookies.txt');
+        } else {
+            // Development mode - save to project directory
+            cookieFilePath = path.join(__dirname, 'cookies.txt');
         }
-    
-        console.log(`[save-cookies-txt] Saving cookies to: ${userDataFilePath}`);
-        fs.writeFileSync(userDataFilePath, content, 'utf8');
         
-        // Also save to project directory
-        console.log(`[save-cookies-txt] Also saving cookies to: ${projectFilePath}`);
-        fs.writeFileSync(projectFilePath, content, 'utf8');
+        console.log(`[save-cookies-txt] Saving cookies to: ${cookieFilePath}`);
+        fs.writeFileSync(cookieFilePath, content, 'utf8');
         
-    return { success: true, path: userDataFilePath, projectPath: projectFilePath };
+    return { success: true, path: cookieFilePath };
   } catch (err) {
     console.error('Failed to save cookies.txt:', err);
     return { success: false, error: err.message };
@@ -423,12 +421,19 @@ ipcMain.handle('save-cookies-txt', async (event, content) => {
 // Add handler to get cookies content (for the cookies helper)
 ipcMain.handle('get-cookies-txt', async () => {
     try {
-        const userDataPath = app.getPath('userData');
-        const filePath = path.join(userDataPath, 'cookies.txt');
+        // Get cookies from project directory or resources folder
+        let cookieFilePath;
+        if (app.isPackaged) {
+            // When packaged, read from resources folder (outside app.asar)
+            cookieFilePath = path.join(process.resourcesPath, 'cookies.txt');
+        } else {
+            // Development mode - read from project directory
+            cookieFilePath = path.join(__dirname, 'cookies.txt');
+        }
         
-        if (fs.existsSync(filePath)) {
-            const content = fs.readFileSync(filePath, 'utf8');
-            return { success: true, content, path: filePath };
+        if (fs.existsSync(cookieFilePath)) {
+            const content = fs.readFileSync(cookieFilePath, 'utf8');
+            return { success: true, content, path: cookieFilePath };
         } else {
             return { success: false, error: 'Cookies file not found' };
         }

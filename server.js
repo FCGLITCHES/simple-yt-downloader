@@ -856,26 +856,18 @@ console.log(`Using ffmpeg: ${ffmpegExecutable}`);
       let cookieFilePath = null;
       const possiblePaths = [];
       
-      // Always check userData first (works for both dev and production)
-      const userDataPath = getUserDataPath();
-      possiblePaths.push(path.join(userDataPath, 'cookies.txt'));
-      
       if (isDev) {
-            // Development: also check project root
-          possiblePaths.push(
-              path.join(__dirname, 'cookies.txt')
-          );
+            // Development: check project directory
+          possiblePaths.push(path.join(__dirname, 'cookies.txt'));
       } else {
-            // Production: Use Electron's userData directory
-            // Already added to possiblePaths above
-          const electronUserDataPath = app?.getPath('userData');
-          if (electronUserDataPath) {
-              possiblePaths.unshift(path.join(electronUserDataPath, 'cookies.txt'));
+            // Production: check resources folder (outside app.asar)
+          const resourcesPath = process.env.ELECTRON_RESOURCES_PATH || process.resourcesPath;
+          if (resourcesPath) {
+              possiblePaths.push(path.join(resourcesPath, 'cookies.txt'));
           }
+          // Fallback to __dirname (might be app.asar)
+          possiblePaths.push(path.join(__dirname, 'cookies.txt'));
       }
-      
-      // Add fallback to project directory for easy access
-      possiblePaths.push(path.join(__dirname, 'cookies.txt'));
         
         console.log('[getCookiesPath] Environment:', isDev ? 'Development' : 'Production');
         console.log('[getCookiesPath] Checking paths:', possiblePaths);
