@@ -1,16 +1,29 @@
 // script.js - Frontend logic for Simple YTD
 
+// Move these to global scope (before DOMContentLoaded)
+let ws;
+let clientId = localStorage.getItem('ytdClientId');
+let activeDownloader = localStorage.getItem('activeDownloader') || 'youtube';
+let userSettings;
+let downloadItemsState;
+let isPowerSaveBlockerActive = false;
+
+// Make WebSocket globally accessible
+window.ws = ws;
+
 document.addEventListener('DOMContentLoaded', () => {
-    // Globals
-    let ws;
-    let clientId = localStorage.getItem('ytdClientId');
+    // Initialize variables
     if (!clientId) {
         clientId = `client_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
         localStorage.setItem('ytdClientId', clientId);
     }
-    let activeDownloader = localStorage.getItem('activeDownloader') || 'youtube';
-    let userSettings = loadSettings();
-    const downloadItemsState = new Map(); // To store item details and manage them
+    userSettings = loadSettings();
+    downloadItemsState = new Map(); // To store item details and manage them
+
+    // Make userSettings globally accessible
+    window.userSettings = userSettings;
+    window.managePowerSaveBlocker = managePowerSaveBlocker;
+    window.isPowerSaveBlockerActive = isPowerSaveBlockerActive;
 
     // DOM Elements - These might not all exist on every page
     const youtubeUrlInput = document.getElementById('youtubeUrl');
@@ -46,6 +59,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const removeCompletedCheckbox = document.getElementById('removeCompleted');
     const notificationSoundCheckbox = document.getElementById('notificationSound');
     const notificationPopupCheckbox = document.getElementById('notificationPopup');
+    let keepPcAwakeCheckbox = document.getElementById('keepPcAwake');
     const speedUnitDisplaySelect = document.getElementById('speedUnitDisplay');
     const resetSpeedBtn = document.getElementById('resetSpeedBtn');
     const downloadFolderInput = document.getElementById('downloadFolder');
@@ -88,10 +102,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function connectWebSocket() {
         const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const wsUrl = `${wsProtocol}//${window.location.hostname}:3000?clientId=${clientId}`;
+        const wsUrl = `${wsProtocol}//${window.location.hostname}:9875?clientId=${clientId}`;
         console.log(`Attempting to connect to WebSocket: ${wsUrl}`);
 
         ws = new WebSocket(wsUrl);
+        window.ws = ws; // Make it globally accessible
 
         ws.onopen = () => {
             console.log('WebSocket connection established.');
@@ -162,7 +177,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Message Handling ---
     function handleWebSocketMessage(data) {
-        const { type, message, itemId, downloadUrl, filename, title, estimatedSize, actualSize, percent, rawSpeed, speedBytesPerSec, source = activeDownloader, isPlaylistItem, playlistIndex } = data;
+        const { type, message, itemId, downloadUrl, filename, title, actualSize, percent, rawSpeed, speedBytesPerSec, source = activeDownloader, isPlaylistItem, playlistIndex, thumbnail, fullPath } = data;
         const currentItemState = downloadItemsState.get(itemId);
 
         // Hide playlist meta items (e.g., 'Fetching playlist: ...')
@@ -179,20 +194,37 @@ document.addEventListener('DOMContentLoaded', () => {
 
         switch (type) {
             case 'queued':
-                createDownloadItemStructure(itemId, title || 'Processing...', source, estimatedSize || 'N/A', isPlaylistItem);
+                createDownloadItemStructure(itemId, title || 'Processing...', source, isPlaylistItem);
                 updateDownloadItemStatus(itemId, message || 'Queued...', source);
+                // Show pause/play button and remove button immediately for queued items
+                const queuedItemDiv = document.getElementById(`item-${itemId}`);
+                if (queuedItemDiv) {
+                    const pausePlayBtn = queuedItemDiv.querySelector('.item-pause-play-btn');
+                    const removeBtn = queuedItemDiv.querySelector('.item-remove-btn');
+                    if (pausePlayBtn) pausePlayBtn.style.display = 'inline-flex';
+                    if (removeBtn) removeBtn.style.display = 'inline-flex';
+                }
                 if (currentItemState) currentItemState.status = 'queued';
                 updateDownloadStats();
                 break;
             case 'item_info':
                 if (!downloadItemsState.has(itemId)) {
-                    createDownloadItemStructure(itemId, title || 'Fetching info...', source, estimatedSize || 'N/A', isPlaylistItem);
+                    createDownloadItemStructure(itemId, title || 'Fetching info...', source, isPlaylistItem);
+                    // Show pause/play button and remove button for new items
+                    const newItemDiv = document.getElementById(`item-${itemId}`);
+                    if (newItemDiv) {
+                        const pausePlayBtn = newItemDiv.querySelector('.item-pause-play-btn');
+                        const removeBtn = newItemDiv.querySelector('.item-remove-btn');
+                        if (pausePlayBtn) pausePlayBtn.style.display = 'inline-flex';
+                        if (removeBtn) removeBtn.style.display = 'inline-flex';
+                    }
                 }
                 updateDownloadItemTitle(itemId, title, source);
-                updateDownloadItemEstimatedSize(itemId, estimatedSize, source);
+                if (thumbnail) updateDownloadItemThumbnail(itemId, thumbnail);
                 if (currentItemState) {
                     currentItemState.title = title;
-                    currentItemState.estimatedSize = estimatedSize;
+                    if (thumbnail) currentItemState.thumbnail = thumbnail;
+                    if (fullPath) currentItemState.fullPath = fullPath;
                 }
                 break;
             case 'progress':
@@ -201,7 +233,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 updateDownloadStats();
                 break;
             case 'complete':
-                updateDownloadItemComplete(itemId, message, downloadUrl, filename, actualSize, source);
+                updateDownloadItemComplete(itemId, message, downloadUrl, filename, actualSize, source, fullPath, thumbnail);
                 if (userSettings.notificationSound && completionSound) playNotificationSound();
                 if (userSettings.notificationPopup) showDesktopNotification(filename || title, message || 'Download complete!');
                 if (userSettings.removeCompleted) {
@@ -222,10 +254,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 history.unshift({
                   name: filename,
                   path: downloadUrl,
+                  folder: data.downloadFolder || getDownloadFolder(), // <-- add this
                   type: subtabKey === 'youtube' ? 'youtubeSingles' : subtabKey,
                   size: actualSize || 'N/A',
                   mtime: new Date().toISOString(),
-                  thumbnail: currentItemState?.thumbnail || null
+                  thumbnail: (thumbnail || currentItemState?.thumbnail) || null
                 });
                 localStorage.setItem('ytdHistory', JSON.stringify(history.slice(0, 500)));
                 renderFromLocalStorage();
@@ -245,6 +278,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 const statusDivForGeneral = source === 'youtube' ? youtubeStatusDiv : instagramStatusDiv;
                 if (statusDivForGeneral) {
                     showStatus(message, source, 'info');
+                }
+                // If this is a download status message, show the pause/play button and remove button
+                if (message && message.includes('Downloading') && itemId) {
+                    const itemDiv = document.getElementById(`item-${itemId}`);
+                    if (itemDiv) {
+                        const pausePlayBtn = itemDiv.querySelector('.item-pause-play-btn');
+                        const removeBtn = itemDiv.querySelector('.item-remove-btn');
+                        if (pausePlayBtn) pausePlayBtn.style.display = 'inline-flex';
+                        if (removeBtn) removeBtn.style.display = 'inline-flex';
+                    }
                 }
                 break;
             case 'playlist_complete':
@@ -274,7 +317,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return source === 'youtube' ? youtubeDownloadLinksArea : instagramDownloadLinksArea;
     }
 
-    function createDownloadItemStructure(itemId, titleText, source, estimatedSizeText = 'N/A', isPlaylistItem = false) {
+    function createDownloadItemStructure(itemId, titleText, source, isPlaylistItem = false) {
         const linksArea = getLinksArea(source);
         if (!linksArea || downloadItemsState.has(itemId)) return;
 
@@ -296,11 +339,6 @@ document.addEventListener('DOMContentLoaded', () => {
         titleDiv.className = 'item-title';
         titleDiv.textContent = titleText;
         itemContentDiv.appendChild(titleDiv);
-
-        const estimatedSizeSpan = document.createElement('span');
-        estimatedSizeSpan.className = 'item-size';
-        estimatedSizeSpan.textContent = estimatedSizeText ? ` (Est: ${estimatedSizeText})` : '';
-        titleDiv.appendChild(estimatedSizeSpan);
 
         const statusDiv = document.createElement('div');
         statusDiv.className = 'item-status';
@@ -325,19 +363,34 @@ document.addEventListener('DOMContentLoaded', () => {
         const buttonsDiv = document.createElement('div');
         buttonsDiv.className = 'item-buttons';
 
+        // Control buttons row (pause, play, remove)
+        const controlButtonsDiv = document.createElement('div');
+        controlButtonsDiv.className = 'item-control-buttons';
+
+        const pausePlayBtn = document.createElement('button');
+        pausePlayBtn.className = 'item-control-btn item-pause-play-btn';
+        pausePlayBtn.innerHTML = '<i class="fas fa-pause"></i>';
+        pausePlayBtn.title = 'Pause download';
+        pausePlayBtn.style.display = 'none';
+        pausePlayBtn.onclick = () => handlePausePlayToggle(itemId, source);
+        controlButtonsDiv.appendChild(pausePlayBtn);
+
+        const removeBtn = document.createElement('button');
+        removeBtn.className = 'item-control-btn item-remove-btn';
+        removeBtn.innerHTML = '<i class="fas fa-times"></i>';
+        removeBtn.title = 'Remove this item';
+        removeBtn.style.display = 'none';
+        removeBtn.onclick = () => handleRemoveDownloadItem(itemId, source);
+        controlButtonsDiv.appendChild(removeBtn);
+
+        buttonsDiv.appendChild(controlButtonsDiv);
+
+        // Cancel button (below control buttons)
         const cancelBtn = document.createElement('button');
         cancelBtn.className = 'item-cancel-btn';
         cancelBtn.textContent = 'Cancel';
         cancelBtn.onclick = () => handleCancelDownload(itemId, source);
         buttonsDiv.appendChild(cancelBtn);
-
-        const removeBtn = document.createElement('button');
-        removeBtn.className = 'item-remove-btn';
-        removeBtn.innerHTML = '&times;';
-        removeBtn.title = 'Remove this item';
-        removeBtn.style.display = 'none';
-        removeBtn.onclick = () => handleRemoveDownloadItem(itemId, source);
-        buttonsDiv.appendChild(removeBtn);
 
         itemDiv.appendChild(buttonsDiv);
         linksArea.prepend(itemDiv);
@@ -346,9 +399,9 @@ document.addEventListener('DOMContentLoaded', () => {
             title: titleText, 
             status: 'queued', 
             source: source,
-            estimatedSize: estimatedSizeText, 
             domElement: itemDiv,
-            isPlaylist: isPlaylistItem // Store the playlist flag
+            isPlaylist: isPlaylistItem, // Store the playlist flag
+            thumbnailEl: thumbnailImg
         });
         
         updateDownloadStats();
@@ -377,24 +430,18 @@ document.addEventListener('DOMContentLoaded', () => {
         if (itemDiv) {
             const titleEl = itemDiv.querySelector('.item-title');
             if (titleEl) {
-                const sizeSpan = titleEl.querySelector('.item-size');
                 titleEl.textContent = newTitle;
-                if (sizeSpan) titleEl.appendChild(sizeSpan);
             }
         }
     }
 
-    function updateDownloadItemEstimatedSize(itemId, newSize, source) {
+    function updateDownloadItemThumbnail(itemId, thumbnailUrl) {
         const itemDiv = document.getElementById(`item-${itemId}`);
-        if (itemDiv) {
-            let sizeEl = itemDiv.querySelector('.item-title .item-size');
-            if (!sizeEl) {
-                sizeEl = document.createElement('span');
-                sizeEl.className = 'item-size';
-                const titleEl = itemDiv.querySelector('.item-title');
-                if (titleEl) titleEl.appendChild(sizeEl);
+        if (itemDiv && thumbnailUrl) {
+            const img = itemDiv.querySelector('.item-thumbnail');
+            if (img) {
+                img.src = thumbnailUrl;
             }
-            if (sizeEl) sizeEl.textContent = newSize ? ` (Est: ${newSize})` : '';
         }
     }
 
@@ -456,31 +503,49 @@ document.addEventListener('DOMContentLoaded', () => {
             if (progressBar && typeof percent === 'number' && !isNaN(percent)) {
                 progressBar.style.width = `${Math.max(0, Math.min(100, percent))}%`;
             }
+            
+            // Show pause/play button and remove button when download starts (when progress > 0)
+            if (typeof percent === 'number' && percent > 0) {
+                const pausePlayBtn = itemDiv.querySelector('.item-pause-play-btn');
+                const removeBtn = itemDiv.querySelector('.item-remove-btn');
+                if (pausePlayBtn) pausePlayBtn.style.display = 'inline-flex';
+                if (removeBtn) removeBtn.style.display = 'inline-flex';
+            }
         }
     }
 
-    function updateDownloadItemComplete(itemId, message, downloadUrl, filename, actualSize, source) {
+    function updateDownloadItemComplete(itemId, message, downloadUrl, filename, actualSize, source, fullPath, thumb) {
         const itemDiv = document.getElementById(`item-${itemId}`);
         if (itemDiv) {
-            updateDownloadItemStatus(itemId, message || `Complete: ${filename}`, source, 'success');
+            // Compact status message: "Download complete • filesize"
+            const statusText = `Download complete${actualSize ? ' • ' + actualSize : ''}`;
+            updateDownloadItemStatus(itemId, statusText, source, 'success');
+            
             const linkEl = itemDiv.querySelector('.item-link');
             if (linkEl && downloadUrl && filename) {
                 linkEl.innerHTML = '';
-                const a = document.createElement('a');
-                a.href = downloadUrl;
-                a.textContent = `Download "${filename}" ${actualSize ? '(' + actualSize + ')' : ''}`;
-                a.download = filename;
-                a.style.display = 'none';
-                linkEl.appendChild(a);
-
+                
                 const openFolderBtn = document.createElement('button');
-                openFolderBtn.className = 'ml-2 inline-flex items-center justify-center text-xs bg-green-100 hover:bg-green-200 text-green-700 rounded px-2 py-1 transition';
+                openFolderBtn.className = 'modern-folder-btn compact-folder-btn';
                 openFolderBtn.title = 'Open containing folder';
-                openFolderBtn.innerHTML = '<i class="fas fa-folder-open"></i>';
+                openFolderBtn.innerHTML = '<i class="fas fa-folder-open"></i> Open Folder';
                 openFolderBtn.onclick = async () => {
                     if (window.electronAPI && window.electronAPI.openPathInExplorer) {
-                        const folderPath = getDownloadFolder();
-                        await window.electronAPI.openPathInExplorer(folderPath);
+                        try {
+                            let targetPath = fullPath;
+                            if (!targetPath && window.electronAPI?.resolvePath) {
+                                const root = getDownloadFolder();
+                                const rel = decodeURIComponent(downloadUrl.replace('/downloads/', ''));
+                                targetPath = await window.electronAPI.resolvePath(root, rel);
+                            }
+                            const folderPath = window.electronAPI?.getDirname && targetPath
+                                ? await window.electronAPI.getDirname(targetPath)
+                                : getDownloadFolder();
+                            await window.electronAPI.openPathInExplorer(folderPath);
+                        } catch (e) {
+                            console.error('Open folder failed:', e);
+                            alert('Unable to open containing folder.');
+                        }
                     } else {
                         console.error('Open folder not available. window.electronAPI:', window.electronAPI);
                         alert('Open folder not available. Make sure you are running in Electron.');
@@ -488,9 +553,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 };
                 linkEl.appendChild(openFolderBtn);
             }
+            if (thumb) updateDownloadItemThumbnail(itemId, thumb);
             disableCancelButton(itemId, source);
-            const removeBtn = itemDiv.querySelector('.item-remove-btn');
-            if (removeBtn) removeBtn.style.display = 'inline-block';
+            showActionButtons(itemId);
         }
     }
 
@@ -499,8 +564,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (itemDiv) {
             updateDownloadItemStatus(itemId, `Error: ${errorMessage}`, source, 'error');
             disableCancelButton(itemId, source);
-            const removeBtn = itemDiv.querySelector('.item-remove-btn');
-            if (removeBtn) removeBtn.style.display = 'inline-block';
+            showActionButtons(itemId);
         }
     }
 
@@ -534,6 +598,39 @@ document.addEventListener('DOMContentLoaded', () => {
         downloadItemsState.delete(itemId);
         updateDownloadStats();
         console.log(`Removed item ${itemId} from UI and state.`);
+    }
+
+    function showActionButtons(itemId) {
+        const itemDiv = document.getElementById(`item-${itemId}`);
+        if (itemDiv) {
+            const removeBtn = itemDiv.querySelector('.item-remove-btn');
+            if (removeBtn) removeBtn.style.display = 'inline-flex';
+        }
+    }
+
+    // Dynamic pause/play toggle function
+    function handlePausePlayToggle(itemId, source) {
+        const itemDiv = document.getElementById(`item-${itemId}`);
+        if (itemDiv) {
+            const pausePlayBtn = itemDiv.querySelector('.item-pause-play-btn');
+            if (pausePlayBtn) {
+                const isPaused = pausePlayBtn.innerHTML.includes('fa-play');
+                
+                if (isPaused) {
+                    // Currently paused, resume download
+                    console.log(`[Placeholder] Resuming download for item: ${itemId}, source: ${source}`);
+                    pausePlayBtn.innerHTML = '<i class="fas fa-pause"></i>';
+                    pausePlayBtn.title = 'Pause download';
+                    updateDownloadItemStatus(itemId, 'Resuming...', source);
+                } else {
+                    // Currently downloading, pause download
+                    console.log(`[Placeholder] Pausing download for item: ${itemId}, source: ${source}`);
+                    pausePlayBtn.innerHTML = '<i class="fas fa-play"></i>';
+                    pausePlayBtn.title = 'Resume download';
+                    updateDownloadItemStatus(itemId, 'Paused', source);
+                }
+            }
+        }
     }
 
     // --- Download Initiation ---
@@ -612,27 +709,27 @@ document.addEventListener('DOMContentLoaded', () => {
             if (format === 'mp4') {
                 qualities = [
                     { value: 'highest', text: 'Highest Available MP4' },
-                    { value: '2160', text: '2160p (4K Ultra HD) ⚡' },
-                    { value: '1440', text: '1440p (2K Quad HD) 🔥' },
-                    { value: '1080', text: '1080p (Full HD)' },
-                    { value: '720', text: '720p (HD)' },
+                    { value: '2160', text: '4K' },
+                    { value: '1440', text: '1440p' },
+                    { value: '1080', text: '1080p' },
+                    { value: '720', text: '720p' },
                     { value: '480', text: '480p' },
                     { value: '360', text: '360p' }
                 ];
             } else if (format === 'mp3') {
                 qualities = [
-                    { value: 'highest', text: 'Highest Quality MP3 (VBR 0)' },
-                    { value: '320', text: '320 kbps (Premium)' },
-                    { value: '256', text: '256 kbps (High)' },
-                    { value: '192', text: '192 kbps (Standard)' },
-                    { value: '128', text: '128 kbps (Basic)' }
+                    { value: 'highest', text: 'Highest Quality MP3' },
+                    { value: '320', text: '320 kbps' },
+                    { value: '256', text: '256 kbps' },
+                    { value: '192', text: '192 kbps' },
+                    { value: '128', text: '128 kbps' }
                 ];
             }
         } else if (source === 'instagram') {
             qualities = [
                 { value: 'highest', text: 'Highest Available' },
-                { value: '1080', text: '1080p (if available)' },
-                { value: '720', text: '720p (if available)' }
+                { value: '1080', text: '1080p' },
+                { value: '720', text: '720p' }
             ];
         }
         qualities.forEach(q => {
@@ -727,6 +824,13 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // --- UI Scale Management ---
+    function applyUIScale(scale) {
+        document.documentElement.style.fontSize = `${scale}rem`;
+        localStorage.setItem('uiScale', scale);
+        console.log(`UI scale applied: ${scale}`);
+    }
+
     // --- Settings Modal ---
     function loadSettings() {
         const defaults = {
@@ -741,7 +845,9 @@ document.addEventListener('DOMContentLoaded', () => {
             downloadFolder: '', 
             compactMode: false,
             skipDeleteConfirmation: false,
-            themePreset: 'light'
+            themePreset: 'light',
+            keepPcAwake: true,
+            uiScale: 1.0 // Add UI scale default
         };
         const storedSettings = localStorage.getItem('ytdUserSettings');
         let settings = storedSettings ? JSON.parse(storedSettings) : { ...defaults };
@@ -750,6 +856,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function saveSettings() {
+        // Ensure checkbox is found
+        if (!keepPcAwakeCheckbox) {
+            keepPcAwakeCheckbox = document.getElementById('keepPcAwake');
+        }
+        
         userSettings = {
             maxSpeed: maxSpeedInput ? (parseInt(maxSpeedInput.value, 10) || 0) : 0,
             numerateFiles: numerateFilesCheckbox ? numerateFilesCheckbox.checked : false,
@@ -762,12 +873,18 @@ document.addEventListener('DOMContentLoaded', () => {
             downloadFolder: downloadFolderInput ? downloadFolderInput.value : '',
             compactMode: compactModeCheckbox ? compactModeCheckbox.checked : false,
             skipDeleteConfirmation: skipDeleteConfirmationCheckbox ? skipDeleteConfirmationCheckbox.checked : false,
-            themePreset: themePresetSelect ? themePresetSelect.value : 'light'
+            themePreset: themePresetSelect ? themePresetSelect.value : 'light',
+            keepPcAwake: keepPcAwakeCheckbox ? keepPcAwakeCheckbox.checked : true,
+            uiScale: document.getElementById('uiScale') ? parseFloat(document.getElementById('uiScale').value) || 1.0 : 1.0
         };
         localStorage.setItem('ytdUserSettings', JSON.stringify(userSettings));
         
-        // Apply theme immediately
+        // Update global reference
+        window.userSettings = userSettings;
+        
+        // Apply theme and UI scale immediately
         applyTheme(userSettings.themePreset);
+        applyUIScale(userSettings.uiScale);
         
         if (settingsModal) settingsModal.style.display = 'none';
         
@@ -780,6 +897,38 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function populateSettingsModal() {
         if (!settingsModal) return;
+        
+        // Ensure checkbox is found
+        if (!keepPcAwakeCheckbox) {
+            keepPcAwakeCheckbox = document.getElementById('keepPcAwake');
+        }
+        
+        // If still not found, try to create it programmatically
+        if (!keepPcAwakeCheckbox) {
+            console.log('Creating keepPcAwake checkbox programmatically...');
+            const notificationsSection = document.querySelector('.settings-section h3');
+            if (notificationsSection && notificationsSection.textContent === 'Notifications') {
+                const section = notificationsSection.parentElement;
+                const notificationPopupDiv = section.querySelector('#notificationPopup').closest('.setting-item');
+                
+                if (notificationPopupDiv) {
+                    const newCheckboxDiv = document.createElement('div');
+                    newCheckboxDiv.className = 'setting-item checkbox-group';
+                    newCheckboxDiv.innerHTML = `
+                        <input type="checkbox" id="keepPcAwake" name="keepPcAwake">
+                        <label for="keepPcAwake">Keep PC awake during downloads</label>
+                    `;
+                    
+                    // Insert after notificationPopup
+                    notificationPopupDiv.parentNode.insertBefore(newCheckboxDiv, notificationPopupDiv.nextSibling);
+                    
+                    // Update the reference
+                    keepPcAwakeCheckbox = document.getElementById('keepPcAwake');
+                    console.log('Checkbox created and reference updated:', keepPcAwakeCheckbox);
+                }
+            }
+        }
+        
         if (maxSpeedInput) maxSpeedInput.value = userSettings.maxSpeed;
         if (numerateFilesCheckbox) numerateFilesCheckbox.checked = userSettings.numerateFiles;
         if (skipDuplicatesCheckbox) skipDuplicatesCheckbox.checked = userSettings.skipDuplicates;
@@ -787,12 +936,23 @@ document.addEventListener('DOMContentLoaded', () => {
         if (removeCompletedCheckbox) removeCompletedCheckbox.checked = userSettings.removeCompleted;
         if (notificationSoundCheckbox) notificationSoundCheckbox.checked = userSettings.notificationSound;
         if (notificationPopupCheckbox) notificationPopupCheckbox.checked = userSettings.notificationPopup;
+        if (keepPcAwakeCheckbox) keepPcAwakeCheckbox.checked = userSettings.keepPcAwake;
         if (speedUnitDisplaySelect) speedUnitDisplaySelect.value = userSettings.speedUnitDisplay;
         if (downloadFolderInput) downloadFolderInput.value = userSettings.downloadFolder || '';
         if (compactModeCheckbox) compactModeCheckbox.checked = userSettings.compactMode;
         if (skipDeleteConfirmationCheckbox) skipDeleteConfirmationCheckbox.checked = userSettings.skipDeleteConfirmation;
         if (themePresetSelect) themePresetSelect.value = userSettings.themePreset;
+        
+        // Add UI scale
+        const uiScaleInput = document.getElementById('uiScale');
+        const uiScaleValue = document.getElementById('uiScaleValue');
+        if (uiScaleInput) {
+            uiScaleInput.value = userSettings.uiScale || 1.0;
+            if (uiScaleValue) uiScaleValue.textContent = `${Math.round((userSettings.uiScale || 1.0) * 100)}%`;
+        }
+        
         applyCompactMode(userSettings.compactMode);
+        applyUIScale(userSettings.uiScale || 1.0);
     }
 
     if (settingsBtn) {
@@ -808,6 +968,44 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (saveSettingsBtn) {
         saveSettingsBtn.onclick = saveSettings;
+    }
+    
+    // Update tools button
+    const updateToolsBtn = document.getElementById('updateToolsBtn');
+    if (updateToolsBtn) {
+        updateToolsBtn.onclick = async () => {
+            try {
+                updateToolsBtn.disabled = true;
+                updateToolsBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Updating...';
+                
+                const result = await window.updateTools();
+                
+                if (result) {
+                    let message = 'Tools update completed!\n\n';
+                    
+                    if (result.ytdlp && result.ytdlp.updated) {
+                        message += `✅ yt-dlp: ${result.ytdlp.oldVersion} → ${result.ytdlp.newVersion}\n`;
+                    } else if (result.ytdlp) {
+                        message += `ℹ️ yt-dlp: ${result.ytdlp.reason || 'No update needed'}\n`;
+                    }
+                    
+                    if (result.ffmpeg && result.ffmpeg.hasUpdate) {
+                        message += `🔄 FFmpeg: Update available (${result.ffmpeg.latestVersion})\n`;
+                        message += '💡 Download from: https://ffmpeg.org/download.html\n';
+                    } else if (result.ffmpeg) {
+                        message += `ℹ️ FFmpeg: ${result.ffmpeg.reason || 'No update needed'}\n`;
+                    }
+                    
+                    alert(message);
+                }
+            } catch (error) {
+                console.error('Error updating tools:', error);
+                alert('Error updating tools. Check console for details.');
+            } finally {
+                updateToolsBtn.disabled = false;
+                updateToolsBtn.innerHTML = '<i class="fas fa-download"></i> Update Tools';
+            }
+        };
     }
     
     // Reset speed button
@@ -860,6 +1058,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Initializations ---
     applyTheme(userSettings.themePreset || 'light');
+    applyUIScale(userSettings.uiScale || 1.0); // Add this line
     
     if (document.getElementById('youtubeDownloader') || document.getElementById('instagramDownloader')) {
         showTab(activeDownloader);
@@ -868,7 +1067,22 @@ document.addEventListener('DOMContentLoaded', () => {
         document.body.classList.remove('instagram-theme-active');
     }
     
-    populateSettingsModal();
+    // Ensure DOM is fully loaded before populating settings
+    setTimeout(() => {
+        // Re-find elements in case they weren't available initially
+        if (!keepPcAwakeCheckbox) {
+            keepPcAwakeCheckbox = document.getElementById('keepPcAwake');
+        }
+        populateSettingsModal();
+        
+        // Final check - if checkbox still not found, log error
+        if (!keepPcAwakeCheckbox) {
+            console.error('Keep PC awake checkbox could not be found or created!');
+            console.log('Available checkboxes:', document.querySelectorAll('input[type="checkbox"]'));
+        } else {
+            console.log('Keep PC awake checkbox successfully initialized:', keepPcAwakeCheckbox);
+        }
+    }, 100);
 
     // Folder picker logic
     if (chooseFolderBtn && downloadFolderInput) {
@@ -965,7 +1179,70 @@ document.addEventListener('DOMContentLoaded', () => {
         if (queuedCount) queuedCount.textContent = queuedItems;
         if (downloadingCount) downloadingCount.textContent = downloadingItems;
         if (downloadedCount) downloadedCount.textContent = completedItems;
+        
+        // Manage power save blocker based on active downloads
+        managePowerSaveBlocker();
     }
+
+    async function managePowerSaveBlocker() {
+        if (!userSettings.keepPcAwake || !window.electronAPI) {
+            console.log("Power save blocker disabled or electronAPI missing");
+            return;
+        }
+        
+        const activeDownloads = Array.from(downloadItemsState.values()).filter(
+            item => item.status === 'downloading' || item.status === 'queued'
+        ).length;
+        
+        console.log("Active downloads count:", activeDownloads);
+        console.log("Power save blocker currently active:", isPowerSaveBlockerActive);
+        
+        if (activeDownloads > 0 && !isPowerSaveBlockerActive) {
+            // Start power save blocker
+            try {
+                console.log("Attempting to start power save blocker...");
+                const result = await window.electronAPI.startPowerSaveBlocker();
+                console.log("Start power save blocker result:", result);
+                
+                if (result.success) {
+                    isPowerSaveBlockerActive = true;
+                    console.log('✅ Power save blocker activated - keeping PC awake during downloads');
+                } else {
+                    console.warn('⚠️ Power save blocker start returned success=false:', result.message);
+                    // Even if it says "already active", update our state to match
+                    isPowerSaveBlockerActive = true;
+                }
+            } catch (error) {
+                console.error('❌ Failed to start power save blocker:', error);
+            }
+        } else if (activeDownloads === 0 && isPowerSaveBlockerActive) {
+            // Stop power save blocker
+            try {
+                console.log("Attempting to stop power save blocker...");
+                const result = await window.electronAPI.stopPowerSaveBlocker();
+                console.log("Stop power save blocker result:", result);
+                
+                if (result.success) {
+                    isPowerSaveBlockerActive = false;
+                    console.log('✅ Power save blocker deactivated - PC can sleep normally');
+                } else {
+                    console.warn('⚠️ Power save blocker stop returned success=false:', result.message);
+                    // Even if there was an issue, update our state
+                    isPowerSaveBlockerActive = false;
+                }
+            } catch (error) {
+                console.error('❌ Failed to stop power save blocker:', error);
+                // Reset state on error
+                isPowerSaveBlockerActive = false;
+            }
+        } else {
+            console.log("No state change needed - Downloads:", activeDownloads, "Blocker active:", isPowerSaveBlockerActive);
+        }
+    }
+
+
+
+
 
     // Speed Slider Widget
     if (headerSpeedSlider && speedValue) {
@@ -1027,6 +1304,98 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     applyCompactMode(userSettings.compactMode);
+
+
+
+
+
+    // Tool update functions
+    window.checkToolsStatus = async function() {
+        console.log('=== Checking Tools Status ===');
+        try {
+            const response = await fetch('/tools-status');
+            const status = await response.json();
+            
+            console.log('📋 Tools Status:', status);
+            
+            // Display in a nice format
+            const ytdlpInfo = status.ytdlp;
+            const ffmpegInfo = status.ffmpeg;
+            
+            console.log(`🎬 yt-dlp: ${ytdlpInfo.version} (last checked: ${ytdlpInfo.daysSinceLastCheck} days ago)`);
+            console.log(`🎥 FFmpeg: ${ffmpegInfo.version} (last checked: ${ffmpegInfo.daysSinceLastCheck} days ago)`);
+            
+            return status;
+        } catch (error) {
+            console.error('❌ Error checking tools status:', error);
+            return null;
+        }
+    };
+
+    window.updateTools = async function() {
+        console.log('=== Updating Tools ===');
+        try {
+            console.log('🔄 Starting tool updates...');
+            
+            const response = await fetch('/update-tools', { method: 'POST' });
+            const result = await response.json();
+            
+            console.log('📊 Update Results:', result);
+            
+            // Display results
+            if (result.ytdlp) {
+                if (result.ytdlp.updated) {
+                    console.log(`✅ yt-dlp updated: ${result.ytdlp.oldVersion} → ${result.ytdlp.newVersion}`);
+                } else {
+                    console.log(`ℹ️ yt-dlp: ${result.ytdlp.reason || result.ytdlp.error || 'No update needed'}`);
+                }
+            }
+            
+            if (result.ffmpeg) {
+                if (result.ffmpeg.hasUpdate) {
+                    console.log(`🔄 FFmpeg update available: ${result.ffmpeg.latestVersion}`);
+                    console.log(`💡 Note: FFmpeg requires manual download from https://ffmpeg.org/download.html`);
+                } else {
+                    console.log(`ℹ️ FFmpeg: ${result.ffmpeg.reason || 'No update needed'}`);
+                }
+            }
+            
+            if (result.error) {
+                console.error('❌ Update error:', result.error);
+            }
+            
+            return result;
+        } catch (error) {
+            console.error('❌ Error updating tools:', error);
+            return null;
+        }
+    };
+
+    window.forceUpdateTools = async function() {
+        console.log('=== Force Updating Tools ===');
+        try {
+            // Clear last update check to force update
+            console.log('🔄 Clearing update check timestamps...');
+            
+            // Force update by clearing timestamps (this will be handled server-side)
+            const response = await fetch('/force-update-tools', { method: 'POST' });
+            const result = await response.json();
+            
+            console.log('📊 Force Update Results:', result);
+            return result;
+        } catch (error) {
+            console.error('❌ Error force updating tools:', error);
+            return null;
+        }
+    };
+
+
+
+
+
+
+
+
 
     // Fix playlist detection logic in handleWebSocketMessage and history categorization
     // ... ensure you use:
@@ -1295,12 +1664,17 @@ document.addEventListener('DOMContentLoaded', () => {
     async function createHistoryItemElement(item, index, rootFolder) {
         try {
             let absPath;
+            const itemFolder = item.folder || rootFolder;
             if (item.path.startsWith('/downloads/')) {
-                const relativePath = decodeURIComponent(item.path.replace('/downloads/', ''));
-                if (window.electronAPI?.resolvePath) {
-                    absPath = await window.electronAPI.resolvePath(rootFolder, relativePath);
+                let relativePath = decodeURIComponent(item.path.replace('/downloads/', ''));
+                // If relativePath is already absolute, use it directly
+                const isAbsolute = /^[a-zA-Z]:[\\/]/.test(relativePath) || relativePath.startsWith('/');
+                if (isAbsolute) {
+                    absPath = relativePath;
+                } else if (window.electronAPI?.resolvePath) {
+                    absPath = await window.electronAPI.resolvePath(itemFolder, relativePath);
                 } else {
-                    absPath = rootFolder + '\\' + relativePath.replace(/\//g, '\\');
+                    absPath = itemFolder + '\\' + relativePath.replace(/\//g, '\\');
                 }
             } else if (item.path.startsWith('http')) {
                 return null;
@@ -1311,30 +1685,30 @@ document.addEventListener('DOMContentLoaded', () => {
             if (window.electronAPI?.pathExists) {
                 fileExists = await window.electronAPI.pathExists(absPath);
             }
-        const div = document.createElement('div');
-        div.className = 'history-item';
+            const div = document.createElement('div');
+            div.className = 'history-item';
             div.dataset.index = index;
             div.dataset.originalIndex = findOriginalIndex(item);
             if (!fileExists) {
                 div.classList.add('file-missing');
             }
-        div.innerHTML = `
-                <img class="history-thumb" src="${item.thumbnail || 'https://placehold.co/120x90/e0e0e0/7f7f7f?text=Video'}" alt="Thumbnail" loading="lazy">
-                <div style="flex: 1; min-width: 0;">
-                    <div class="history-title" title="${item.name.replace(/"/g, '&quot;')}">${item.name}${!fileExists ? ' (Missing)' : ''}</div>
-                    <div class="history-meta">${new Date(item.mtime).toLocaleString()} • ${item.size}</div>
-          </div>
-          <div class="history-actions">
-                    <button class="history-action-btn play" title="Play Video" data-action="play" data-path="${absPath}" data-index="${index}" ${!fileExists ? 'disabled' : ''}>
-              <i class="fas fa-play"></i>
-            </button>
-                    <button class="history-action-btn folder" title="Open Folder" data-action="folder" data-path="${absPath}" data-index="${index}">
-              <i class="fas fa-folder-open"></i>
-            </button>
-                    <button class="history-action-btn delete" title="Delete File" data-action="delete" data-path="${absPath}" data-index="${index}">
-              <i class="fas fa-trash"></i>
-            </button>
-          </div>`;
+            div.innerHTML = `
+                    <img class="history-thumb" src="${item.thumbnail || 'https://placehold.co/120x90/e0e0e0/7f7f7f?text=Video'}" alt="Thumbnail" loading="lazy">
+                    <div style="flex: 1; min-width: 0;">
+                        <div class="history-title" title="${item.name.replace(/"/g, '&quot;')}">${item.name}${!fileExists ? ' (Missing)' : ''}</div>
+                        <div class="history-meta">${new Date(item.mtime).toLocaleString()} • ${item.size}</div>
+              </div>
+              <div class="history-actions">
+                        <button class="history-action-btn play" title="Play Video" data-action="play" data-path="${absPath}" data-index="${index}" ${!fileExists ? 'disabled' : ''}>
+                  <i class="fas fa-play"></i>
+                </button>
+                        <button class="history-action-btn folder" title="Open Folder" data-action="folder" data-path="${absPath}" data-index="${index}">
+                  <i class="fas fa-folder-open"></i>
+                </button>
+                        <button class="history-action-btn delete" title="Delete File" data-action="delete" data-path="${absPath}" data-index="${index}">
+                  <i class="fas fa-trash"></i>
+                </button>
+              </div>`;
             return div;
         } catch (error) {
             console.error(`Error creating history item element:`, error);
@@ -1568,7 +1942,7 @@ document.addEventListener('DOMContentLoaded', () => {
     );
     
     // Initial history setup
-    activateHistoryTab('youtubePlaylists');
+    activateHistoryTab('youtubeSingles');
     setupHistoryManagement();
     filterAndRenderHistory();
 
@@ -1587,28 +1961,52 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     scanDownloadFolderAndUpdateHistory();
+
+    // UI Scale slider event listener
+    const uiScaleInput = document.getElementById('uiScale');
+    const uiScaleValue = document.getElementById('uiScaleValue');
+
+    if (uiScaleInput && uiScaleValue) {
+        uiScaleInput.addEventListener('input', (e) => {
+            const scaleValue = parseFloat(e.target.value);
+            uiScaleValue.textContent = `${Math.round(scaleValue * 100)}%`;
+            applyUIScale(scaleValue);
+        });
+        
+        uiScaleInput.addEventListener('change', (e) => {
+            const scaleValue = parseFloat(e.target.value);
+            userSettings.uiScale = scaleValue;
+            localStorage.setItem('ytdUserSettings', JSON.stringify(userSettings));
+        });
+    }
 });
 
-// Ensure default download folder is set to the full absolute path on first launch
+// Ensure default download folder is set to the SimplyYTD downloads folder on first launch
 window.addEventListener('DOMContentLoaded', async () => {
     const downloadFolderInput = document.getElementById('downloadFolder');
-    const absoluteDefault = 'C:/Users/Youssef Ben/Desktop/Code/Video downloader Gemini (Complete) - Stable #2/downloads';
+    // Use the SimplyYTD downloads folder as the default
+    const defaultDownloadsPath = 'C:/Users/Youssef Ben/Desktop/Code/SimplyYTD/downloads';
+    
     if (downloadFolderInput) {
         let savedFolder = localStorage.getItem('downloadFolder');
         if (!savedFolder) {
-            downloadFolderInput.value = absoluteDefault;
-            localStorage.setItem('downloadFolder', absoluteDefault);
+            // Set default to SimplyYTD downloads directory on first launch
+            downloadFolderInput.value = defaultDownloadsPath;
+            localStorage.setItem('downloadFolder', defaultDownloadsPath);
         } else {
             downloadFolderInput.value = savedFolder;
         }
     }
-    // Update default folder button to use the absolute path
+    
+    // Update default folder button to use the SimplyYTD path
     const defaultFolderBtn = document.getElementById('defaultFolderBtn');
     if (defaultFolderBtn) {
         defaultFolderBtn.onclick = () => {
             const downloadFolderInput = document.getElementById('downloadFolder');
-            if (downloadFolderInput) downloadFolderInput.value = absoluteDefault;
-            localStorage.setItem('downloadFolder', absoluteDefault);
+            if (downloadFolderInput) {
+                downloadFolderInput.value = defaultDownloadsPath;
+                localStorage.setItem('downloadFolder', defaultDownloadsPath);
+            }
         };
     }
 });

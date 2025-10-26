@@ -42,8 +42,8 @@ console.log("[server.js] Received FFMPEG_PATH from env: ", process.env.FFMPEG_PA
   // Dynamically import get-port (ESM)
   const getPort = (await import('get-port')).default;
 
-  // Replace the current port assignment with:
-  const PORT = process.env.PORT || await getAvailablePort(3000);
+  // Use fixed port 9875 as requested
+  const PORT = 9875;
   let DOWNLOAD_DIR = path.join(__dirname, 'downloads');
   // Safety: Never allow app.asar or app.asa in the path
   if (DOWNLOAD_DIR.includes('app.asar') || DOWNLOAD_DIR.includes('app.asa')) {
@@ -76,17 +76,14 @@ console.log("[server.js] Received FFMPEG_PATH from env: ", process.env.FFMPEG_PA
   console.log("[server.js] Effective ffmpegExecutable: ", ffmpegExecutable);
   // ... rest of your server.js code
 
-  // Dynamically import p-limit
-  let pLimit;
-  import('p-limit').then(module => {
-      pLimit = module.default;
-      // Initialize limiters after p-limit is loaded
-      singleVideoProcessingLimit = pLimit(1); // Default to 1 for single videos initially
-      playlistItemProcessingLimit = pLimit(3); // Default for items within a playlist
-      console.log('p-limit loaded and limiters initialized.');
-      console.log(`Using yt-dlp: ${ytdlpExecutable}`);
-      console.log(`Using ffmpeg: ${ffmpegExecutable}`);
-  }).catch(err => console.error("Failed to load p-limit:", err));
+const pLimit = require('p-limit');
+
+// Initialize limiters
+let singleVideoProcessingLimit = pLimit(1); // Default to 1 for single videos initially
+let playlistItemProcessingLimit = pLimit(3); // Default for items within a playlist
+console.log('p-limit loaded and limiters initialized.');
+console.log(`Using yt-dlp: ${ytdlpExecutable}`);
+console.log(`Using ffmpeg: ${ffmpegExecutable}`);
 
 
   const app = express();
@@ -98,8 +95,7 @@ console.log("[server.js] Received FFMPEG_PATH from env: ", process.env.FFMPEG_PA
   const activeProcesses = new Map(); // Stores active yt-dlp/ffmpeg processes (itemId -> { ytdlpProc, ffmpegProc, tempFiles: [], cancelled: false })
   const downloadQueue = new Map(); // Stores item details before processing (itemId -> { clientId, videoUrl, format, quality, source, settings, isPlaylistItem, playlistIndex, status: 'queued' })
 
-  let singleVideoProcessingLimit; // To be initialized after p-limit loads
-  let playlistItemProcessingLimit; // To be initialized after p-limit loads
+  // Limiters are now initialized above with p-limit
 
 
   // --- Middleware ---
@@ -186,7 +182,7 @@ console.log("[server.js] Received FFMPEG_PATH from env: ", process.env.FFMPEG_PA
       if (!videoUrl) {
           return sendMessageToClient(clientId, { type: 'error', message: 'Missing video URL.' });
       }
-      if (!pLimit || !singleVideoProcessingLimit || !playlistItemProcessingLimit) { // Check if limiters are initialized
+      if (!singleVideoProcessingLimit || !playlistItemProcessingLimit) { // Check if limiters are initialized
            return sendMessageToClient(clientId, { type: 'error', message: 'Server not ready (concurrency limiters not initialized). Please try again shortly.' });
       }
 
@@ -1135,11 +1131,8 @@ console.log("[server.js] Received FFMPEG_PATH from env: ", process.env.FFMPEG_PA
       // Wait a bit for WebSocket server to be fully ready
       setTimeout(() => {
           console.log('WebSocket server should be ready now');
-          if (!pLimit) console.warn("p-limit module not loaded yet. Concurrency limiters will be initialized once it loads.");
-          else {
-              console.log(`Using yt-dlp executable: ${ytdlpExecutable}`);
-              console.log(`Using ffmpeg executable: ${ffmpegExecutable}`);
-          }
+          console.log(`Using yt-dlp executable: ${ytdlpExecutable}`);
+          console.log(`Using ffmpeg executable: ${ffmpegExecutable}`);
           
           // Send 'ready' message to all connected clients
           wss.clients.forEach(client => {
@@ -1156,6 +1149,8 @@ console.log("[server.js] Received FFMPEG_PATH from env: ", process.env.FFMPEG_PA
 
   function gracefulShutdown() {
       console.log('Received shutdown signal. Closing server and cleaning up...');
+      
+      // Notify all clients about shutdown
       wss.clients.forEach(clientWs => {
           const clientEntry = Array.from(clients.entries()).find(([id, cws]) => cws === clientWs);
           if (clientEntry) {
@@ -1164,26 +1159,60 @@ console.log("[server.js] Received FFMPEG_PATH from env: ", process.env.FFMPEG_PA
           clientWs.terminate();
       });
 
+      // Close WebSocket server
+      wss.close(() => {
+          console.log('WebSocket server closed.');
+      });
+
+      // Terminate all active processes more aggressively
+      activeProcesses.forEach((procInfo, itemId) => {
+          console.log(`Terminating active processes for item: ${itemId} during shutdown.`);
+          procInfo.cancelled = true;
+          
+          // Kill yt-dlp processes
+          if (procInfo.ytdlpProc && procInfo.ytdlpProc.pid && !procInfo.ytdlpProc.killed) {
+              console.log(`Force killing yt-dlp process (PID: ${procInfo.ytdlpProc.pid})`);
+              terminateProcessTree(procInfo.ytdlpProc.pid);
+              procInfo.ytdlpProc.killed = true;
+          }
+          
+          // Kill ffmpeg processes
+          if (procInfo.ffmpegProc && procInfo.ffmpegProc.pid && !procInfo.ffmpegProc.killed) {
+              console.log(`Force killing ffmpeg process (PID: ${procInfo.ffmpegProc.pid})`);
+              terminateProcessTree(procInfo.ffmpegProc.pid);
+              procInfo.ffmpegProc.killed = true;
+          }
+      });
+
+      // Clear all maps
+      activeProcesses.clear();
+      downloadQueue.clear();
+      clients.clear();
+
       server.close(() => {
           console.log('HTTP server closed.');
-          activeProcesses.forEach((procInfo, itemId) => {
-              console.log(`Terminating active processes for item: ${itemId} during shutdown.`);
-              procInfo.cancelled = true;
-              if (procInfo.ytdlpProc && procInfo.ytdlpProc.pid && !procInfo.ytdlpProc.killed) {
-                  terminateProcessTree(procInfo.ytdlpProc.pid);
-              }
-              if (procInfo.ffmpegProc && procInfo.ffmpegProc.pid && !procInfo.ffmpegProc.killed) {
-                  terminateProcessTree(procInfo.ffmpegProc.pid);
-              }
-          });
           console.log("Cleanup complete. Exiting.");
           process.exit(0);
       });
 
+      // More aggressive timeout for shutdown
       setTimeout(() => {
-          console.error("Graceful shutdown timed out. Forcing exit.");
+          console.error("Graceful shutdown timed out. Force killing all processes and exiting.");
+          // Force kill any remaining processes
+          activeProcesses.forEach((procInfo) => {
+              if (procInfo.ytdlpProc && procInfo.ytdlpProc.pid) {
+                  try {
+                      process.kill(procInfo.ytdlpProc.pid, 'SIGKILL');
+                  } catch (e) {}
+              }
+              if (procInfo.ffmpegProc && procInfo.ffmpegProc.pid) {
+                  try {
+                      process.kill(procInfo.ffmpegProc.pid, 'SIGKILL');
+                  } catch (e) {}
+              }
+          });
           process.exit(1);
-      }, 10000);
+      }, 5000); // Reduced timeout to 5 seconds
   }
 
   // Helper to get playlist title using yt-dlp

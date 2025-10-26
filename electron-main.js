@@ -8,7 +8,7 @@ const net = require('net'); // Required for server readiness check
 
 let mainWindow;
 let serverProcess;
-let serverPort = process.env.PORT || 3000; // Will be updated when server starts
+let serverPort = 9875; // Fixed port as requested
 
 // --- Determine Paths for Packaged App ---
 const isDev = process.env.NODE_ENV !== 'production';
@@ -213,6 +213,9 @@ function startServer() {
       }
     );
 
+    // Set up server exit handler immediately
+    serverProcess.on('exit', handleServerExit);
+
     // Wait for server to be ready
     serverProcess.on('message', (msg) => {
       console.log('Message from server process:', msg);
@@ -236,9 +239,13 @@ function startServer() {
   });
 }
 
-// Add server exit handler
-serverProcess?.on('exit', (code, signal) => {
+// Enhanced server exit handler with cleanup
+function handleServerExit(code, signal) {
   console.log(`Server process exited with code ${code} and signal ${signal}`);
+  
+  // Clean up any remaining child processes
+  cleanupAllProcesses();
+  
   if (code !== 0 && !serverProcess?.killed) {
     dialog.showMessageBox(mainWindow || null, {
       type: 'warning',
@@ -247,7 +254,51 @@ serverProcess?.on('exit', (code, signal) => {
     });
   }
   serverProcess = null;
-});
+}
+
+// Function to cleanup all related processes
+function cleanupAllProcesses() {
+  console.log('Cleaning up all related processes...');
+  
+  // Kill any remaining yt-dlp processes
+  try {
+    if (os.platform() === 'win32') {
+      require('child_process').exec('taskkill /f /im yt-dlp.exe', (error) => {
+        if (error && !error.message.includes('not found')) {
+          console.error('Error killing yt-dlp processes:', error);
+        }
+      });
+    } else {
+      require('child_process').exec('pkill -f yt-dlp', (error) => {
+        if (error && !error.message.includes('No matching processes')) {
+          console.error('Error killing yt-dlp processes:', error);
+        }
+      });
+    }
+  } catch (e) {
+    console.error('Error in yt-dlp cleanup:', e);
+  }
+  
+  // Kill any remaining ffmpeg processes
+  try {
+    if (os.platform() === 'win32') {
+      require('child_process').exec('taskkill /f /im ffmpeg.exe', (error) => {
+        if (error && !error.message.includes('not found')) {
+          console.error('Error killing ffmpeg processes:', error);
+        }
+      });
+    } else {
+      require('child_process').exec('pkill -f ffmpeg', (error) => {
+        if (error && !error.message.includes('No matching processes')) {
+          console.error('Error killing ffmpeg processes:', error);
+        }
+      });
+    }
+  } catch (e) {
+    console.error('Error in ffmpeg cleanup:', e);
+  }
+}
+
 
 app.on('ready', async () => {
   try {
@@ -259,6 +310,9 @@ app.on('ready', async () => {
 });
 
 app.on('window-all-closed', () => {
+  console.log('All windows closed. Cleaning up processes...');
+  cleanupAllProcesses();
+  
   if (process.platform !== 'darwin') {
     app.quit();
   }
@@ -268,13 +322,33 @@ app.on('before-quit', (event) => {
   console.log('App before-quit event triggered.');
   if (serverProcess && !serverProcess.killed) {
     console.log('Attempting to kill server process...');
+    
+    // First try graceful shutdown
     const killed = serverProcess.kill('SIGTERM');
     if (killed) {
-      console.log('Sent SIGTERM to server process. Waiting for exit...');
+      console.log('Sent SIGTERM to server process. Waiting for graceful shutdown...');
+      
+      // Wait for graceful shutdown with timeout
+      const shutdownTimeout = setTimeout(() => {
+        if (serverProcess && !serverProcess.killed) {
+          console.log('Graceful shutdown timeout. Force killing server process...');
+          try {
+            serverProcess.kill('SIGKILL');
+          } catch (e) {
+            console.error('Error force killing server process:', e);
+          }
+        }
+      }, 3000); // 3 second timeout for graceful shutdown
+      
+      serverProcess.on('exit', () => {
+        clearTimeout(shutdownTimeout);
+        console.log('Server process exited gracefully.');
+        serverProcess = null;
+      });
     } else {
       console.log('Failed to send SIGTERM or process already exited.');
+      serverProcess = null;
     }
-    serverProcess = null;
   }
 });
 
