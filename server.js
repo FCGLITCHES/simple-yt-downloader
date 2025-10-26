@@ -856,22 +856,26 @@ console.log(`Using ffmpeg: ${ffmpegExecutable}`);
       let cookieFilePath = null;
       const possiblePaths = [];
       
+      // Always check userData first (works for both dev and production)
+      const userDataPath = getUserDataPath();
+      possiblePaths.push(path.join(userDataPath, 'cookies.txt'));
+      
       if (isDev) {
-            // Development: check project root first, then userData
+            // Development: also check project root
           possiblePaths.push(
-              path.join(__dirname, 'cookies.txt'),
-                path.join(os.homedir(), '.video-downloader-gemini', 'cookies.txt')
+              path.join(__dirname, 'cookies.txt')
           );
       } else {
             // Production: Use Electron's userData directory
-            // We need to get this from the main process, but for now we'll construct the standard path
-            const userDataPath = getUserDataPath();
-          possiblePaths.push(
-                path.join(userDataPath, 'cookies.txt'),
-                // Fallback paths
-                path.join(os.homedir(), '.video-downloader-gemini', 'cookies.txt')
-          );
+            // Already added to possiblePaths above
+          const electronUserDataPath = app?.getPath('userData');
+          if (electronUserDataPath) {
+              possiblePaths.unshift(path.join(electronUserDataPath, 'cookies.txt'));
+          }
       }
+      
+      // Add fallback to project directory for easy access
+      possiblePaths.push(path.join(__dirname, 'cookies.txt'));
         
         console.log('[getCookiesPath] Environment:', isDev ? 'Development' : 'Production');
         console.log('[getCookiesPath] Checking paths:', possiblePaths);

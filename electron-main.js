@@ -395,18 +395,25 @@ ipcMain.handle('get-userdata-path', async () => {
 ipcMain.handle('save-cookies-txt', async (event, content) => {
   try {
         const userDataPath = app.getPath('userData');
-        const filePath = path.join(userDataPath, 'cookies.txt');
+        const userDataFilePath = path.join(userDataPath, 'cookies.txt');
+        
+        // Also save to project directory for easy access
+        const projectFilePath = path.join(__dirname, 'cookies.txt');
         
         // Ensure the userData directory exists
         if (!fs.existsSync(userDataPath)) {
             fs.mkdirSync(userDataPath, { recursive: true });
             console.log(`[save-cookies-txt] Created userData directory: ${userDataPath}`);
-    }
+        }
     
-    console.log(`[save-cookies-txt] Saving cookies to: ${filePath}`);
-    fs.writeFileSync(filePath, content, 'utf8');
+        console.log(`[save-cookies-txt] Saving cookies to: ${userDataFilePath}`);
+        fs.writeFileSync(userDataFilePath, content, 'utf8');
         
-    return { success: true, path: filePath };
+        // Also save to project directory
+        console.log(`[save-cookies-txt] Also saving cookies to: ${projectFilePath}`);
+        fs.writeFileSync(projectFilePath, content, 'utf8');
+        
+    return { success: true, path: userDataFilePath, projectPath: projectFilePath };
   } catch (err) {
     console.error('Failed to save cookies.txt:', err);
     return { success: false, error: err.message };
