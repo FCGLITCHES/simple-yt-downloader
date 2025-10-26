@@ -1337,36 +1337,27 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             console.log('🔄 Starting tool updates...');
             
-            const response = await fetch('/update-tools', { method: 'POST' });
+            const response = await fetch('/update-tools', { 
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ platform: navigator.platform.toLowerCase().indexOf('win') !== -1 ? 'win32' : os.platform() })
+            });
             const result = await response.json();
             
             console.log('📊 Update Results:', result);
             
-            // Display results
-            if (result.ytdlp) {
-                if (result.ytdlp.updated) {
-                    console.log(`✅ yt-dlp updated: ${result.ytdlp.oldVersion} → ${result.ytdlp.newVersion}`);
-                } else {
-                    console.log(`ℹ️ yt-dlp: ${result.ytdlp.reason || result.ytdlp.error || 'No update needed'}`);
-                }
-            }
-            
-            if (result.ffmpeg) {
-                if (result.ffmpeg.hasUpdate) {
-                    console.log(`🔄 FFmpeg update available: ${result.ffmpeg.latestVersion}`);
-                    console.log(`💡 Note: FFmpeg requires manual download from https://ffmpeg.org/download.html`);
-                } else {
-                    console.log(`ℹ️ FFmpeg: ${result.ffmpeg.reason || 'No update needed'}`);
-                }
-            }
-            
-            if (result.error) {
-                console.error('❌ Update error:', result.error);
+            if (result.success) {
+                console.log('✅ Tools update process started successfully');
+                alert('Tools are being updated in the background. Please check the terminal for progress.');
+            } else {
+                console.error('❌ Update failed:', result.error);
+                alert('Failed to start update process: ' + result.error);
             }
             
             return result;
         } catch (error) {
             console.error('❌ Error updating tools:', error);
+            alert('Error updating tools. Check console for details.');
             return null;
         }
     };

@@ -1075,6 +1075,81 @@ console.log(`Using ffmpeg: ${ffmpegExecutable}`);
   }
 
 
+  // --- Update Tools Functions ---
+  async function updateYtDlp(ytdlpPath) {
+      return new Promise((resolve, reject) => {
+          console.log('[updateYtDlp] Starting yt-dlp update...');
+          
+          // yt-dlp can update itself
+          const updateProcess = spawn(ytdlpPath, ['-U'], {
+              cwd: path.dirname(ytdlpPath),
+              stdio: 'pipe'
+          });
+          
+          let output = '';
+          
+          updateProcess.stdout.on('data', (data) => {
+              output += data.toString();
+              console.log('[updateYtDlp]', data.toString().trim());
+          });
+          
+          updateProcess.stderr.on('data', (data) => {
+              output += data.toString();
+              console.error('[updateYtDlp]', data.toString().trim());
+          });
+          
+          updateProcess.on('close', (code) => {
+              if (code === 0) {
+                  console.log('[updateYtDlp] Successfully updated yt-dlp');
+                  resolve();
+              } else {
+                  console.error(`[updateYtDlp] Process exited with code ${code}`);
+                  reject(new Error(`yt-dlp update failed with code ${code}`));
+              }
+          });
+          
+          updateProcess.on('error', (error) => {
+              console.error('[updateYtDlp] Failed to start update process:', error);
+              reject(error);
+          });
+      });
+  }
+  
+  async function updateFfmpeg(ffmpegPath, platform) {
+      return new Promise((resolve, reject) => {
+          console.log('[updateFfmpeg] Starting ffmpeg update...');
+          
+          if (platform !== 'win32') {
+              // For Linux/Mac, use system package manager
+              console.log('[updateFfmpeg] Platform not Windows, skipping direct update');
+              resolve();
+              return;
+          }
+          
+          // For Windows, download from ffmpeg.org
+          const https = require('https');
+          const ffmpegUrl = 'https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip';
+          
+          https.get(ffmpegUrl, (response) => {
+              if (response.statusCode !== 200) {
+                  reject(new Error(`Failed to download ffmpeg: ${response.statusCode}`));
+                  return;
+              }
+              
+              const fileStream = fs.createWriteStream(ffmpegPath + '.zip');
+              response.pipe(fileStream);
+              
+              fileStream.on('finish', () => {
+                  console.log('[updateFfmpeg] Downloaded ffmpeg successfully');
+                  resolve();
+              });
+          }).on('error', (error) => {
+              console.error('[updateFfmpeg] Download error:', error);
+              reject(error);
+          });
+      });
+  }
+
   // --- HTTP Routes ---
   app.get('/', (req, res) => {
       res.sendFile(path.join(__dirname, 'index.html'));
@@ -1105,6 +1180,35 @@ console.log(`Using ffmpeg: ${ffmpegExecutable}`);
   app.post('/shutdown', (req, res) => {
       res.json({ message: 'Server shutting down...' });
       setTimeout(() => gracefulShutdown(), 100); // Give response time to send
+  });
+
+  // Update tools endpoint
+  app.post('/update-tools', async (req, res) => {
+      const { platform = os.platform() } = req.body;
+      
+      try {
+          const binDir = path.join(__dirname, 'bin');
+          const ytdlpPath = path.join(binDir, platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp');
+          const ffmpegPath = path.join(binDir, platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg');
+          
+          console.log('[update-tools] Starting tool updates...');
+          
+          // Send initial response
+          res.json({ 
+              success: true, 
+              message: 'Update process started',
+              platform 
+          });
+          
+          // Update yt-dlp
+          await updateYtDlp(ytdlpPath);
+          
+          // Update ffmpeg
+          await updateFfmpeg(ffmpegPath, platform);
+          
+      } catch (error) {
+          console.error('[update-tools] Error:', error);
+      }
   });
 
 
