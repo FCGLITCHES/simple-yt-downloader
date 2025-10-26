@@ -578,8 +578,8 @@ console.log(`Using ffmpeg: ${ffmpegExecutable}`);
 
           if (format === 'mp3') {
               const tempDownloadFilenamePattern = `tmp_${itemId}_audio.*`;
-              downloadedPrimaryPath = path.join(DOWNLOAD_DIR, `tmp_${itemId}_audio.%(ext)s`); // For yt-dlp output
-              tempFilesCreated.push(path.join(DOWNLOAD_DIR, tempDownloadFilenamePattern)); // Use wildcard for cleanup
+              downloadedPrimaryPath = path.join(targetDir, `tmp_${itemId}_audio.%(ext)s`); // For yt-dlp output
+              tempFilesCreated.push(path.join(targetDir, tempDownloadFilenamePattern)); // Use wildcard for cleanup
 
               let audioDownloadArgs = ['-f', 'bestaudio/best', '--no-playlist', '-o', downloadedPrimaryPath, videoUrl];
               if (settings.skipDuplicates && isPlaylistItem) audioDownloadArgs.unshift('--no-overwrites');
@@ -594,12 +594,12 @@ console.log(`Using ffmpeg: ${ffmpegExecutable}`);
               needsConversion = true; finalExtension = 'mp3';
           } else if (format === 'mp4') {
               const tempVideoFilenamePattern = `tmp_${itemId}_video.*`;
-              downloadedPrimaryPath = path.join(DOWNLOAD_DIR, `tmp_${itemId}_video.%(ext)s`);
-              tempFilesCreated.push(path.join(DOWNLOAD_DIR, tempVideoFilenamePattern));
+              downloadedPrimaryPath = path.join(targetDir, `tmp_${itemId}_video.%(ext)s`);
+              tempFilesCreated.push(path.join(targetDir, tempVideoFilenamePattern));
 
               const tempAudioFilenamePattern = `tmp_${itemId}_audio_for_mp4.*`;
-              tempAudioPath = path.join(DOWNLOAD_DIR, `tmp_${itemId}_audio_for_mp4.%(ext)s`);
-              tempFilesCreated.push(path.join(DOWNLOAD_DIR, tempAudioFilenamePattern));
+              tempAudioPath = path.join(targetDir, `tmp_${itemId}_audio_for_mp4.%(ext)s`);
+              tempFilesCreated.push(path.join(targetDir, tempAudioFilenamePattern));
 
               const height = parseInt(quality);
               let formatString = height === 2160
