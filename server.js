@@ -1080,30 +1080,44 @@ console.log(`Using ffmpeg: ${ffmpegExecutable}`);
       return new Promise((resolve, reject) => {
           console.log('[updateYtDlp] Starting yt-dlp update...');
           
+          // Check if yt-dlp exists
+          if (!fs.existsSync(ytdlpPath)) {
+              console.error('[updateYtDlp] yt-dlp not found at:', ytdlpPath);
+              reject(new Error('yt-dlp not found'));
+              return;
+          }
+          
           // yt-dlp can update itself
           const updateProcess = spawn(ytdlpPath, ['-U'], {
               cwd: path.dirname(ytdlpPath),
-              stdio: 'pipe'
+              stdio: 'pipe',
+              shell: true
           });
           
           let output = '';
+          let errorOutput = '';
           
           updateProcess.stdout.on('data', (data) => {
-              output += data.toString();
-              console.log('[updateYtDlp]', data.toString().trim());
+              const dataStr = data.toString();
+              output += dataStr;
+              console.log('[updateYtDlp]', dataStr.trim());
           });
           
           updateProcess.stderr.on('data', (data) => {
-              output += data.toString();
-              console.error('[updateYtDlp]', data.toString().trim());
+              const dataStr = data.toString();
+              errorOutput += dataStr;
+              console.log('[updateYtDlp]', dataStr.trim()); // yt-dlp may output to stderr
           });
           
           updateProcess.on('close', (code) => {
-              if (code === 0) {
-                  console.log('[updateYtDlp] Successfully updated yt-dlp');
-                  resolve();
+              // yt-dlp -U can return non-zero codes even on success
+              if (code === 0 || code === 1) {
+                  console.log('[updateYtDlp] Update process completed');
+                  resolve({ output, error: errorOutput });
               } else {
                   console.error(`[updateYtDlp] Process exited with code ${code}`);
+                  console.error('[updateYtDlp] Output:', output);
+                  console.error('[updateYtDlp] Error:', errorOutput);
                   reject(new Error(`yt-dlp update failed with code ${code}`));
               }
           });
@@ -1119,34 +1133,10 @@ console.log(`Using ffmpeg: ${ffmpegExecutable}`);
       return new Promise((resolve, reject) => {
           console.log('[updateFfmpeg] Starting ffmpeg update...');
           
-          if (platform !== 'win32') {
-              // For Linux/Mac, use system package manager
-              console.log('[updateFfmpeg] Platform not Windows, skipping direct update');
-              resolve();
-              return;
-          }
-          
-          // For Windows, download from ffmpeg.org
-          const https = require('https');
-          const ffmpegUrl = 'https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip';
-          
-          https.get(ffmpegUrl, (response) => {
-              if (response.statusCode !== 200) {
-                  reject(new Error(`Failed to download ffmpeg: ${response.statusCode}`));
-                  return;
-              }
-              
-              const fileStream = fs.createWriteStream(ffmpegPath + '.zip');
-              response.pipe(fileStream);
-              
-              fileStream.on('finish', () => {
-                  console.log('[updateFfmpeg] Downloaded ffmpeg successfully');
-                  resolve();
-              });
-          }).on('error', (error) => {
-              console.error('[updateFfmpeg] Download error:', error);
-              reject(error);
-          });
+          // For now, skip ffmpeg update as it requires manual handling
+          // Users should update ffmpeg manually
+          console.log('[updateFfmpeg] Skipping ffmpeg update - please update manually from https://ffmpeg.org');
+          resolve({ message: 'FFmpeg update skipped - please update manually' });
       });
   }
 
@@ -1284,6 +1274,9 @@ console.log(`Using ffmpeg: ${ffmpegExecutable}`);
           const ffmpegPath = path.join(binDir, platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg');
           
           console.log('[update-tools] Starting tool updates...');
+          console.log('[update-tools] binDir:', binDir);
+          console.log('[update-tools] ytdlpPath:', ytdlpPath);
+          console.log('[update-tools] ffmpegPath:', ffmpegPath);
           
           // Send initial response
           res.json({ 
@@ -1293,10 +1286,20 @@ console.log(`Using ffmpeg: ${ffmpegExecutable}`);
           });
           
           // Update yt-dlp
-          await updateYtDlp(ytdlpPath);
+          try {
+              const result = await updateYtDlp(ytdlpPath);
+              console.log('[update-tools] yt-dlp update result:', result);
+          } catch (error) {
+              console.error('[update-tools] yt-dlp update error:', error.message);
+          }
           
           // Update ffmpeg
-          await updateFfmpeg(ffmpegPath, platform);
+          try {
+              const result = await updateFfmpeg(ffmpegPath, platform);
+              console.log('[update-tools] ffmpeg update result:', result);
+          } catch (error) {
+              console.error('[update-tools] ffmpeg update error:', error.message);
+          }
           
       } catch (error) {
           console.error('[update-tools] Error:', error);
