@@ -1087,8 +1087,9 @@ console.log(`Using ffmpeg: ${ffmpegExecutable}`);
               return;
           }
           
-          // yt-dlp can update itself
-          const updateProcess = spawn(ytdlpPath, ['-U'], {
+          // yt-dlp can update itself - quote the path to handle spaces
+          const quotedPath = `"${ytdlpPath}"`;
+          const updateProcess = spawn(quotedPath, ['-U'], {
               cwd: path.dirname(ytdlpPath),
               stdio: 'pipe',
               shell: true
