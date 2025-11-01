@@ -64,7 +64,7 @@
     --border-color: #2a3a6b;
     --header-gradient: linear-gradient(45deg, #e01224, #9b111e);
     --header-text: #ffffff;
-    --shadow-color: rgba(224, 18, 36, 0.25);
+    --shadow-color: rgba(0, 0, 0, 0.3);
     --progress-bar-bg: #e01224;
 }
 
@@ -90,7 +90,15 @@
 
 [data-theme="vibrant"] .download-btn {
     background: linear-gradient(45deg, var(--primary-color), #b31322);
-    box-shadow: 0 4px 15px rgba(224, 18, 36, 0.35);
+    border: 2px solid var(--primary-color);
+    box-shadow: none;
+}
+
+[data-theme="vibrant"] .download-btn:hover {
+    background: linear-gradient(45deg, #c21b2a, #d63031);
+    border: 2px solid var(--primary-color);
+    filter: brightness(1.15);
+    box-shadow: none;
 }
 
 [data-theme="vibrant"] .progress-bar { background: var(--primary-color); }
@@ -1268,6 +1276,30 @@ output {
     border: 1px solid var(--border-color);
 }
 
+[data-theme="light"] .history-content {
+    background: #f2f2f2;
+}
+
+[data-theme="light"] .history-header {
+    background: #f2f2f2;
+}
+
+[data-theme="light"] .history-sidebar {
+    background: #f2f2f2;
+}
+
+[data-theme="minimal"] .history-content {
+    background: #f2f2f2;
+}
+
+[data-theme="minimal"] .history-header {
+    background: #f2f2f2;
+}
+
+[data-theme="minimal"] .history-sidebar {
+    background: #f2f2f2;
+}
+
 /* History header: search and filters in the same row */
 .history-header {
     display: flex;
@@ -1482,7 +1514,6 @@ body.compact-mode .history-filters label {
     align-items: center;
     min-height: 150px;
     max-height: 150px;
-    background: var(--input-bg);
     border-radius: 0.6rem;
     box-shadow: 0 2px 8px var(--shadow-color);
     padding: 1.2rem;
@@ -1490,6 +1521,22 @@ body.compact-mode .history-filters label {
     position: relative;
     transition: all 0.2s ease;
     border: 2px solid transparent;
+}
+
+[data-theme="light"] .history-item {
+    background: #ffffff;
+}
+
+[data-theme="dark"] .history-item {
+    background: #454545;
+}
+
+[data-theme="minimal"] .history-item {
+    background: #ffffff;
+}
+
+[data-theme="vibrant"] .history-item {
+    background: var(--input-bg);
 }
 
 .history-item > div:not(.history-thumb):not(.history-actions) {
@@ -1516,6 +1563,11 @@ body.compact-mode .history-filters label {
     background: rgba(231, 76, 60, 0.1);
     border-color: var(--primary-color);
     box-shadow: 0 0 0 3px rgba(231, 76, 60, 0.2);
+}
+
+[data-theme="vibrant"] .history-item.selected {
+    border: 2px solid var(--primary-color);
+    box-shadow: none;
 }
 
 .history-item-checkbox {

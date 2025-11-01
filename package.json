@@ -9,9 +9,9 @@
     "electron:dev": "cross-env NODE_ENV=development electron .",
     "electron": "cross-env NODE_ENV=production electron .",
     "build": "npm run build:win",
-    "build:win": "electron-packager . \"SimplyYTD\" --platform=win32 --arch=x64 --out=dist --prune=true --asar --asarUnpack=\"{cookies/**,*.json}\" --icon=./public/Logo_1.ico --extra-resource=./bin --extra-resource=./assets --extra-resource=./public",
-    "build:mac": "electron-packager . \"SimplyYTD\" --platform=darwin --arch=x64 --out=dist --prune=true --asar --asarUnpack=\"{cookies/**,*.json}\" --icon=./public/Logo_1.ico --extra-resource=./bin --extra-resource=./assets --extra-resource=./public",
-    "build:linux": "electron-packager . \"SimplyYTD\" --platform=linux --arch=x64 --out=dist --prune=true --asar --asarUnpack=\"{cookies/**,*.json}\" --icon=./public/Logo_1.ico --extra-resource=./bin --extra-resource=./assets --extra-resource=./public"
+    "build:win": "electron-packager . \"SimplyYTD\" --platform=win32 --arch=x64 --out=dist --prune=true --asar --asarUnpack=\"{cookies/**,*.json}\" --extra-resource=./bin --extra-resource=./assets --extra-resource=./public",
+    "build:mac": "electron-packager . \"SimplyYTD\" --platform=darwin --arch=x64 --out=dist --prune=true --asar --asarUnpack=\"{cookies/**,*.json}\" --icon=./public/Logo.ico --extra-resource=./bin --extra-resource=./assets --extra-resource=./public",
+    "build:linux": "electron-packager . \"SimplyYTD\" --platform=linux --arch=x64 --out=dist --prune=true --asar --asarUnpack=\"{cookies/**,*.json}\" --icon=./public/Logo.ico --extra-resource=./bin --extra-resource=./assets --extra-resource=./public"
   },
   "keywords": [
     "simplyytd",
