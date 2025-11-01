@@ -50,15 +50,17 @@ function loadWindowState() {
   } catch (e) {
     console.error('Failed to load window state:', e);
   }
-  return { width: 1280, height: 800, isMaximized: false, isFullScreen: false };
+  return { width: 1280, height: 800, x: undefined, y: undefined, isMaximized: false, isFullScreen: false };
 }
 
 function saveWindowState(win) {
-  if (!win) return;
+  if (!win || win.isMaximized() || win.isFullScreen()) return; // Don't save position when maximized/fullscreen
   const bounds = win.getBounds();
   const state = {
     width: bounds.width,
     height: bounds.height,
+    x: bounds.x,
+    y: bounds.y,
     isMaximized: win.isMaximized(),
     isFullScreen: win.isFullScreen()
   };
@@ -103,7 +105,7 @@ async function createWindow() {
     const port = await startServer();
     console.log(`Server started on port ${port}`);
     
-    mainWindow = new BrowserWindow({
+    const winOptions = {
       width: lastState.width,
       height: lastState.height,
       title: 'SimplyYTD - Video Downloader',
@@ -115,7 +117,15 @@ async function createWindow() {
         preload: path.join(__dirname, 'preload.js')
       },
       icon: path.join(__dirname, 'assets', 'Logo 1.png')
-    });
+    };
+    
+    // Restore position if available and valid
+    if (lastState.x !== undefined && lastState.y !== undefined) {
+      winOptions.x = lastState.x;
+      winOptions.y = lastState.y;
+    }
+    
+    mainWindow = new BrowserWindow(winOptions);
 
     // Wait for server to be truly ready before loading
     console.log('Waiting for server to be ready...');
@@ -144,16 +154,39 @@ async function createWindow() {
     saveWindowState(mainWindow);
   });
 
+  mainWindow.on('move', () => {
+    if (!mainWindow.isMaximized() && !mainWindow.isFullScreen()) {
+      saveWindowState(mainWindow);
+    }
+  });
+
   mainWindow.on('resize', () => {
-    saveWindowState(mainWindow);
+    if (!mainWindow.isMaximized() && !mainWindow.isFullScreen()) {
+      saveWindowState(mainWindow);
+    }
   });
 
   mainWindow.on('maximize', () => {
-    saveWindowState(mainWindow);
+    const state = {
+      width: lastState.width || 1280,
+      height: lastState.height || 800,
+      x: lastState.x,
+      y: lastState.y,
+      isMaximized: true,
+      isFullScreen: mainWindow.isFullScreen()
+    };
+    try {
+      fs.writeFileSync(windowStatePath, JSON.stringify(state));
+    } catch (e) {
+      console.error('Failed to save window state:', e);
+    }
   });
 
   mainWindow.on('unmaximize', () => {
-    saveWindowState(mainWindow);
+    // Save state after a brief delay to ensure bounds are correct
+    setTimeout(() => {
+      saveWindowState(mainWindow);
+    }, 100);
   });
 
   mainWindow.on('enter-full-screen', () => {

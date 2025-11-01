@@ -251,13 +251,14 @@ body {
     border-radius: 1rem;
     box-shadow: 0 8px 25px var(--shadow-color);
     border: 1px solid var(--border-color);
-    flex: 1 1 550px; /* Allow card to grow but have a base */
+    flex: 0 2 550px; /* Higher shrink (2) so it shrinks first, base 550px */
+    min-width: 350px; /* Minimum width before wrapping */
     max-width: 600px; /* Max width for the input card */
     margin-bottom: 0;
 }
 
 .download-links-container {
-    flex: 1 1 450px; /* Allow links area to grow but have a base */
+    flex: 1 0 450px; /* No shrink (0) to maintain size, can grow, base 450px */
     background: var(--card-bg);
     padding: 1.5rem;
     border-radius: 1rem;
@@ -266,6 +267,7 @@ body {
     min-height: 460px; /* Consistent minimum height */
     max-height: 70vh; /* Limit max height relative to viewport */
     overflow-y: auto;
+    min-width: 400px; /* Minimum width to maintain prominence */
 }
 
 .card h2 {
@@ -311,8 +313,12 @@ body {
 
 .form-group {
     margin-bottom: 1.2rem; /* Adjusted */
+    width: 100%;
+    box-sizing: border-box;
 }
-.options-grid .form-group { margin-bottom: 0; }
+.options-grid .form-group { 
+    margin-bottom: 0; 
+}
 
 .single-concurrency-options label {
     display: block;
@@ -409,10 +415,15 @@ body {
     margin-top: 1.5rem;
     padding-top: 1.5rem;
     border-top: 1px dashed var(--border-color);
+    width: 100%;
+    box-sizing: border-box;
 }
 .playlist-options h4 { margin-bottom: 0.5rem; text-align: center; color: var(--primary-color); }
 .playlist-options p { text-align: center; margin-bottom: 1rem; font-size: 0.95rem; opacity: 0.8; }
-.playlist-options .form-group { margin-bottom: 1rem; }
+.playlist-options .form-group { 
+    margin-bottom: 1rem; 
+    width: 100%;
+}
 .playlist-options label { display: block; margin-bottom: 0.3rem; font-weight: 500; }
 
 /* Download Item Styles */
@@ -1120,28 +1131,93 @@ body.instagram-theme-active .reset-btn:hover { border-color: #C13584; }
 }
 
 /* Responsive Adjustments */
-@media (max-width: 992px) { /* Adjust breakpoint for layout change */
-    .downloader-layout {
-        flex-direction: column;
-    }
-    .downloader-layout .card,
-    .download-links-container {
-        max-width: 100%; /* Allow them to take full width when stacked */
-        flex-basis: auto;
+@media (max-width: 1200px) {
+    .downloader-layout .card {
+        flex: 0 2 480px; /* Shrink input card first */
+        min-width: 320px;
+        max-width: 550px;
     }
     .download-links-container {
-        margin-top: 1.5rem; /* Add space when stacked */
-        max-height: 50vh; /* Adjust max height for smaller screens */
+        flex: 1 0 400px; /* Maintain download card size */
+        min-width: 350px;
     }
 }
 
+@media (max-width: 992px) { /* Stack vertically at this breakpoint */
+    .downloader-layout {
+        flex-direction: column;
+    }
+    .downloader-layout .card {
+        width: 100%;
+        max-width: 100%;
+        flex: 0 0 auto; /* Fixed size when stacked */
+        min-width: 100%;
+        padding: 1.5rem 1.8rem; /* Reduce padding for smaller input card */
+    }
+    .download-links-container {
+        width: 100%;
+        max-width: 100%;
+        flex: 1 0 auto; /* Take remaining space */
+        min-width: 100%;
+        margin-top: 1.5rem; /* Add space when stacked */
+        max-height: 60vh; /* Give download card more prominence */
+        min-height: 400px;
+    }
+}
+
+/* Prioritize shrinking input card on smaller screens */
 @media (max-width: 768px) {
+    .downloader-layout .card {
+        padding: 1.2rem 1.5rem; /* Further reduce input card padding */
+        min-width: 100%;
+    }
+    .download-links-container {
+        min-height: 400px; /* Ensure download card has good visibility */
+    }
+    /* Ensure all form elements are properly wrapped */
+    .options-grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+        width: 100%;
+    }
+    .form-group {
+        width: 100%;
+        box-sizing: border-box;
+    }
+    .input-field,
+    .select-field {
+        width: 100%;
+        box-sizing: border-box;
+    }
+    .radio-group {
+        flex-wrap: wrap;
+        gap: 1rem;
+        width: 100%;
+    }
+    .download-btn {
+        width: 100%;
+        box-sizing: border-box;
+    }
+    .playlist-options {
+        width: 100%;
+        box-sizing: border-box;
+    }
+    .playlist-options .select-field {
+        width: 100%;
+    }
+    .single-concurrency-options {
+        width: 100%;
+    }
+    .input-adornment-btn {
+        position: absolute;
+        right: 8px;
+        z-index: 1;
+    }
     .header { padding: 0.8rem 1rem; }
     .logo { height: 40px; }
     .logo-text { font-size: 1.5rem; }
     .theme-toggle, .settings-btn { font-size: 1.3rem; padding: 0.5rem; }
     .card { padding: 1.5rem; }
-    .options-grid { grid-template-columns: 1fr; gap: 1rem; }
     .content-section h2 { font-size: 1.6rem; }
     .steps-list li { padding-left: 2.5rem; font-size: 0.95rem; }
     .steps-list li::before { width: 1.8rem; height: 1.8rem; font-size: 0.9rem; }
@@ -1156,6 +1232,9 @@ body.instagram-theme-active .reset-btn:hover { border-color: #C13584; }
     .main-nav { padding: 0.5rem 0.8rem; margin-bottom: 1rem; }
     .main-nav .nav-link { padding: 0.5rem 0.8rem; }
     .container { padding: 1rem; }
+    .downloader-layout .card {
+        padding: 1rem 1.2rem;
+    }
     .card { padding: 1.2rem; }
     .modal-content { padding: 1.5rem; }
     .modal-content h2 { font-size: 1.4rem; }
@@ -1163,6 +1242,14 @@ body.instagram-theme-active .reset-btn:hover { border-color: #C13584; }
     .item-thumbnail { width: 100px; height: 75px; }
     .item-title { font-size: 0.9rem; }
     .item-link a { font-size: 0.85rem; padding: 0.3rem 0.6rem; }
+    /* Ensure all form elements stay contained */
+    .form-group {
+        width: 100%;
+        position: relative;
+    }
+    .options-grid {
+        gap: 0.8rem;
+    }
 }
 
 input[type="range"] {
@@ -1298,6 +1385,14 @@ output {
 
 [data-theme="minimal"] .history-sidebar {
     background: #f2f2f2;
+}
+
+[data-theme="light"] .main-nav {
+    background-color: #f2f2f2;
+}
+
+[data-theme="minimal"] .main-nav {
+    background-color: #f2f2f2;
 }
 
 /* History header: search and filters in the same row */
