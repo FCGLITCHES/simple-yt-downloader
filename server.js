@@ -76,15 +76,15 @@ console.log("[server.js] Received FFMPEG_PATH from env: ", process.env.FFMPEG_PA
   console.log("[server.js] Effective ffmpegExecutable: ", ffmpegExecutable);
 
   // Auto-update system for yt-dlp and FFmpeg
-  async function checkAndUpdateTools() {
-    console.log('🔄 Starting automatic tool updates...');
+  async function checkAndUpdateTools(forceCheck = false) {
+    console.log('🔄 Starting tool updates...');
     
     try {
       // Check and update yt-dlp
-      const ytdlpResult = await updateYtDlp();
+      const ytdlpResult = await updateYtDlp(forceCheck);
       
       // Check and update FFmpeg
-      const ffmpegResult = await updateFFmpeg();
+      const ffmpegResult = await updateFFmpeg(forceCheck);
       
       console.log('✅ Tool update check completed');
       return { ytdlp: ytdlpResult, ffmpeg: ffmpegResult };
@@ -94,7 +94,50 @@ console.log("[server.js] Received FFMPEG_PATH from env: ", process.env.FFMPEG_PA
     }
   }
 
-  async function updateYtDlp() {
+  async function checkYtDlpUpdateAvailable() {
+    try {
+      const currentVersion = await getToolVersion(ytdlpExecutable);
+      
+      // Run yt-dlp -U which will update if available, or report if already up to date
+      // We'll check the output to see what happened
+      const checkResult = await runToolUpdate(ytdlpExecutable, ['-U', '--verbose']);
+      
+      // Check output for update indicators
+      const output = (checkResult.output || '').toLowerCase();
+      const errorOutput = (checkResult.error || '').toLowerCase();
+      const combinedOutput = output + ' ' + errorOutput;
+      
+      if (checkResult.success) {
+        const newVersion = await getToolVersion(ytdlpExecutable);
+        
+        // Check if version changed (update occurred)
+        if (newVersion !== currentVersion) {
+          return { hasUpdate: true, updated: true, currentVersion, newVersion };
+        }
+        
+        // Version unchanged - check output messages
+        if (combinedOutput.includes('already up to date') || 
+            combinedOutput.includes('no update') ||
+            combinedOutput.includes('is up to date')) {
+          return { hasUpdate: false, currentVersion, reason: 'Already up to date' };
+        }
+        
+        // If update messages present but version unchanged, might be same version
+        if (combinedOutput.includes('updating') || combinedOutput.includes('upgraded')) {
+          return { hasUpdate: false, currentVersion, reason: 'Update attempted but already on latest version' };
+        }
+        
+        // Default: no update available
+        return { hasUpdate: false, currentVersion, reason: 'No update available' };
+      }
+      
+      return { hasUpdate: false, error: checkResult.error || 'Failed to check for updates' };
+    } catch (error) {
+      return { hasUpdate: false, error: error.message };
+    }
+  }
+
+  async function updateYtDlp(forceCheck = false) {
     try {
       console.log('🔄 Checking yt-dlp for updates...');
       
@@ -102,32 +145,51 @@ console.log("[server.js] Received FFMPEG_PATH from env: ", process.env.FFMPEG_PA
       const currentVersion = await getToolVersion(ytdlpExecutable);
       console.log(`📋 Current yt-dlp version: ${currentVersion}`);
       
-      // Check if update is needed (run every 3 days for more frequent updates)
-      const lastUpdateCheck = getLastUpdateCheck('ytdlp');
-      const daysSinceLastCheck = (Date.now() - lastUpdateCheck) / (1000 * 60 * 60 * 24);
-      
-      if (daysSinceLastCheck < 3) {
-        console.log(`⏰ yt-dlp update check skipped (last checked ${Math.round(daysSinceLastCheck)} days ago)`);
-        return { updated: false, currentVersion, reason: 'Update check skipped (checked recently)' };
+      // If not forcing check, respect time-based check
+      if (!forceCheck) {
+        const lastUpdateCheck = getLastUpdateCheck('ytdlp');
+        const daysSinceLastCheck = (Date.now() - lastUpdateCheck) / (1000 * 60 * 60 * 24);
+        
+        if (daysSinceLastCheck < 3) {
+          console.log(`⏰ yt-dlp update check skipped (last checked ${Math.round(daysSinceLastCheck)} days ago)`);
+          return { updated: false, currentVersion, reason: 'Update check skipped (checked recently)' };
+        }
       }
       
-      // Attempt update with enhanced options
-      console.log('📥 Updating yt-dlp...');
-      const updateResult = await runToolUpdate(ytdlpExecutable, ['-U', '--verbose']);
+      // Check and update in one step (yt-dlp -U will update if available)
+      console.log('🔍 Checking for updates and updating if available...');
+      const checkResult = await checkYtDlpUpdateAvailable();
       
-      if (updateResult.success) {
-        const newVersion = await getToolVersion(ytdlpExecutable);
-        console.log(`✅ yt-dlp updated successfully! ${currentVersion} → ${newVersion}`);
+      if (checkResult.error) {
+        console.log(`❌ yt-dlp update check failed: ${checkResult.error}`);
         setLastUpdateCheck('ytdlp');
-        
-        // Update the global executable path if needed
-        global.ytdlpExecutable = ytdlpExecutable;
-        
-        return { updated: true, oldVersion: currentVersion, newVersion: newVersion };
-      } else {
-        console.log(`⚠️ yt-dlp update failed: ${updateResult.error}`);
-        return { updated: false, currentVersion, error: updateResult.error };
+        return { 
+          updated: false, 
+          currentVersion, 
+          error: checkResult.error || 'Failed to check for updates' 
+        };
       }
+      
+      // If update occurred (version changed)
+      if (checkResult.updated && checkResult.newVersion) {
+        console.log(`✅ yt-dlp updated successfully! ${currentVersion} → ${checkResult.newVersion}`);
+        setLastUpdateCheck('ytdlp');
+        global.ytdlpExecutable = ytdlpExecutable;
+        return { 
+          updated: true, 
+          oldVersion: currentVersion, 
+          newVersion: checkResult.newVersion 
+        };
+      }
+      
+      // No update available
+      console.log(`ℹ️ yt-dlp: ${checkResult.reason || 'No update available'}`);
+      setLastUpdateCheck('ytdlp');
+      return { 
+        updated: false, 
+        currentVersion: checkResult.currentVersion || currentVersion, 
+        reason: checkResult.reason || 'No update available' 
+      };
       
     } catch (error) {
       console.error('❌ Error updating yt-dlp:', error.message);
@@ -135,7 +197,7 @@ console.log("[server.js] Received FFMPEG_PATH from env: ", process.env.FFMPEG_PA
     }
   }
 
-  async function updateFFmpeg() {
+  async function updateFFmpeg(forceCheck = false) {
     try {
       console.log('🔄 Checking FFmpeg for updates...');
       
@@ -156,13 +218,15 @@ console.log("[server.js] Received FFMPEG_PATH from env: ", process.env.FFMPEG_PA
         }
       }
       
-      // Check if update is needed (run every 7 days for FFmpeg)
-      const lastUpdateCheck = getLastUpdateCheck('ffmpeg');
-      const daysSinceLastCheck = (Date.now() - lastUpdateCheck) / (1000 * 60 * 60 * 24);
-      
-      if (daysSinceLastCheck < 7) {
-        console.log(`⏰ FFmpeg update check skipped (last checked ${Math.round(daysSinceLastCheck)} days ago)`);
-        return { updated: false, currentVersion, reason: 'Update check skipped (checked recently)' };
+      // If not forcing check, respect time-based check
+      if (!forceCheck) {
+        const lastUpdateCheck = getLastUpdateCheck('ffmpeg');
+        const daysSinceLastCheck = (Date.now() - lastUpdateCheck) / (1000 * 60 * 60 * 24);
+        
+        if (daysSinceLastCheck < 7) {
+          console.log(`⏰ FFmpeg update check skipped (last checked ${Math.round(daysSinceLastCheck)} days ago)`);
+          return { updated: false, currentVersion, reason: 'Update check skipped (checked recently)' };
+        }
       }
       
       // For Windows, try to auto-download FFmpeg (disabled for now due to stability issues)
@@ -1284,7 +1348,9 @@ console.log("[server.js] Received FFMPEG_PATH from env: ", process.env.FFMPEG_PA
   // --- Simplified Cookie Path Management ---
   async function getCookiesPath() {
       // Use userData directory for runtime-modifiable cookies
-      const userDataPath = getUserDataPathFallback();
+      // This matches Electron's app.getPath('userData') path exactly
+      // Works correctly in both development and production builds
+      const userDataPath = getElectronUserDataPath();
       const cookiesDir = path.join(userDataPath, 'cookies');
       const cookiesPath = path.join(cookiesDir, 'cookies.txt');
       
@@ -1692,7 +1758,8 @@ app.post('/shutdown', (req, res) => {
 app.post('/update-tools', async (req, res) => {
     try {
         console.log('🔄 Manual tool update request received');
-        const result = await checkAndUpdateTools();
+        // Force update check by skipping the time-based check
+        const result = await checkAndUpdateTools(true); // Pass true to force check
         res.json(result);
     } catch (error) {
         console.error('❌ Error in manual update endpoint:', error);

@@ -972,35 +972,82 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Update tools button
     const updateToolsBtn = document.getElementById('updateToolsBtn');
+    const updateStatusMessage = document.getElementById('updateToolsStatus');
+    
+    function showUpdateStatus(message, type) {
+        if (!updateStatusMessage) return;
+        updateStatusMessage.textContent = message;
+        updateStatusMessage.className = 'status-message ' + (type || '');
+        updateStatusMessage.style.display = 'flex';
+        
+        if (type === 'success') {
+            setTimeout(() => {
+                updateStatusMessage.style.display = 'none';
+            }, 5000);
+        }
+    }
+    
     if (updateToolsBtn) {
         updateToolsBtn.onclick = async () => {
             try {
                 updateToolsBtn.disabled = true;
-                updateToolsBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Updating...';
+                updateToolsBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Checking...';
+                showUpdateStatus('Checking for updates...', '');
                 
                 const result = await window.updateTools();
                 
+                if (result && result.error) {
+                    showUpdateStatus(`Error: ${result.error}`, 'error');
+                    updateToolsBtn.disabled = false;
+                    updateToolsBtn.innerHTML = '<i class="fas fa-download"></i> Update Tools';
+                    return;
+                }
+                
                 if (result) {
-                    let message = 'Tools update completed!\n\n';
+                    let message = '';
+                    let hasUpdates = false;
+                    let hasErrors = false;
                     
-                    if (result.ytdlp && result.ytdlp.updated) {
-                        message += `✅ yt-dlp: ${result.ytdlp.oldVersion} → ${result.ytdlp.newVersion}\n`;
-                    } else if (result.ytdlp) {
-                        message += `ℹ️ yt-dlp: ${result.ytdlp.reason || 'No update needed'}\n`;
+                    // Check yt-dlp results
+                    if (result.ytdlp) {
+                        if (result.ytdlp.updated) {
+                            message += `✅ yt-dlp updated: ${result.ytdlp.oldVersion} → ${result.ytdlp.newVersion}\n`;
+                            hasUpdates = true;
+                        } else if (result.ytdlp.error) {
+                            message += `❌ yt-dlp update failed: ${result.ytdlp.error}\n`;
+                            hasErrors = true;
+                        } else {
+                            message += `ℹ️ yt-dlp: ${result.ytdlp.reason || 'No update available'}\n`;
+                        }
                     }
                     
-                    if (result.ffmpeg && result.ffmpeg.hasUpdate) {
-                        message += `🔄 FFmpeg: Update available (${result.ffmpeg.latestVersion})\n`;
-                        message += '💡 Download from: https://ffmpeg.org/download.html\n';
-                    } else if (result.ffmpeg) {
-                        message += `ℹ️ FFmpeg: ${result.ffmpeg.reason || 'No update needed'}\n`;
+                    // Check FFmpeg results
+                    if (result.ffmpeg) {
+                        if (result.ffmpeg.hasUpdate) {
+                            message += `🔄 FFmpeg update available: ${result.ffmpeg.latestVersion}\n`;
+                            message += '💡 Manual download required: https://ffmpeg.org/download.html\n';
+                            hasUpdates = true;
+                        } else if (result.ffmpeg.error) {
+                            message += `❌ FFmpeg check failed: ${result.ffmpeg.error}\n`;
+                            hasErrors = true;
+                        } else {
+                            message += `ℹ️ FFmpeg: ${result.ffmpeg.reason || 'No update available'}\n`;
+                        }
                     }
                     
-                    alert(message);
+                    if (hasUpdates) {
+                        showUpdateStatus(message.trim(), 'success');
+                    } else if (hasErrors) {
+                        showUpdateStatus(message.trim(), 'error');
+                    } else {
+                        showUpdateStatus(message.trim() || 'All tools are up to date.', '');
+                    }
+                } else {
+                    showUpdateStatus('Unable to check for updates. Please try again.', 'error');
                 }
             } catch (error) {
                 console.error('Error updating tools:', error);
-                alert('Error updating tools. Check console for details.');
+                showUpdateStatus(`Error: ${error.message || 'Failed to update tools. Please try again.'}`, 'error');
             } finally {
                 updateToolsBtn.disabled = false;
                 updateToolsBtn.innerHTML = '<i class="fas fa-download"></i> Update Tools';

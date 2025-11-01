@@ -95,10 +95,7 @@
 }
 
 [data-theme="vibrant"] .download-btn:hover {
-    background: linear-gradient(45deg, #c21b2a, #d63031);
-    border: 2px solid var(--primary-color);
-    filter: brightness(1.15);
-    box-shadow: none;
+    filter: brightness(1.05);
 }
 
 [data-theme="vibrant"] .progress-bar { background: var(--primary-color); }
@@ -393,9 +390,7 @@ body {
 }
 
 .download-btn:hover {
-    background: var(--secondary-color);
     transform: translateY(-3px);
-    filter: brightness(1.1);
     box-shadow: 0 4px 15px var(--shadow-color); /* Add shadow on hover */
     animation: pulse 1.5s infinite ease-in-out;
 }
@@ -876,7 +871,10 @@ body.instagram-theme-active #instagramDownloader .card h2 .downloader-icon { /* 
 
 
 body.instagram-theme-active #instagramDownloader .download-btn { background: #C13584; }
-body.instagram-theme-active #instagramDownloader .download-btn:hover { background: #d6249f; }
+body.instagram-theme-active #instagramDownloader .download-btn:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 4px 15px rgba(193, 53, 132, 0.3);
+}
 body.instagram-theme-active #instagramDownloadLinksArea .item-link a { color: #C13584; border-color: #C13584; }
 body.instagram-theme-active #instagramDownloadLinksArea .item-link a:hover { background-color: #C13584; color: var(--header-text); border-color: #C13584; }
 body.instagram-theme-active #instagramDownloader .input-field:focus,
@@ -945,12 +943,12 @@ body:not(.instagram-theme-active) .progress-bar {
 }
 .modal-close-btn { position: absolute; top: 0.8rem; right: 1rem; color: var(--text-color); font-size: 1.8rem; font-weight: bold; background: none; border: none; cursor: pointer; opacity: 0.6; transition: opacity 0.2s ease, transform 0.2s ease; }
 .modal-close-btn:hover { opacity: 1; transform: scale(1.1); }
-.modal-content h2 { text-align: center; margin-bottom: 1.8rem; color: var(--primary-color); display: block; font-size: 1.6rem; }
+.modal-content h2 { text-align: center; margin-bottom: 1rem; color: var(--primary-color); display: block; font-size: 1.4rem; flex-shrink: 0; }
 
 .setting-item {
-    margin-bottom: 0.9rem;
+    margin-bottom: 0.6rem;
 }
-.setting-item label { display: block; margin-bottom: 0.5rem; font-weight: 500; }
+.setting-item label { display: block; margin-bottom: 0.3rem; font-weight: 500; }
 .setting-item input[type="number"] { width: 120px; } /* Wider number input */
 .setting-item.checkbox-group { display: flex; align-items: center; gap: 0.5rem; }
 .setting-item.checkbox-group input[type="checkbox"] { width: auto; margin-right: 0; accent-color: var(--primary-color); transform: scale(1.2); cursor: pointer; }
@@ -1057,8 +1055,6 @@ body.instagram-theme-active .reset-btn:hover { border-color: #C13584; }
   gap: 0.5rem;
 }
 .flex-row-btns .download-btn:hover, .flex-row-btns .download-btn:focus {
-  background: var(--secondary-color);
-  color: #fff;
   box-shadow: 0 4px 12px var(--shadow-color);
 }
 .flex-row-btns {
@@ -1121,8 +1117,8 @@ body.instagram-theme-active .reset-btn:hover { border-color: #C13584; }
 }
 
 .search-button:hover {
-    background: var(--secondary-color);
     transform: translateY(-1px);
+    box-shadow: 0 2px 8px var(--shadow-color);
 }
 
 /* Remove item count from filters, will be replaced by search button */
@@ -1561,7 +1557,6 @@ body.compact-mode .history-filters label {
 
 .bulk-action-btn:hover {
     transform: translateY(-1px);
-    filter: brightness(1.1);
     box-shadow: 0 2px 8px var(--shadow-color);
 }
 
@@ -2227,9 +2222,11 @@ body.compact-mode #importCookiesBtn {
 .modal-content {
     max-width: 700px;
     width: 98vw;
-    max-height: none;
-    overflow-y: visible;
-    padding: 0.8rem 1.2rem;
+    max-height: 95vh;
+    overflow-y: auto;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
 }
 .setting-item {
     margin-bottom: 0.4rem;
@@ -2452,47 +2449,53 @@ body.compact-mode .item-count {
 /* ===== PROFESSIONAL SETTINGS MODAL ===== */
 .settings-modal {
     max-width: 900px !important;
-    width: 85vw !important;
-    max-height: 90vh !important;
+    width: 90vw !important;
+    max-height: 95vh !important;
     overflow-y: auto !important;
-    padding: 1.8rem !important;
+    padding: 1.2rem !important;
+    display: flex !important;
+    flex-direction: column !important;
 }
 
 .settings-layout {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 2.5rem;
-    margin-bottom: 1.8rem;
+    gap: 1.5rem;
+    margin-bottom: 1.2rem;
+    flex: 1;
+    overflow-y: auto;
 }
 
 .settings-column {
     display: flex;
     flex-direction: column;
-    gap: 1.5rem;
+    gap: 1rem;
+    min-height: 0;
 }
 
 .settings-section {
     background: var(--input-bg);
-    padding: 1.5rem;
+    padding: 1rem;
     border-radius: 0.6rem;
     border: 1px solid var(--border-color);
 }
 
 .settings-section h3 {
-    margin: 0 0 1rem 0;
-    font-size: 1.1rem;
+    margin: 0 0 0.8rem 0;
+    font-size: 1rem;
     color: var(--primary-color);
     font-weight: 600;
     border-bottom: 1px solid var(--border-color);
-    padding-bottom: 0.5rem;
+    padding-bottom: 0.4rem;
 }
 
 .folder-section {
     background: var(--card-bg);
     border: 2px solid var(--primary-color);
     border-radius: 0.8rem;
-    padding: 1.8rem;
-    margin-bottom: 1.8rem;
+    padding: 1.2rem;
+    margin-bottom: 1.2rem;
+    flex-shrink: 0;
 }
 
 .folder-input {
@@ -2507,10 +2510,11 @@ body.compact-mode .item-count {
 
 .settings-actions {
     display: flex;
-    gap: 1.2rem;
+    gap: 1rem;
     justify-content: center;
-    padding-top: 1.2rem;
+    padding-top: 1rem;
     border-top: 1px solid var(--border-color);
+    flex-shrink: 0;
 }
 
 .action-btn {
@@ -2535,7 +2539,6 @@ body.compact-mode .item-count {
 }
 
 .action-btn.primary:hover {
-    background: var(--secondary-color);
     transform: translateY(-1px);
     box-shadow: 0 4px 12px var(--shadow-color);
 }
@@ -2547,8 +2550,8 @@ body.compact-mode .item-count {
 }
 
 .action-btn.secondary:hover {
-    background: var(--border-color);
     transform: translateY(-1px);
+    box-shadow: 0 2px 8px var(--shadow-color);
 }
 
 .action-btn:disabled {
@@ -2589,9 +2592,19 @@ body.compact-mode .item-count {
         gap: 1.2rem;
     }
     
-    .settings-section {
-        padding: 1.2rem;
-    }
+        .settings-section {
+            padding: 0.9rem;
+        }
+        
+        .settings-modal {
+            max-height: 98vh !important;
+            padding: 1rem !important;
+        }
+        
+        .settings-layout {
+            gap: 1rem !important;
+            margin-bottom: 1rem !important;
+        }
     
     .folder-actions {
         flex-direction: column;
@@ -2806,6 +2819,77 @@ html {
 
 body {
     font-size: 1rem; /* Inherit from html */
+}
+
+/* Cookies page specific styles */
+.cookies-section {
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.cookies-section h2 {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.cookie-instructions {
+    margin: 2rem 0;
+    padding: 1.5rem;
+    background: var(--input-bg);
+    border-radius: 0.5rem;
+    border: 1px solid var(--border-color);
+}
+
+.cookie-instructions h3 {
+    margin-bottom: 1rem;
+    color: var(--primary-color);
+    font-size: 1.1rem;
+}
+
+.cookie-instructions ol {
+    margin-left: 1.5rem;
+    line-height: 1.8;
+}
+
+.cookie-instructions code {
+    background: var(--card-bg);
+    padding: 0.2rem 0.4rem;
+    border-radius: 0.3rem;
+    font-family: 'Courier New', monospace;
+    font-size: 0.9em;
+    border: 1px solid var(--border-color);
+}
+
+.cookie-input-section {
+    margin-top: 2rem;
+}
+
+.cookie-input-section textarea {
+    resize: vertical;
+    min-height: 150px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.9rem;
+}
+
+.footer-links {
+    display: flex;
+    justify-content: center;
+    gap: 1.5rem;
+    margin-bottom: 1rem;
+}
+
+.footer-links a {
+    color: var(--primary-color);
+    text-decoration: none;
+    font-weight: 500;
+    transition: opacity 0.2s ease;
+}
+
+.footer-links a:hover {
+    opacity: 0.8;
+    text-decoration: underline;
 }
 
 /* Responsive adjustments for UI scale */

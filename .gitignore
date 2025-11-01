@@ -37,6 +37,13 @@ dist/
 *.ico
 *.png
 
+# Allow logo and icon files for GitHub README
+!assets/Logo*.png
+!assets/Logo*.ico
+!public/Logo*.png
+!public/Logo*.ico
+!favicon.ico
+
 # Locales and build output
 locales/
 

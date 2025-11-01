@@ -116,7 +116,7 @@ async function createWindow() {
         devTools: !app.isPackaged,
         preload: path.join(__dirname, 'preload.js')
       },
-      icon: path.join(__dirname, 'assets', 'Logo 1.png')
+      icon: path.join(__dirname, 'public', 'Logo_1.ico')
     };
     
     // Restore position if available and valid

@@ -9,9 +9,12 @@
     "electron:dev": "cross-env NODE_ENV=development electron .",
     "electron": "cross-env NODE_ENV=production electron .",
     "build": "npm run build:win",
-    "build:win": "electron-packager . \"SimplyYTD\" --platform=win32 --arch=x64 --out=dist --prune=true --asar --asarUnpack=\"{cookies/**,*.json}\" --extra-resource=./bin --extra-resource=./assets --extra-resource=./public",
-    "build:mac": "electron-packager . \"SimplyYTD\" --platform=darwin --arch=x64 --out=dist --prune=true --asar --asarUnpack=\"{cookies/**,*.json}\" --icon=./public/Logo.ico --extra-resource=./bin --extra-resource=./assets --extra-resource=./public",
-    "build:linux": "electron-packager . \"SimplyYTD\" --platform=linux --arch=x64 --out=dist --prune=true --asar --asarUnpack=\"{cookies/**,*.json}\" --icon=./public/Logo.ico --extra-resource=./bin --extra-resource=./assets --extra-resource=./public"
+    "build:win": "electron-packager . \"SimplyYTD\" --platform=win32 --arch=x64 --out=dist --overwrite --prune=true --asar --asarUnpack=\"{cookies/**,*.json}\" --icon=./public/Logo_1 --extra-resource=./bin --extra-resource=./assets --extra-resource=./public && node set-icon.js",
+    "build:mac": "electron-packager . \"SimplyYTD\" --platform=darwin --arch=x64 --out=dist --prune=true --asar --asarUnpack=\"{cookies/**,*.json}\" --icon=./public/Logo_1.ico --extra-resource=./bin --extra-resource=./assets --extra-resource=./public",
+    "build:linux": "electron-packager . \"SimplyYTD\" --platform=linux --arch=x64 --out=dist --prune=true --asar --asarUnpack=\"{cookies/**,*.json}\" --icon=./public/Logo_1.ico --extra-resource=./bin --extra-resource=./assets --extra-resource=./public",
+    "icon:generate": "node generate-icon.js",
+    "icon:verify": "node check-icon-format.js",
+    "icon:verify-exe": "node verify-icon.js"
   },
   "keywords": [
     "simplyytd",
@@ -38,6 +41,9 @@
   "devDependencies": {
     "cross-env": "^7.0.3",
     "electron": "^28.3.3",
-    "electron-packager": "^17.1.2"
+    "electron-packager": "^17.1.2",
+    "rcedit": "^4.0.1",
+    "sharp": "^0.34.4",
+    "to-ico": "^1.1.5"
   }
 }
