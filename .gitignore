@@ -21,6 +21,11 @@ package-lock.json
 node_modules/
 downloads/
 
+# Android/Gradle files (large build artifacts)
+.gradle/
+.android/
+*.jar
+
 # Build output and large files (exclude from Git, keep locally)
 dist/
 *.exe
