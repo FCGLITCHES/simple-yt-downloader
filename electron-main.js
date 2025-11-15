@@ -513,25 +513,82 @@ ipcMain.handle('list-download-folder', async (_, folderPath) => {
   const pattern = path.join(root, '**/*.{mp4,mkv,webm,avi,mov,flv,3gp}');
   const files   = glob.sync(pattern, { nodir: true });
 
-  // 3.  Build the list the frontend expects
-  const list = files.map(file => {
+  // 3.  Group playlist videos by folder
+  const playlistFolders = new Map(); // folderPath -> { folderName, videos: [] }
+  const singleVideos = [];
+
+  files.forEach(file => {
     const stat = fs.statSync(file);
     const name = path.basename(file);
+    const dir = path.dirname(file);
+    const relativeDir = path.relative(root, dir);
 
     // Decide which sub-tab this file belongs to
-    let type = 'youtubeSingles';          // default
+    let type = 'youtubeSingles';
     if (name.includes('_playlist_')) type = 'youtubePlaylists';
     if (name.includes('_instagram_')) type = 'instagram';
 
-    return {
+    const fileInfo = {
       name,
       path: file,
       type,
       size: (stat.size / 1024 / 1024).toFixed(1) + ' MB',
       mtime: stat.mtime.toISOString(),
-      thumbnail: null   // thumbnails can be added later
+      thumbnail: null,
+      folder: dir,
+      relativeFolder: relativeDir
     };
+
+    // If it's a playlist video and not in root, group by folder
+    if (type === 'youtubePlaylists' && relativeDir && relativeDir !== '.' && relativeDir !== '') {
+      if (!playlistFolders.has(dir)) {
+        playlistFolders.set(dir, {
+          folderName: path.basename(dir),
+          folderPath: dir,
+          relativeFolder: relativeDir,
+          videos: [],
+          type: 'youtubePlaylists',
+          mtime: stat.mtime.toISOString() // Use latest video's mtime
+        });
+      }
+      playlistFolders.get(dir).videos.push(fileInfo);
+      // Update folder mtime to latest video
+      if (new Date(stat.mtime) > new Date(playlistFolders.get(dir).mtime)) {
+        playlistFolders.get(dir).mtime = stat.mtime.toISOString();
+      }
+    } else {
+      singleVideos.push(fileInfo);
+    }
   });
+
+  // 4.  Build the list: folders first, then single videos
+  const list = [];
+  
+  // Add playlist folders as folder items
+  for (const [folderPath, folderData] of playlistFolders.entries()) {
+    // Calculate total size
+    const totalSize = folderData.videos.reduce((sum, v) => {
+      const sizeMB = parseFloat(v.size);
+      return sum + (isNaN(sizeMB) ? 0 : sizeMB);
+    }, 0);
+    
+    list.push({
+      name: folderData.folderName,
+      path: folderPath,
+      type: folderData.type,
+      size: totalSize.toFixed(1) + ' MB',
+      mtime: folderData.mtime,
+      thumbnail: null,
+      isFolder: true,
+      videoCount: folderData.videos.length,
+      videos: folderData.videos, // Include videos for expandable UI
+      folder: folderPath,
+      relativeFolder: folderData.relativeFolder
+    });
+  }
+  
+  // Add single videos
+  list.push(...singleVideos);
 
   return list;
 });
@@ -555,6 +612,30 @@ ipcMain.handle('delete-file', async (event, filePath) => {
         }
     } catch (error) {
         console.error(`[delete-file] Error deleting file ${filePath}:`, error);
+        return { success: false, error: error.message };
+    }
+});
+
+// Delete folder handler (for playlist folders)
+ipcMain.handle('delete-folder', async (event, folderPath) => {
+    try {
+        console.log(`[delete-folder] Attempting to delete folder: ${folderPath}`);
+        if (fs.existsSync(folderPath)) {
+            const stats = fs.statSync(folderPath);
+            if (stats.isDirectory()) {
+                // Recursively delete folder and all contents
+                fs.rmSync(folderPath, { recursive: true, force: true });
+                console.log(`[delete-folder] Successfully deleted folder: ${folderPath}`);
+                return { success: true };
+            } else {
+                return { success: false, error: 'Path is not a directory' };
+            }
+        } else {
+            console.log(`[delete-folder] Folder not found: ${folderPath}`);
+            return { success: false, error: 'Folder not found' };
+        }
+    } catch (error) {
+        console.error(`[delete-folder] Error deleting folder ${folderPath}:`, error);
         return { success: false, error: error.message };
     }
 });

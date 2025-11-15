@@ -233,9 +233,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 updateDownloadStats();
                 break;
             case 'complete':
-                updateDownloadItemComplete(itemId, message, downloadUrl, filename, actualSize, source, fullPath, thumbnail);
+                // Use clean title from server if available, otherwise fall back to filename or title
+                const displayTitle = data.title || title || filename || 'Download complete';
+                updateDownloadItemComplete(itemId, message, downloadUrl, filename, actualSize, source, fullPath, thumbnail, displayTitle);
                 if (userSettings.notificationSound && completionSound) playNotificationSound();
-                if (userSettings.notificationPopup) showDesktopNotification(filename || title, message || 'Download complete!');
+                if (userSettings.notificationPopup) showDesktopNotification(displayTitle, message || 'Download complete!');
                 if (userSettings.removeCompleted) {
                     setTimeout(() => handleRemoveDownloadItem(itemId, source), 5000);
                 }
@@ -252,7 +254,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 scanDownloadFolderAndUpdateHistory();
                 const history = JSON.parse(localStorage.getItem('ytdHistory') || '[]');
                 history.unshift({
-                  name: filename,
+                  name: displayTitle || filename, // Use clean title for history display
                   path: downloadUrl,
                   folder: data.downloadFolder || getDownloadFolder(), // <-- add this
                   type: subtabKey === 'youtube' ? 'youtubeSingles' : subtabKey,
@@ -469,54 +471,86 @@ document.addEventListener('DOMContentLoaded', () => {
         return bytes;
     }
 
+    // Cache DOM elements for progress updates to avoid repeated queries
+    const progressUpdateCache = new Map();
+    
+    // Throttled progress update for better performance
+    const throttledProgressUpdate = throttle((itemId, progressData) => {
+        requestAnimationFrame(() => {
+            updateDownloadItemProgressInternal(itemId, progressData);
+        });
+    }, 100); // Update max every 100ms
+    
     function updateDownloadItemProgress(itemId, message, percent, rawSpeed, source, speedBytesPerSec) {
-        const itemDiv = document.getElementById(`item-${itemId}`);
-        if (itemDiv) {
-            // Only update the progress bar and status text, do not recreate or reload the element
-            const statusEl = itemDiv.querySelector('.item-status');
-            const progressBarContainer = itemDiv.querySelector('.progress-bar-container');
-            const progressBar = itemDiv.querySelector('.progress-bar');
+        throttledProgressUpdate(itemId, { message, percent, rawSpeed, speedBytesPerSec });
+    }
+    
+    function updateDownloadItemProgressInternal(itemId, { message, percent, rawSpeed, speedBytesPerSec }) {
+        let itemDiv = progressUpdateCache.get(`div-${itemId}`);
+        if (!itemDiv) {
+            itemDiv = document.getElementById(`item-${itemId}`);
+            if (itemDiv) {
+                // Cache DOM elements for this item
+                progressUpdateCache.set(`div-${itemId}`, itemDiv);
+                progressUpdateCache.set(`status-${itemId}`, itemDiv.querySelector('.item-status'));
+                progressUpdateCache.set(`progressBar-${itemId}`, itemDiv.querySelector('.progress-bar'));
+                progressUpdateCache.set(`progressBarContainer-${itemId}`, itemDiv.querySelector('.progress-bar-container'));
+            }
+        }
+        
+        if (!itemDiv) return;
+        
+        const statusEl = progressUpdateCache.get(`status-${itemId}`);
+        const progressBarContainer = progressUpdateCache.get(`progressBarContainer-${itemId}`);
+        const progressBar = progressUpdateCache.get(`progressBar-${itemId}`);
 
-            let progressText = '';
-            if (typeof percent === 'number' && !isNaN(percent)) {
-                progressText += percent.toFixed(1) + '%';
-            }
-            let speedText = '';
-            let speedVal = null;
-            if (typeof speedBytesPerSec === 'number' && !isNaN(speedBytesPerSec)) {
-                speedVal = speedBytesPerSec;
-            } else if (rawSpeed) {
-                speedVal = parseSpeedString(rawSpeed);
-            }
-            if (speedVal !== null) {
-                speedText = formatSpeed(speedVal, userSettings.speedUnitDisplay);
-            }
-            if (speedText) {
-                if (progressText) progressText += ' at ';
-                progressText += speedText;
-            }
-            if (!progressText && message) {
-                progressText = message;
-            }
-            if (statusEl) statusEl.textContent = progressText || 'Processing...';
-            if (progressBarContainer) progressBarContainer.style.display = 'block';
-            if (progressBar && typeof percent === 'number' && !isNaN(percent)) {
-                progressBar.style.width = `${Math.max(0, Math.min(100, percent))}%`;
-            }
-            
-            // Show pause/play button and remove button when download starts (when progress > 0)
-            if (typeof percent === 'number' && percent > 0) {
-                const pausePlayBtn = itemDiv.querySelector('.item-pause-play-btn');
-                const removeBtn = itemDiv.querySelector('.item-remove-btn');
-                if (pausePlayBtn) pausePlayBtn.style.display = 'inline-flex';
-                if (removeBtn) removeBtn.style.display = 'inline-flex';
-            }
+        let progressText = '';
+        if (typeof percent === 'number' && !isNaN(percent)) {
+            progressText += percent.toFixed(1) + '%';
+        }
+        let speedText = '';
+        let speedVal = null;
+        if (typeof speedBytesPerSec === 'number' && !isNaN(speedBytesPerSec)) {
+            speedVal = speedBytesPerSec;
+        } else if (rawSpeed) {
+            speedVal = parseSpeedString(rawSpeed);
+        }
+        if (speedVal !== null) {
+            speedText = formatSpeed(speedVal, userSettings.speedUnitDisplay);
+        }
+        if (speedText) {
+            if (progressText) progressText += ' at ';
+            progressText += speedText;
+        }
+        if (!progressText && message) {
+            progressText = message;
+        }
+        if (statusEl) statusEl.textContent = progressText || 'Processing...';
+        if (progressBarContainer) progressBarContainer.style.display = 'block';
+        if (progressBar && typeof percent === 'number' && !isNaN(percent)) {
+            progressBar.style.width = `${Math.max(0, Math.min(100, percent))}%`;
+        }
+        
+        // Show pause/play button and remove button when download starts (when progress > 0)
+        if (typeof percent === 'number' && percent > 0) {
+            const pausePlayBtn = itemDiv.querySelector('.item-pause-play-btn');
+            const removeBtn = itemDiv.querySelector('.item-remove-btn');
+            if (pausePlayBtn) pausePlayBtn.style.display = 'inline-flex';
+            if (removeBtn) removeBtn.style.display = 'inline-flex';
         }
     }
 
-    function updateDownloadItemComplete(itemId, message, downloadUrl, filename, actualSize, source, fullPath, thumb) {
+    function updateDownloadItemComplete(itemId, message, downloadUrl, filename, actualSize, source, fullPath, thumb, cleanTitle) {
         const itemDiv = document.getElementById(`item-${itemId}`);
         if (itemDiv) {
+            // Update title with clean title if provided
+            if (cleanTitle) {
+                updateDownloadItemTitle(itemId, cleanTitle, source);
+                const currentItemState = downloadItemsState.get(itemId);
+                if (currentItemState) {
+                    currentItemState.title = cleanTitle;
+                }
+            }
             // Compact status message: "Download complete • filesize"
             const statusText = `Download complete${actualSize ? ' • ' + actualSize : ''}`;
             updateDownloadItemStatus(itemId, statusText, source, 'success');
@@ -544,11 +578,11 @@ document.addEventListener('DOMContentLoaded', () => {
                             await window.electronAPI.openPathInExplorer(folderPath);
                         } catch (e) {
                             console.error('Open folder failed:', e);
-                            alert('Unable to open containing folder.');
+                            showAlert('Unable to open containing folder.', 'Error');
                         }
                     } else {
                         console.error('Open folder not available. window.electronAPI:', window.electronAPI);
-                        alert('Open folder not available. Make sure you are running in Electron.');
+                        showAlert('Open folder not available. Make sure you are running in Electron.', 'Not Available');
                     }
                 };
                 linkEl.appendChild(openFolderBtn);
@@ -556,6 +590,12 @@ document.addEventListener('DOMContentLoaded', () => {
             if (thumb) updateDownloadItemThumbnail(itemId, thumb);
             disableCancelButton(itemId, source);
             showActionButtons(itemId);
+            
+            // Hide pause/play and cancel buttons when download completes
+            const pausePlayBtn = itemDiv.querySelector('.item-pause-play-btn');
+            if (pausePlayBtn) pausePlayBtn.style.display = 'none';
+            const cancelBtn = itemDiv.querySelector('.item-cancel-btn');
+            if (cancelBtn) cancelBtn.style.display = 'none';
         }
     }
 
@@ -596,6 +636,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const itemDiv = document.getElementById(`item-${itemId}`);
         if (itemDiv) itemDiv.remove();
         downloadItemsState.delete(itemId);
+        // Clear cache for removed item
+        progressUpdateCache.delete(`div-${itemId}`);
+        progressUpdateCache.delete(`status-${itemId}`);
+        progressUpdateCache.delete(`progressBar-${itemId}`);
+        progressUpdateCache.delete(`progressBarContainer-${itemId}`);
         updateDownloadStats();
         console.log(`Removed item ${itemId} from UI and state.`);
     }
@@ -970,6 +1015,17 @@ document.addEventListener('DOMContentLoaded', () => {
         saveSettingsBtn.onclick = saveSettings;
     }
     
+    // Tutorial button
+    const openTutorialBtn = document.getElementById('openTutorialBtn');
+    if (openTutorialBtn) {
+        openTutorialBtn.onclick = () => {
+            if (settingsModal) settingsModal.style.display = 'none';
+            if (window.openTutorial) {
+                window.openTutorial(0);
+            }
+        };
+    }
+    
     // Update tools button
     const updateToolsBtn = document.getElementById('updateToolsBtn');
     const updateStatusMessage = document.getElementById('updateToolsStatus');
@@ -1096,11 +1152,117 @@ document.addEventListener('DOMContentLoaded', () => {
         return userSettings.skipDeleteConfirmation === true;
     }
 
-    function confirmDelete(message) {
+    // Aceternity UI Custom Confirmation Modal
+    function confirmDelete(message, title = 'Confirm Deletion') {
         if (shouldSkipDeleteConfirmation()) {
             return true;
         }
-        return confirm(message);
+        
+        return new Promise((resolve) => {
+            const modal = document.getElementById('confirmationModal');
+            const messageEl = document.getElementById('confirmationMessage');
+            const titleEl = document.getElementById('confirmationTitle');
+            const confirmBtn = document.getElementById('confirmationConfirmBtn');
+            const cancelBtn = document.getElementById('confirmationCancelBtn');
+            
+            // Set content
+            titleEl.textContent = title;
+            messageEl.textContent = message;
+            
+            // Show modal
+            modal.style.display = 'flex';
+            
+            // Remove existing listeners
+            const newConfirmBtn = confirmBtn.cloneNode(true);
+            const newCancelBtn = cancelBtn.cloneNode(true);
+            confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
+            cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
+            
+            // Add new listeners
+            newConfirmBtn.addEventListener('click', () => {
+                modal.style.display = 'none';
+                resolve(true);
+            });
+            
+            newCancelBtn.addEventListener('click', () => {
+                modal.style.display = 'none';
+                resolve(false);
+            });
+            
+            // Close on backdrop click
+            modal.addEventListener('click', function backdropClick(e) {
+                if (e.target === modal) {
+                    modal.style.display = 'none';
+                    modal.removeEventListener('click', backdropClick);
+                    resolve(false);
+                }
+            });
+            
+            // Close on Escape key
+            const escapeHandler = (e) => {
+                if (e.key === 'Escape') {
+                    modal.style.display = 'none';
+                    document.removeEventListener('keydown', escapeHandler);
+                    resolve(false);
+                }
+            };
+            document.addEventListener('keydown', escapeHandler);
+        });
+    }
+    
+    // Aceternity UI Custom Alert Modal
+    function showAlert(message, title = 'Notification') {
+        return new Promise((resolve) => {
+            const modal = document.getElementById('alertModal');
+            const messageEl = document.getElementById('alertMessage');
+            const titleEl = document.getElementById('alertTitle');
+            const okBtn = document.getElementById('alertOkBtn');
+            
+            // Set content
+            titleEl.textContent = title;
+            messageEl.textContent = message;
+            
+            // Show modal
+            modal.style.display = 'flex';
+            
+            // Remove existing listeners
+            const newOkBtn = okBtn.cloneNode(true);
+            okBtn.parentNode.replaceChild(newOkBtn, okBtn);
+            
+            // Add new listener
+            newOkBtn.addEventListener('click', () => {
+                modal.style.display = 'none';
+                resolve();
+            });
+            
+            // Close on backdrop click
+            modal.addEventListener('click', function backdropClick(e) {
+                if (e.target === modal) {
+                    modal.style.display = 'none';
+                    modal.removeEventListener('click', backdropClick);
+                    resolve();
+                }
+            });
+            
+            // Close on Escape key
+            const escapeHandler = (e) => {
+                if (e.key === 'Escape') {
+                    modal.style.display = 'none';
+                    document.removeEventListener('keydown', escapeHandler);
+                    resolve();
+                }
+            };
+            document.addEventListener('keydown', escapeHandler);
+        });
+    }
+
+    // --- Logo Click Handler ---
+    const logoContainer = document.querySelector('.logo-container');
+    if (logoContainer) {
+        logoContainer.style.cursor = 'pointer';
+        logoContainer.addEventListener('click', () => {
+            showTab('youtube');
+        });
     }
 
     // --- Initializations ---
@@ -1141,7 +1303,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             } else {
                 console.error('Folder picker not available. window.electronAPI:', window.electronAPI);
-                alert('Folder picker not available. Make sure you are running in Electron.');
+                showAlert('Folder picker not available. Make sure you are running in Electron.', 'Not Available');
             }
         };
     }
@@ -1154,7 +1316,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             } else {
                 console.error('Default folder not available. window.electronAPI:', window.electronAPI);
-                alert('Default folder not available. Make sure you are running in Electron.');
+                showAlert('Default folder not available. Make sure you are running in Electron.', 'Not Available');
             }
         };
     }
@@ -1162,14 +1324,14 @@ document.addEventListener('DOMContentLoaded', () => {
         openFolderBtn.onclick = async () => {
             const folderPath = downloadFolderInput.value;
             if (!folderPath) {
-                alert('No folder selected.');
+                showAlert('No folder selected.', 'No Selection');
                 return;
             }
             if (window.electronAPI && window.electronAPI.openPathInExplorer) {
                 await window.electronAPI.openPathInExplorer(folderPath);
             } else {
                 console.error('Open folder not available. window.electronAPI:', window.electronAPI);
-                alert('Open folder not available. Make sure you are running in Electron.');
+                showAlert('Open folder not available. Make sure you are running in Electron.', 'Not Available');
             }
         };
     }
@@ -1196,15 +1358,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Delete all buttons with confirmation
     if (clearYoutubeDownloadsBtn && youtubeDownloadLinksArea) {
-        clearYoutubeDownloadsBtn.onclick = () => {
-            if (confirmDelete('Are you sure you want to clear all YouTube downloads from the list?')) {
+        clearYoutubeDownloadsBtn.onclick = async () => {
+            const confirmed = await confirmDelete('Are you sure you want to clear all YouTube downloads from the list?', 'Clear All Downloads');
+            if (confirmed) {
                 youtubeDownloadLinksArea.replaceChildren(clearYoutubeDownloadsBtn);
             }
         };
     }
     if (clearInstagramDownloadsBtn && instagramDownloadLinksArea) {
-        clearInstagramDownloadsBtn.onclick = () => {
-            if (confirmDelete('Are you sure you want to clear all Instagram downloads from the list?')) {
+        clearInstagramDownloadsBtn.onclick = async () => {
+            const confirmed = await confirmDelete('Are you sure you want to clear all Instagram downloads from the list?', 'Clear All Downloads');
+            if (confirmed) {
                 instagramDownloadLinksArea.replaceChildren(clearInstagramDownloadsBtn);
             }
         };
@@ -1469,7 +1633,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             } else {
                 console.error('Folder picker not available. window.electronAPI:', window.electronAPI);
-                alert('Folder picker not available. Make sure you are running in Electron.');
+                showAlert('Folder picker not available. Make sure you are running in Electron.', 'Not Available');
             }
         };
     }
@@ -1482,7 +1646,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             } else {
                 console.error('Default folder not available. window.electronAPI:', window.electronAPI);
-                alert('Default folder not available. Make sure you are running in Electron.');
+                showAlert('Default folder not available. Make sure you are running in Electron.', 'Not Available');
             }
         };
     }
@@ -1490,14 +1654,14 @@ document.addEventListener('DOMContentLoaded', () => {
         openFolderBtn.onclick = async () => {
             const folderPath = downloadFolderInput.value;
             if (!folderPath) {
-                alert('No folder selected.');
+                showAlert('No folder selected.', 'No Selection');
                 return;
             }
             if (window.electronAPI && window.electronAPI.openPathInExplorer) {
                 await window.electronAPI.openPathInExplorer(folderPath);
             } else {
                 console.error('Open folder not available. window.electronAPI:', window.electronAPI);
-                alert('Open folder not available. Make sure you are running in Electron.');
+                showAlert('Open folder not available. Make sure you are running in Electron.', 'Not Available');
             }
         };
     }
@@ -1524,15 +1688,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Delete all buttons with confirmation
     if (clearYoutubeDownloadsBtn && youtubeDownloadLinksArea) {
-        clearYoutubeDownloadsBtn.onclick = () => {
-            if (confirmDelete('Are you sure you want to clear all YouTube downloads from the list?')) {
+        clearYoutubeDownloadsBtn.onclick = async () => {
+            const confirmed = await confirmDelete('Are you sure you want to clear all YouTube downloads from the list?', 'Clear All Downloads');
+            if (confirmed) {
                 youtubeDownloadLinksArea.replaceChildren(clearYoutubeDownloadsBtn);
             }
         };
     }
     if (clearInstagramDownloadsBtn && instagramDownloadLinksArea) {
-        clearInstagramDownloadsBtn.onclick = () => {
-            if (confirmDelete('Are you sure you want to clear all Instagram downloads from the list?')) {
+        clearInstagramDownloadsBtn.onclick = async () => {
+            const confirmed = await confirmDelete('Are you sure you want to clear all Instagram downloads from the list?', 'Clear All Downloads');
+            if (confirmed) {
                 instagramDownloadLinksArea.replaceChildren(clearInstagramDownloadsBtn);
             }
         };
@@ -1574,6 +1740,36 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentTimeFilter = 'all';
     let currentSort = 'newest';
     let allHistoryItems = [];
+    
+    // Performance: Debounce function
+    function debounce(func, wait) {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func(...args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
+    }
+    
+    // Performance: Throttle function
+    function throttle(func, limit) {
+        let inThrottle;
+        return function(...args) {
+            if (!inThrottle) {
+                func.apply(this, args);
+                inThrottle = true;
+                setTimeout(() => inThrottle = false, limit);
+            }
+        };
+    }
+    
+    // Debounced history filter for better performance
+    const debouncedFilterHistory = debounce(() => {
+        filterAndRenderHistory();
+    }, 300);
 
     // History Search and Filter Functions
     function setupHistoryManagement() {
@@ -1586,7 +1782,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (historySearchInput) {
             historySearchInput.addEventListener('input', (e) => {
                 historySearchTerm = e.target.value.toLowerCase().trim();
-                filterAndRenderHistory();
+                debouncedFilterHistory();
             });
             historySearchInput.addEventListener('keydown', (e) => {
                 if (e.key === 'Escape') {
@@ -1696,9 +1892,17 @@ document.addEventListener('DOMContentLoaded', () => {
             const list = historyLists[type];
             if (!list) continue;
             for (const [index, item] of items.entries()) {
-                const historyItem = await createHistoryItemElement(item, index, rootFolder);
-                if (historyItem) {
-                    list.appendChild(historyItem);
+                // Check if this is a folder (playlist folder)
+                if (item.isFolder && item.videos && item.videos.length > 0) {
+                    const folderElement = await createFolderElement(item, index, rootFolder);
+                    if (folderElement) {
+                        list.appendChild(folderElement);
+                    }
+                } else {
+                    const historyItem = await createHistoryItemElement(item, index, rootFolder);
+                    if (historyItem) {
+                        list.appendChild(historyItem);
+                    }
                 }
             }
         }
@@ -1759,6 +1963,123 @@ document.addEventListener('DOMContentLoaded', () => {
             return div;
         } catch (error) {
             console.error(`Error creating history item element:`, error);
+            return null;
+        }
+    }
+
+    async function createFolderElement(folderItem, index, rootFolder) {
+        try {
+            const folderPath = folderItem.path || folderItem.folder;
+            let absPath = folderPath;
+            
+            // Resolve absolute path if needed
+            if (folderPath && window.electronAPI?.resolvePath) {
+                // Check if path is relative (doesn't start with drive letter or /)
+                const isRelative = !/^[a-zA-Z]:[\\/]/.test(folderPath) && !folderPath.startsWith('/');
+                if (isRelative) {
+                    absPath = await window.electronAPI.resolvePath(rootFolder, folderPath);
+                } else {
+                    absPath = folderPath;
+                }
+            }
+            
+            let folderExists = true;
+            if (window.electronAPI?.pathExists) {
+                folderExists = await window.electronAPI.pathExists(absPath);
+            }
+            
+            const folderDiv = document.createElement('div');
+            folderDiv.className = 'history-folder';
+            folderDiv.dataset.index = index;
+            folderDiv.dataset.folderPath = absPath;
+            folderDiv.dataset.expanded = 'false';
+            
+            const videoCount = folderItem.videoCount || (folderItem.videos ? folderItem.videos.length : 0);
+            const folderName = folderItem.name || 'Playlist Folder';
+            
+            folderDiv.innerHTML = `
+                <div class="history-folder-header" style="display: flex; align-items: center; padding: 12px; cursor: pointer; border-bottom: 1px solid #e0e0e0;">
+                    <button class="history-folder-toggle" style="background: none; border: none; padding: 4px 8px; cursor: pointer; margin-right: 8px;">
+                        <i class="fas fa-chevron-right" style="transition: transform 0.2s;"></i>
+                    </button>
+                    <i class="fas fa-folder" style="margin-right: 8px; color: #4a90e2;"></i>
+                    <div style="flex: 1; min-width: 0;">
+                        <div class="history-title" style="font-weight: 600;">${folderName}</div>
+                        <div class="history-meta">${new Date(folderItem.mtime).toLocaleString()} • ${folderItem.size} • ${videoCount} video${videoCount !== 1 ? 's' : ''}</div>
+                    </div>
+                    <div class="history-actions">
+                        <button class="history-action-btn folder" title="Open Folder" data-action="folder" data-path="${absPath}" data-index="${index}">
+                            <i class="fas fa-folder-open"></i>
+                        </button>
+                        <button class="history-action-btn delete" title="Delete Playlist Folder" data-action="delete-folder" data-path="${absPath}" data-index="${index}">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="history-folder-content" style="display: none; padding-left: 20px;">
+                    <!-- Videos will be inserted here when expanded -->
+                </div>
+            `;
+            
+            // Add expand/collapse functionality
+            const toggleBtn = folderDiv.querySelector('.history-folder-toggle');
+            const contentDiv = folderDiv.querySelector('.history-folder-content');
+            const chevron = toggleBtn.querySelector('i');
+            
+            toggleBtn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                const isExpanded = folderDiv.dataset.expanded === 'true';
+                
+                if (!isExpanded && contentDiv.children.length === 0) {
+                    // Load videos when first expanded
+                    if (folderItem.videos && folderItem.videos.length > 0) {
+                        for (let i = 0; i < folderItem.videos.length; i++) {
+                            const video = folderItem.videos[i];
+                            const videoElement = await createHistoryItemElement(video, `${index}_${i}`, rootFolder);
+                            if (videoElement) {
+                                videoElement.style.marginLeft = '20px';
+                                contentDiv.appendChild(videoElement);
+                            }
+                        }
+                    }
+                }
+                
+                folderDiv.dataset.expanded = isExpanded ? 'false' : 'true';
+                contentDiv.style.display = isExpanded ? 'none' : 'block';
+                chevron.style.transform = isExpanded ? 'rotate(0deg)' : 'rotate(90deg)';
+            });
+            
+            // Handle folder actions
+            folderDiv.addEventListener('click', (e) => {
+                const actionBtn = e.target.closest('.history-action-btn');
+                if (actionBtn) {
+                    const action = actionBtn.dataset.action;
+                    const path = actionBtn.dataset.path;
+                    
+                    if (action === 'folder' && window.electronAPI?.openPathInExplorer) {
+                        window.electronAPI.openPathInExplorer(path);
+                    } else if (action === 'delete-folder') {
+                        confirmDelete(`Delete entire playlist folder "${folderName}" and all ${videoCount} videos?`, 'Delete Playlist Folder').then(async (confirmed) => {
+                            if (confirmed) {
+                                // Delete folder and all videos
+                                if (window.electronAPI?.deleteFolder) {
+                                    await window.electronAPI.deleteFolder(path);
+                                    folderDiv.remove();
+                                    scanDownloadFolderAndUpdateHistory();
+                                }
+                            }
+                        });
+                    }
+                }
+            });
+            
+            if (!folderExists) {
+                folderDiv.classList.add('file-missing');
+            }
+            
+            return folderDiv;
+        } catch (error) {
+            console.error(`Error creating folder element:`, error);
             return null;
         }
     }
@@ -1881,11 +2202,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function deleteSelectedItems() {
         if (selectedHistoryItems.size === 0) {
-            alert('No items selected for deletion.');
+            await showAlert('No items selected for deletion.', 'No Selection');
             return;
         }
         const confirmMessage = `Delete ${selectedHistoryItems.size} selected item${selectedHistoryItems.size !== 1 ? 's' : ''} permanently?`;
-        if (!confirmDelete(confirmMessage)) return;
+        const confirmed = await confirmDelete(confirmMessage, 'Delete Selected Items');
+        if (!confirmed) return;
         
       const history = JSON.parse(localStorage.getItem('ytdHistory') || '[]');
         const indicesToDelete = Array.from(selectedHistoryItems).sort((a, b) => b - a);
@@ -1921,14 +2243,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const message = deletedCount > 0 
             ? `Successfully deleted ${deletedCount} file${deletedCount !== 1 ? 's' : ''} and removed ${removedCount} item${removedCount !== 1 ? 's' : ''} from history.`
             : `Removed ${removedCount} item${removedCount !== 1 ? 's' : ''} from history.`;
-        alert(message);
+        await showAlert(message, 'Deletion Complete');
     }
 
     // Clear History button with confirmation
     const clearHistoryBtn = document.getElementById('clearHistoryBtn');
     if (clearHistoryBtn) {
-        clearHistoryBtn.onclick = () => {
-            if (confirmDelete('Are you sure you want to clear all history?')) {
+        clearHistoryBtn.onclick = async () => {
+            const confirmed = await confirmDelete('Are you sure you want to clear all history?', 'Clear All History');
+            if (confirmed) {
                 localStorage.removeItem('ytdHistory');
                 filterAndRenderHistory();
             }
@@ -1954,7 +2277,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 await window.electronAPI.openPathInExplorer(folderPath);
             }
         } else if (action === 'delete') {
-            if (confirmDelete('Are you sure you want to delete this file?')) {
+            const confirmed = await confirmDelete('Are you sure you want to delete this file?', 'Delete File');
+            if (confirmed) {
                 try {
                     if (window.electronAPI?.deleteFile) {
                         const result = await window.electronAPI.deleteFile(filePath);
@@ -1969,12 +2293,12 @@ document.addEventListener('DOMContentLoaded', () => {
                                 filterAndRenderHistory();
                             }
                         } else {
-                            alert('Failed to delete file: ' + (result.error || 'Unknown error'));
+                            await showAlert('Failed to delete file: ' + (result.error || 'Unknown error'), 'Deletion Failed');
                         }
                     }
                 } catch (error) {
                     console.error('Error deleting file:', error);
-                    alert('Error deleting file: ' + error.message);
+                    await showAlert('Error deleting file: ' + error.message, 'Error');
                 }
             }
         }
@@ -2026,33 +2350,510 @@ document.addEventListener('DOMContentLoaded', () => {
             localStorage.setItem('ytdUserSettings', JSON.stringify(userSettings));
         });
     }
+
+    // ===== TUTORIAL SYSTEM =====
+    initTutorial();
 });
 
-// Ensure default download folder is set to the SimplyYTD downloads folder on first launch
+// Tutorial System
+function initTutorial() {
+    const tutorialModal = document.getElementById('tutorialModal');
+    const tutorialContent = document.getElementById('tutorialContent');
+    const closeTutorialBtn = document.getElementById('closeTutorialBtn');
+    
+    if (!tutorialModal || !tutorialContent) return;
+    
+    let currentStep = 0;
+    
+    const tutorialSteps = [
+        {
+            number: 1,
+            title: 'Set Download Location',
+            subtitle: 'Choose where videos are saved',
+            images: [
+                './assets/Tutorial One 1-2.png',
+                './assets/Tutorial One 2-2.png'
+            ],
+            content: `
+                <div class="tutorial-content-box">
+                    <h3><i class="fas fa-folder-open"></i> Quick Setup</h3>
+                    <p>Change from the default app folder to a local folder for better access.</p>
+                    <ol>
+                        <li>Click <strong>Settings</strong> <i class="fas fa-cog"></i> (top-right)</li>
+                        <li>Go to <strong>Download Location</strong></li>
+                        <li>Click <strong>Choose</strong> or <strong>Default</strong></li>
+                        <li>Click <strong>Save Settings</strong></li>
+                    </ol>
+                </div>
+            `
+        },
+        {
+            number: 2,
+            title: 'Add Cookies (Optional)',
+            subtitle: 'For age-restricted & private content',
+            images: [
+                './assets/Tutorial Two 1-3.png',
+                './assets/Tutorial Two 2-3.png',
+                './assets/Tutorial Two 3-3.png'
+            ],
+            content: `
+                <div class="tutorial-content-box">
+                    <h3><i class="fas fa-cookie-bite"></i> Why Cookies?</h3>
+                    <p>Access age-restricted videos and improve download speeds. Optional but recommended.</p>
+                    <ol>
+                        <li>Click <strong>Import Cookies</strong> in Settings</li>
+                        <li>Follow the instructions shown</li>
+                        <li>Export cookies from your browser</li>
+                        <li>Upload or paste cookies.txt</li>
+                        <li>Click <strong>Save Cookies</strong></li>
+                    </ol>
+                </div>
+            `
+        },
+        {
+            number: 3,
+            title: 'Download & History',
+            subtitle: 'Start downloading and track your files',
+            images: [
+                './assets/Tutorial Three 1-1.png'
+            ],
+            content: `
+                <div class="tutorial-content-box">
+                    <h3><i class="fas fa-download"></i> Download Videos</h3>
+                    <ol>
+                        <li>Paste YouTube URL in <strong>Video</strong> tab</li>
+                        <li>Choose <strong>Format</strong> (MP4/MP3) & <strong>Quality</strong></li>
+                        <li>Click <strong>Download Now</strong></li>
+                        <li>Watch progress in the right panel</li>
+                    </ol>
+                </div>
+                <div class="tutorial-content-box" style="margin-top: 1rem;">
+                    <h3><i class="fas fa-history"></i> View History</h3>
+                    <ol>
+                        <li>Click <strong>History</strong> tab</li>
+                        <li>Browse: Singles, Playlists, Instagram</li>
+                        <li>Search, filter, and sort your downloads</li>
+                        <li>Use <strong>Play</strong> or <strong>Folder</strong> buttons</li>
+                    </ol>
+                </div>
+            `
+        }
+    ];
+    
+    // Image popup modal functionality
+    function createImagePopup() {
+        const popup = document.createElement('div');
+        popup.className = 'image-popup-modal';
+        popup.innerHTML = `
+            <div class="image-popup-content">
+                <button class="image-popup-close" aria-label="Close image">&times;</button>
+                <img class="image-popup-img" src="" alt="Full size image" />
+                <button class="image-popup-prev" aria-label="Previous image">
+                    <i class="fas fa-chevron-left"></i>
+                </button>
+                <button class="image-popup-next" aria-label="Next image">
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+            </div>
+        `;
+        document.body.appendChild(popup);
+        
+        let currentImageIndex = 0;
+        let currentImages = [];
+        
+        function openPopup(images, index) {
+            currentImages = images;
+            currentImageIndex = index;
+            const img = popup.querySelector('.image-popup-img');
+            img.src = images[index];
+            popup.style.display = 'flex';
+            document.body.style.overflow = 'hidden';
+        }
+        
+        function closePopup() {
+            popup.style.display = 'none';
+            document.body.style.overflow = '';
+        }
+        
+        function showNext() {
+            if (currentImages.length === 0) return;
+            currentImageIndex = (currentImageIndex + 1) % currentImages.length;
+            popup.querySelector('.image-popup-img').src = currentImages[currentImageIndex];
+        }
+        
+        function showPrev() {
+            if (currentImages.length === 0) return;
+            currentImageIndex = (currentImageIndex - 1 + currentImages.length) % currentImages.length;
+            popup.querySelector('.image-popup-img').src = currentImages[currentImageIndex];
+        }
+        
+        popup.querySelector('.image-popup-close').onclick = closePopup;
+        popup.querySelector('.image-popup-next').onclick = showNext;
+        popup.querySelector('.image-popup-prev').onclick = showPrev;
+        popup.onclick = (e) => {
+            if (e.target === popup) closePopup();
+        };
+        
+        document.addEventListener('keydown', (e) => {
+            if (popup.style.display === 'flex') {
+                if (e.key === 'Escape') closePopup();
+                if (e.key === 'ArrowRight') showNext();
+                if (e.key === 'ArrowLeft') showPrev();
+            }
+        });
+        
+        return { openPopup };
+    }
+    
+    const imagePopup = createImagePopup();
+    
+    function createCarousel(images, stepIndex, stepTitle) {
+        if (!images || images.length === 0) return '';
+        
+        const carouselId = `carousel-${stepIndex}`;
+        const itemGroupId = `carousel-items-${stepIndex}`;
+        const indicatorsId = `carousel-indicators-${stepIndex}`;
+        
+        const indicatorsHTML = images.map((_, idx) => 
+            `<button class="carousel-indicator" data-index="${idx}" aria-label="Go to slide ${idx + 1}" ${idx === 0 ? 'data-active' : ''}></button>`
+        ).join('');
+        
+        return `
+            <div class="tutorial-carousel" data-carousel-id="${carouselId}">
+                <div class="carousel-item-group" id="${itemGroupId}">
+                    ${images.map((imgSrc, idx) => `
+                        <div class="carousel-item" data-index="${idx}" ${idx === 0 ? 'data-active' : ''}>
+                            <img 
+                                src="${imgSrc}" 
+                                alt="${stepTitle} - Image ${idx + 1}" 
+                                class="carousel-image"
+                                loading="lazy"
+                                decoding="async"
+                            />
+                        </div>
+                    `).join('')}
+                </div>
+                <div class="carousel-control">
+                    <button class="carousel-prev-btn" aria-label="Previous slide">
+                        <i class="fas fa-chevron-left"></i>
+                    </button>
+                    <div class="carousel-indicator-group" id="${indicatorsId}">
+                        ${indicatorsHTML}
+                    </div>
+                    <button class="carousel-next-btn" aria-label="Next slide">
+                        <i class="fas fa-chevron-right"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+    
+    function initCarousel(carouselEl, images, stepIndex) {
+        const items = carouselEl.querySelectorAll('.carousel-item');
+        const indicators = carouselEl.querySelectorAll('.carousel-indicator');
+        const prevBtn = carouselEl.querySelector('.carousel-prev-btn');
+        const nextBtn = carouselEl.querySelector('.carousel-next-btn');
+        const imagesEl = carouselEl.querySelectorAll('.carousel-image');
+        
+        let currentIndex = 0;
+        
+        function updateCarousel(index) {
+            // Update items
+            items.forEach((item, idx) => {
+                if (idx === index) {
+                    item.setAttribute('data-active', '');
+                } else {
+                    item.removeAttribute('data-active');
+                }
+            });
+            
+            // Update indicators
+            indicators.forEach((indicator, idx) => {
+                if (idx === index) {
+                    indicator.setAttribute('data-active', '');
+                } else {
+                    indicator.removeAttribute('data-active');
+                }
+            });
+            
+            currentIndex = index;
+        }
+        
+        function goToSlide(index) {
+            if (index < 0) index = items.length - 1;
+            if (index >= items.length) index = 0;
+            updateCarousel(index);
+        }
+        
+        function goNext() {
+            goToSlide(currentIndex + 1);
+        }
+        
+        function goPrev() {
+            goToSlide(currentIndex - 1);
+        }
+        
+        // Button events
+        nextBtn?.addEventListener('click', goNext);
+        prevBtn?.addEventListener('click', goPrev);
+        
+        // Indicator events
+        indicators.forEach((indicator, idx) => {
+            indicator.addEventListener('click', () => goToSlide(idx));
+        });
+        
+        // Image click to open popup
+        imagesEl.forEach((img, idx) => {
+            img.style.cursor = 'pointer';
+            img.addEventListener('click', () => {
+                imagePopup.openPopup(images, idx);
+            });
+        });
+        
+        // Keyboard navigation
+        carouselEl.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight') goNext();
+            if (e.key === 'ArrowLeft') goPrev();
+        });
+        
+        // Touch/swipe support
+        let touchStartX = 0;
+        let touchEndX = 0;
+        
+        carouselEl.addEventListener('touchstart', (e) => {
+            touchStartX = e.changedTouches[0].screenX;
+        });
+        
+        carouselEl.addEventListener('touchend', (e) => {
+            touchEndX = e.changedTouches[0].screenX;
+            handleSwipe();
+        });
+        
+        function handleSwipe() {
+            const swipeThreshold = 50;
+            const diff = touchStartX - touchEndX;
+            if (Math.abs(diff) > swipeThreshold) {
+                if (diff > 0) {
+                    goNext();
+                } else {
+                    goPrev();
+                }
+            }
+        }
+    }
+    
+    function renderAllSteps() {
+        const stepsHTML = tutorialSteps.map((step, index) => {
+            // Create carousel for images
+            const carouselHTML = step.images && step.images.length > 0 
+                ? createCarousel(step.images, index, step.title)
+                : '';
+            
+            return `
+            <div class="tutorial-step-card" data-step="${index}">
+                <div class="tutorial-step-number">${step.number}</div>
+                <h2 class="tutorial-step-title">${step.title}</h2>
+                <p class="tutorial-step-subtitle">${step.subtitle}</p>
+                ${step.content}
+                ${carouselHTML ? `<div class="tutorial-images-container">${carouselHTML}</div>` : ''}
+            </div>
+            `;
+        }).join('');
+        
+        // Use innerHTML only once for better performance
+        tutorialContent.innerHTML = `
+            <div class="tutorial-header-bar">
+                <div class="tutorial-header-title">
+                    <i class="fas fa-graduation-cap"></i>
+                    Getting Started Tutorial
+                </div>
+            </div>
+            <div class="tutorial-steps-container">
+                ${stepsHTML}
+            </div>
+            <div class="tutorial-footer">
+                <button class="tutorial-action-btn primary" id="finishTutorialBtn">
+                    Got it! Let's start <i class="fas fa-arrow-right"></i>
+                </button>
+            </div>
+        `;
+        
+        // Initialize carousels
+        tutorialSteps.forEach((step, index) => {
+            if (step.images && step.images.length > 0) {
+                const carouselEl = tutorialContent.querySelector(`[data-carousel-id="carousel-${index}"]`);
+                if (carouselEl) {
+                    initCarousel(carouselEl, step.images, index);
+                }
+            }
+        });
+        
+        // Remove existing listeners to prevent duplicates (performance optimization)
+        const existingClickHandler = tutorialContent._tutorialClickHandler;
+        const existingKeyHandler = tutorialContent._tutorialKeyHandler;
+        if (existingClickHandler) {
+            tutorialContent.removeEventListener('click', existingClickHandler);
+        }
+        if (existingKeyHandler) {
+            tutorialContent.removeEventListener('keypress', existingKeyHandler);
+        }
+        
+        // Add interactive card hover effects with event delegation for better performance
+        const clickHandler = (e) => {
+            const card = e.target.closest('.tutorial-step-card');
+            if (card && !e.target.closest('.carousel-control') && !e.target.closest('.carousel-image')) {
+                const cards = tutorialContent.querySelectorAll('.tutorial-step-card');
+                cards.forEach(c => c.classList.remove('active'));
+                card.classList.add('active');
+            }
+        };
+        tutorialContent._tutorialClickHandler = clickHandler;
+        tutorialContent.addEventListener('click', clickHandler);
+        
+        // Add keyboard navigation
+        const keyHandler = (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                const card = e.target.closest('.tutorial-step-card');
+                if (card) {
+                    e.preventDefault();
+                    card.click();
+                }
+            }
+        };
+        tutorialContent._tutorialKeyHandler = keyHandler;
+        tutorialContent.addEventListener('keypress', keyHandler);
+        
+        // Set tabindex for keyboard navigation
+        const cards = tutorialContent.querySelectorAll('.tutorial-step-card');
+        cards.forEach(card => card.setAttribute('tabindex', '0'));
+        
+        // Finish button
+        const finishBtn = document.getElementById('finishTutorialBtn');
+        if (finishBtn) {
+            finishBtn.onclick = closeTutorial;
+        }
+    }
+    
+    function openTutorial(stepIndex = 0) {
+        // Use requestAnimationFrame for smoother rendering
+        requestAnimationFrame(() => {
+            renderAllSteps();
+            requestAnimationFrame(() => {
+                tutorialModal.style.display = 'flex';
+                document.body.style.overflow = 'hidden';
+            });
+        });
+    }
+    
+    function closeTutorial() {
+        tutorialModal.style.display = 'none';
+        document.body.style.overflow = '';
+        localStorage.setItem('ytdTutorialCompleted', 'true');
+    }
+    
+    if (closeTutorialBtn) {
+        closeTutorialBtn.onclick = closeTutorial;
+    }
+    
+    // Close on outside click
+    tutorialModal.onclick = (e) => {
+        if (e.target === tutorialModal) {
+            closeTutorial();
+        }
+    };
+    
+    // Check if first time user
+    const tutorialCompleted = localStorage.getItem('ytdTutorialCompleted');
+    if (!tutorialCompleted) {
+        // Show tutorial after a short delay
+        setTimeout(() => {
+            openTutorial(0);
+        }, 1000);
+    }
+    
+    // Make tutorial accessible globally
+    window.openTutorial = openTutorial;
+}
+
+// Ensure default download folder is set correctly on first launch
 window.addEventListener('DOMContentLoaded', async () => {
     const downloadFolderInput = document.getElementById('downloadFolder');
-    // Use the SimplyYTD downloads folder as the default
-    const defaultDownloadsPath = 'C:/Users/Youssef Ben/Desktop/Code/SimplyYTD/downloads';
+    
+    // Get the app's downloads folder (for first startup) and user's Downloads folder (for default button)
+    let appDownloadsPath = '';
+    let userDownloadsPath = '';
+    
+    // Try to get paths from Electron API
+    if (window.electronAPI && window.electronAPI.getDefaultDownloadFolder) {
+        try {
+            userDownloadsPath = await window.electronAPI.getDefaultDownloadFolder();
+        } catch (e) {
+            console.error('Failed to get default download folder:', e);
+        }
+    }
+    
+    // Get app directory path for first startup
+    if (window.electronAPI && window.electronAPI.getUserDataPath) {
+        try {
+            const userDataPath = await window.electronAPI.getUserDataPath();
+            // Use a 'downloads' folder inside the app's userData directory
+            appDownloadsPath = userDataPath.replace(/\\/g, '/') + '/downloads';
+        } catch (e) {
+            console.error('Failed to get userData path:', e);
+            // Fallback: use userDownloadsPath if available
+            appDownloadsPath = userDownloadsPath || '';
+        }
+    } else {
+        // Fallback if no Electron API - will be set by userDownloadsPath if available
+        appDownloadsPath = userDownloadsPath || '';
+    }
     
     if (downloadFolderInput) {
         let savedFolder = localStorage.getItem('downloadFolder');
+        let isFirstLaunch = !localStorage.getItem('hasLaunchedBefore');
+        
         if (!savedFolder) {
-            // Set default to SimplyYTD downloads directory on first launch
-            downloadFolderInput.value = defaultDownloadsPath;
-            localStorage.setItem('downloadFolder', defaultDownloadsPath);
+            if (isFirstLaunch) {
+                // First startup: use app's downloads folder
+                downloadFolderInput.value = appDownloadsPath;
+                localStorage.setItem('downloadFolder', appDownloadsPath);
+                localStorage.setItem('hasLaunchedBefore', 'true');
+            } else {
+                // Subsequent launches but no saved folder: use user's Downloads
+                downloadFolderInput.value = userDownloadsPath || appDownloadsPath;
+                localStorage.setItem('downloadFolder', userDownloadsPath || appDownloadsPath);
+            }
         } else {
             downloadFolderInput.value = savedFolder;
         }
     }
     
-    // Update default folder button to use the SimplyYTD path
+    // Update default folder button to use the user's Downloads folder
     const defaultFolderBtn = document.getElementById('defaultFolderBtn');
     if (defaultFolderBtn) {
-        defaultFolderBtn.onclick = () => {
+        defaultFolderBtn.onclick = async () => {
             const downloadFolderInput = document.getElementById('downloadFolder');
             if (downloadFolderInput) {
-                downloadFolderInput.value = defaultDownloadsPath;
-                localStorage.setItem('downloadFolder', defaultDownloadsPath);
+                let defaultPath = userDownloadsPath;
+                
+                // If we don't have it yet, try to get it
+                if (!defaultPath && window.electronAPI && window.electronAPI.getDefaultDownloadFolder) {
+                    try {
+                        defaultPath = await window.electronAPI.getDefaultDownloadFolder();
+                    } catch (e) {
+                        console.error('Failed to get default download folder:', e);
+                        // Fallback for Windows - will be replaced by Electron API when available
+                        defaultPath = 'C:/Users/User/Downloads';
+                    }
+                }
+                
+                if (!defaultPath) {
+                    // Final fallback
+                    defaultPath = 'C:/Users/User/Downloads';
+                }
+                
+                downloadFolderInput.value = defaultPath;
+                localStorage.setItem('downloadFolder', defaultPath);
             }
         };
     }
