@@ -33,6 +33,22 @@
 
 ---
 
+## Screenshots
+
+<div align="center">
+
+![GetVideosLocally Screenshot 1](public/Pic1.png)
+
+![GetVideosLocally Screenshot 2](public/Pic2.png)
+
+![GetVideosLocally Screenshot 3](public/Pic3.png)
+
+![GetVideosLocally Screenshot 4](public/Pic4.png)
+
+</div>
+
+---
+
 ## Features
 
 ### Video & Audio Processing
@@ -100,7 +116,7 @@ For accessing content you have permission to access:
 
 ### Download History
 - View all downloads in the History tab
-- Filter by type (Singles, Playlists, Instagram)
+- Filter by type (Singles, Playlists)
 - Search by filename
 - Sort by date, name, or size
 - Bulk delete files
@@ -187,8 +203,11 @@ npm run electron:dev
 # Run server only
 npm start
 
-# Build for Windows
-npm run build:win
+# Build portable package
+npm run build:portable
+
+# Build Windows installer
+npm run build
 
 # Icon management
 npm run icon:generate    # Generate icons
@@ -199,13 +218,13 @@ npm run icon:verify-exe  # Verify executable icon
 Output is in `dist/` after building.
 
 ### Project Structure
-```
-simply-ytd/
+``` 
+getvideoslocally/
 ├── assets/              # Images, sounds, UI assets
 ├── bin/                 # Bundled executables (yt-dlp, ffmpeg, node)
-├── cookies/             # Cookie storage
-├── downloads/           # Default downloads directory
 ├── public/              # Static HTML and assets
+├── backend/             # Backend modules and services
+├── tests/               # Automated tests
 ├── electron-main.js     # Electron main process
 ├── server.js            # Backend (Express + WebSocket)
 ├── script.js            # Frontend logic
