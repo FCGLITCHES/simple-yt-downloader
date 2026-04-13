@@ -16,7 +16,7 @@
 [⭐ Star](https://github.com/FCGLITCHES/simple-yt-downloader) • 
 [🐛 Report Bug](https://github.com/FCGLITCHES/simple-yt-downloader/issues) • 
 [💬 Discussions](https://github.com/FCGLITCHES/simple-yt-downloader/discussions) • 
-[☕ Support]([https://fcglitches.github.io/Website-Simple-YTD/#support](https://donate.stripe.com/6oU00i73R6eh2yc0oU5AQ00))
+[☕ Support](https://donate.stripe.com/6oU00i73R6eh2yc0oU5AQ00).
 
 </div>
 
