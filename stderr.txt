@@ -1,0 +1,7 @@
+[Firewall] Could not add firewall rule automatically: Command failed: netsh advfirewall firewall add rule name="SimplyYTD-Server-Access" dir=in action=allow program="D:\Completed Projects\Video downloader Website - Copy\dist\win-unpacked\SimplyYTD.exe" enable=yes profile=any
+. This is usually due to lack of admin permissions.
+[2120:0106/165225.455:ERROR:network_sandbox.cc(76)] Failed to delete file C:\Users\FCGLITCHES-YT\AppData\Roaming\SimplyYTD\Cookies: The directory is not empty. (0x91)
+[2120:0106/165225.456:ERROR:network_service_instance_impl.cc(282)] Encountered error while migrating network context data or granting sandbox access for C:\Users\FCGLITCHES-YT\AppData\Roaming\SimplyYTD\Network. Result: 4: The operation completed successfully. (0x0)
+Error occurred in handler for 'get-userdata-path': Error: No handler registered for 'get-userdata-path'
+    at WebContents.<anonymous> (node:electron/js2c/browser_init:2:78076)
+    at WebContents.emit (node:events:517:28)

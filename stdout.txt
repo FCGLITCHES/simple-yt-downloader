@@ -1,0 +1,84 @@
+
+[electron-main.js] FINAL resourcesBinPath: D:\Completed Projects\Video downloader Website - Copy\dist\win-unpacked\resources\bin
+[electron-main.js] FINAL resourcesCookiesPath: D:\Completed Projects\Video downloader Website - Copy\dist\win-unpacked\resources\cookies
+[electron-main.js] FINAL resourcesPublicPath: D:\Completed Projects\Video downloader Website - Copy\dist\win-unpacked\resources\public
+Starting server...
+[electron-main.js] Running in development mode.
+[electron-main.js] __dirname: D:\Completed Projects\Video downloader Website - Copy\dist\win-unpacked\resources\app.asar
+[electron-main.js] Calculated resourcesBinPath for executables: D:\Completed Projects\Video downloader Website - Copy\dist\win-unpacked\resources\bin
+[electron-main.js] Calculated ytdlpPath: D:\Completed Projects\Video downloader Website - Copy\dist\win-unpacked\resources\bin\yt-dlp.exe
+[electron-main.js] Calculated ffmpegPath: D:\Completed Projects\Video downloader Website - Copy\dist\win-unpacked\resources\bin\ffmpeg.exe
+[electron-main.js] Calculated nodeBinaryPath: D:\Completed Projects\Video downloader Website - Copy\dist\win-unpacked\resources\bin\node.exe
+[electron-main.js] Does ytdlp exist at path? true
+[electron-main.js] Does ffmpeg exist at path? true
+[electron-main.js] Does node binary exist at path? true
+Forking server process: D:\Completed Projects\Video downloader Website - Copy\dist\win-unpacked\resources\app.asar\server.js
+[Firewall] Rule "SimplyYTD-Server-Access" not found. Attempting to add...
+[dotenv@17.2.3] injecting env (2) from .env -- tip: 👥 sync secrets across teammates & machines: https://dotenvx.com/ops
+[server.js] Server process started.
+[server.js] Received YTDLP_PATH from env:  D:\Completed Projects\Video downloader Website - Copy\dist\win-unpacked\resources\bin\yt-dlp.exe
+[server.js] Received FFMPEG_PATH from env:  D:\Completed Projects\Video downloader Website - Copy\dist\win-unpacked\resources\bin\ffmpeg.exe
+[server.js] Received NODE_BINARY from env:  D:\Completed Projects\Video downloader Website - Copy\dist\win-unpacked\resources\bin\node.exe
+[server.js] Received USER_DATA_DIR from env:  C:\Users\FCGLITCHES-YT\AppData\Roaming\SimplyYTD
+[server.js] FINAL DOWNLOAD_DIR: C:\Users\FCGLITCHES-YT\Downloads\SimplyYTD
+[server.js] Effective ytdlpExecutable:  D:\Completed Projects\Video downloader Website - Copy\dist\win-unpacked\resources\bin\yt-dlp.exe
+[server.js] Effective ffmpegExecutable:  D:\Completed Projects\Video downloader Website - Copy\dist\win-unpacked\resources\bin\ffmpeg.exe
+[server.js] Effective nodeExecutable:  D:\Completed Projects\Video downloader Website - Copy\dist\win-unpacked\resources\bin\node.exe
+Backend server running on http://127.0.0.1:9875
+Downloads will be saved to: C:\Users\FCGLITCHES-YT\Downloads\SimplyYTD
+✅ Periodic auto-update checks started (every 24 hours)
+Sending server_ready message to parent process...
+Message from server process: { type: 'server_ready', port: 9875 }
+Server started on port 9875
+p-limit loaded and limiters initialized.
+Waiting for server to be ready...
+Checking server readiness (attempt 1/100)...
+Server is ready!
+Server is ready, loading URL...
+Client connected: client_1766866487316_u9cxb. Total clients: 1
+[path-exists] C:/Users/FCGLITCHES-YT/Downloads/I Hate That Fake Frames are Good Now….mp4 exists: true
+Client client_1766866487316_u9cxb auto-update preference: enabled
+WebSocket server should be ready now
+Using yt-dlp executable: D:\Completed Projects\Video downloader Website - Copy\dist\win-unpacked\resources\bin\yt-dlp.exe
+Using ffmpeg executable: D:\Completed Projects\Video downloader Website - Copy\dist\win-unpacked\resources\bin\ffmpeg.exe
+Sending ready message to client
+[path-exists] C:/Users/FCGLITCHES-YT/Downloads/I Hate That Fake Frames are Good Now….jpg exists: true
+URL loaded, showing window...
+[path-exists] C:/Users/FCGLITCHES-YT/Videos/Simply YTD/عبدالله الشريف حلقة 40 أبو عبيدة الموسم التاسع (1).mp4 exists: true
+[path-exists] C:/Users/FCGLITCHES-YT/Videos/Simply YTD/عبدالله الشريف حلقة 40 أبو عبيدة الموسم التاسع (1).jpg exists: false
+[path-exists] C:/Users/FCGLITCHES-YT/Videos/Simply YTD/I'm increasing my size and surface hardness..mp4 exists: false
+[path-exists] C:/Users/FCGLITCHES-YT/Videos/Simply YTD/I'm increasing my size and surface hardness..jpg exists: false
+[path-exists] C:/Users/FCGLITCHES-YT/Videos/Simply YTD/I ORDERED THE BIGGEST BURGER IN FRANCE...OVER 300 PEOPLE HAVE FAILED TO FINISH IT! BeardMeatsFood.mp4 exists: false
+[path-exists] C:/Users/FCGLITCHES-YT/Videos/Simply YTD/I ORDERED THE BIGGEST BURGER IN FRANCE...OVER 300 PEOPLE HAVE FAILED TO FINISH IT! BeardMeatsFood.jpg exists: false
+[path-exists] C:/Users/FCGLITCHES-YT/Videos/Simply YTD/في ناس بتختارهم.mp4 exists: false
+[path-exists] C:/Users/FCGLITCHES-YT/Videos/Simply YTD/في ناس بتختارهم.jpg exists: false
+[path-exists] C:/Users/FCGLITCHES-YT/Videos/Simply YTD/الديوث والأسرة الخائنة.mp4 exists: false
+[path-exists] C:/Users/FCGLITCHES-YT/Videos/Simply YTD/الديوث والأسرة الخائنة.jpg exists: false
+[path-exists] C:/Users/FCGLITCHES-YT/Videos/Simply YTD/لقاء جديد بعنوان التربية بالإبتلاء للدكتور محمود شعبان (1).mp4 exists: false
+[path-exists] C:/Users/FCGLITCHES-YT/Videos/Simply YTD/لقاء جديد بعنوان التربية بالإبتلاء للدكتور محمود شعبان (1).jpg exists: false
+[path-exists] C:/Users/FCGLITCHES-YT/Videos/Simply YTD/لقاء جديد بعنوان التربية بالإبتلاء للدكتور محمود شعبان.mp4 exists: false
+[path-exists] C:/Users/FCGLITCHES-YT/Videos/Simply YTD/لقاء جديد بعنوان التربية بالإبتلاء للدكتور محمود شعبان.jpg exists: false
+[path-exists] C:/Users/FCGLITCHES-YT/Videos/Simply YTD/غض البصر الدرس الثاني.mp3 exists: true
+[path-exists] C:/Users/FCGLITCHES-YT/Videos/Simply YTD/غض البصر الدرس الثاني.jpg exists: false
+[path-exists] C:/Users/FCGLITCHES-YT/Videos/Simply YTD/ما أجهلك! تأملات في سورة البروج.mp3 exists: true
+[path-exists] C:/Users/FCGLITCHES-YT/Videos/Simply YTD/ما أجهلك! تأملات في سورة البروج.jpg exists: false
+[path-exists] C:/Users/FCGLITCHES-YT/Videos/Simply YTD/قصة قارون.mp3 exists: true
+[path-exists] C:/Users/FCGLITCHES-YT/Videos/Simply YTD/قصة قارون.jpg exists: false
+[path-exists] C:/Users/FCGLITCHES-YT/Videos/Simply YTD/أصحاب السبت.mp3 exists: true
+[path-exists] C:/Users/FCGLITCHES-YT/Videos/Simply YTD/أصحاب السبت.jpg exists: false
+[path-exists] C:/Users/FCGLITCHES-YT/Videos/Simply YTD/غض البصر الدرس الأول.mp3 exists: true
+[path-exists] C:/Users/FCGLITCHES-YT/Videos/Simply YTD/غض البصر الدرس الأول.jpg exists: false
+[path-exists] C:/Users/FCGLITCHES-YT/Videos/Simply YTD/8K Cinematic Video • S23 Ultra 🤯.mp4 exists: true
+[path-exists] C:/Users/FCGLITCHES-YT/Videos/Simply YTD/8K Cinematic Video • S23 Ultra 🤯.jpg exists: false
+[auto-launch] Current status: false
+[path-exists] C:/Users/FCGLITCHES-YT/Videos/Simply YTD/I tried the viral 'Star Wars' Starfield mod....mp4 exists: false
+[path-exists] C:/Users/FCGLITCHES-YT/Videos/Simply YTD/I tried the viral 'Star Wars' Starfield mod....jpg exists: false
+[path-exists] C:/Users/FCGLITCHES-YT/Videos/Simply YTD/Do You SIN And You KNOW That You’re Sinning Sound Heart 20 Disease 15.mp4 exists: true
+[path-exists] C:/Users/FCGLITCHES-YT/Videos/Simply YTD/Do You SIN And You KNOW That You’re Sinning Sound Heart 20 Disease 15.jpg exists: false
+[path-exists] C:/Users/FCGLITCHES-YT/Videos/Simply YTD/8K Cinematic Video • S23 Ultra 🤯 (1).mp4 exists: true
+[path-exists] C:/Users/FCGLITCHES-YT/Videos/Simply YTD/8K Cinematic Video • S23 Ultra 🤯 (1).jpg exists: false
+[Downloads] Active download count: 0
+🚀 Server started, checking for yt-dlp updates (auto-update enabled)...
+🔄 Starting tool updates...
+🔄 Checking yt-dlp for updates...
+🔍 Getting version for: D:\Completed Projects\Video downloader Website - Copy\dist\win-unpacked\resources\bin\yt-dlp.exe

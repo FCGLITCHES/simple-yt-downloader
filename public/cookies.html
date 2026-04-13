@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Import Cookies - GetVideosLocally</title>
+    <link rel="stylesheet" href="../style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="icon" type="image/x-icon" href="Logo_1.ico">
+    <style>
+        /* Cookie page specific styles */
+        .cookies-modal-container {
+            max-width: 650px;
+            margin: 1rem auto;
+            padding: 0;
+        }
+
+        .cookies-header-banner {
+            background: #d63031;
+            color: white;
+            padding: 1rem 1.5rem;
+            text-align: center;
+            border-radius: 0.6rem 0.6rem 0 0;
+        }
+
+        .cookies-header-banner h1 {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.6rem;
+            margin: 0;
+            font-size: 1.4rem;
+            font-weight: 700;
+        }
+
+        .cookies-header-banner .cookie-icon {
+            font-size: 1.5rem;
+        }
+
+        .cookies-header-banner p {
+            margin: 0.4rem 0 0 0;
+            font-size: 0.85rem;
+            opacity: 0.95;
+        }
+
+        .cookies-content {
+            background: var(--card-bg);
+            padding: 1.2rem;
+            border-radius: 0 0 0.6rem 0.6rem;
+            border: 1px solid var(--border-color);
+            border-top: none;
+        }
+
+        /* Upload/Drop zone */
+        .cookie-upload-zone {
+            border: 2px dashed var(--border-color);
+            border-radius: 0.6rem;
+            padding: 1.5rem 1rem;
+            text-align: center;
+            background: var(--input-bg);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 1rem;
+            position: relative;
+        }
+
+        .cookie-upload-zone:hover {
+            border-color: var(--primary-color);
+            background: var(--card-bg);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px var(--shadow-color);
+        }
+
+        .cookie-upload-zone.drag-over {
+            border-color: var(--primary-color);
+            background: rgba(var(--primary-color-rgb, 155, 17, 30), 0.1);
+        }
+
+        .cookie-upload-zone input[type="file"] {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        .upload-icon {
+            font-size: 2.5rem;
+            color: #f39c12;
+            margin-bottom: 0.5rem;
+        }
+
+        .upload-text {
+            font-weight: 700;
+            font-size: 0.95rem;
+            color: var(--text-color);
+            margin-bottom: 0.3rem;
+        }
+
+        .upload-hint {
+            font-size: 0.8rem;
+            color: var(--text-color);
+            opacity: 0.7;
+        }
+
+        .cookie-separator {
+            display: flex;
+            align-items: center;
+            margin: 1rem 0;
+            color: var(--text-color);
+            opacity: 0.6;
+        }
+
+        .cookie-separator::before,
+        .cookie-separator::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: var(--border-color);
+        }
+
+        .cookie-separator span {
+            padding: 0 1rem;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        /* Paste cookies section */
+        .cookie-paste-section {
+            margin-bottom: 1rem;
+        }
+
+        .cookie-paste-section h3 {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            margin-bottom: 0.6rem;
+            color: var(--text-color);
+            font-size: 0.95rem;
+            font-weight: 600;
+        }
+
+        .cookie-textarea {
+            width: 100%;
+            min-height: 100px;
+            max-height: 120px;
+            padding: 0.7rem;
+            border: 1px solid var(--border-color);
+            border-radius: 0.4rem;
+            background: var(--input-bg);
+            color: var(--text-color);
+            font-family: 'Courier New', monospace;
+            font-size: 0.8rem;
+            resize: vertical;
+            outline: none;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .cookie-textarea:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(var(--primary-color-rgb, 155, 17, 30), 0.15);
+        }
+
+        /* Instructions section */
+        .cookie-instructions-box {
+            background: #fff8dc;
+            border-left: 4px solid #ffd700;
+            padding: 0.9rem;
+            border-radius: 0.4rem;
+            margin-bottom: 1rem;
+        }
+
+        [data-theme="dark"] .cookie-instructions-box {
+            background: rgba(255, 215, 0, 0.15);
+            border-left-color: #ffd700;
+        }
+
+        [data-theme="vibrant"] .cookie-instructions-box {
+            background: rgba(255, 215, 0, 0.2);
+            border-left-color: #ffd700;
+        }
+
+        .cookie-instructions-box h3 {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            margin: 0 0 0.6rem 0;
+            color: var(--text-color);
+            font-size: 0.95rem;
+            font-weight: 600;
+        }
+
+        .cookie-instructions-box ol {
+            margin: 0;
+            padding-left: 1.2rem;
+        }
+
+        .cookie-instructions-box li {
+            margin-bottom: 0.4rem;
+            line-height: 1.4;
+            color: var(--text-color);
+            font-size: 0.85rem;
+        }
+
+        .cookie-instructions-box strong {
+            font-weight: 700;
+            color: var(--primary-color);
+        }
+
+        /* Action buttons */
+        .cookie-actions {
+            display: flex;
+            gap: 0.8rem;
+            margin-top: 1rem;
+        }
+
+        .cookie-btn {
+            flex: 1;
+            padding: 0.7rem 1rem;
+            border: none;
+            border-radius: 0.4rem;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .cookie-btn-clear {
+            background: linear-gradient(to bottom, #e0e0e0, #c0c0c0);
+            color: #333;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        [data-theme="dark"] .cookie-btn-clear {
+            background: linear-gradient(to bottom, #444, #333);
+            color: #e0e0e0;
+        }
+
+        .cookie-btn-clear:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .cookie-btn-save {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+        }
+
+        .cookie-btn-save:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .cookie-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .cookie-status {
+            margin-top: 0.8rem;
+            padding: 0.6rem 0.8rem;
+            border-radius: 0.4rem;
+            text-align: center;
+            display: none;
+            font-size: 0.85rem;
+        }
+
+        .cookie-status.success {
+            background: rgba(0, 184, 148, 0.1);
+            color: var(--success-color);
+            border: 1px solid rgba(0, 184, 148, 0.3);
+            display: block;
+        }
+
+        .cookie-status.error {
+            background: rgba(214, 48, 49, 0.1);
+            color: var(--error-color);
+            border: 1px solid rgba(214, 48, 49, 0.3);
+            display: block;
+        }
+
+        /* Make body fit window */
+        body {
+            overflow: hidden;
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            padding: 0;
+            margin: 0;
+        }
+
+        main {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .cookies-modal-container {
+                margin: 0.5rem;
+            }
+
+            .cookies-header-banner {
+                padding: 0.8rem 1rem;
+            }
+
+            .cookies-header-banner h1 {
+                font-size: 1.2rem;
+            }
+
+            .cookies-content {
+                padding: 1rem;
+            }
+
+            .cookie-upload-zone {
+                padding: 1rem 0.8rem;
+            }
+
+            .upload-icon {
+                font-size: 2rem;
+            }
+
+            .cookie-actions {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <main>
+            <div class="cookies-modal-container">
+                <!-- Header Banner -->
+                <div class="cookies-header-banner">
+                    <h1>
+                        <i class="fas fa-cookie-bite cookie-icon"></i>
+                        Import Cookies
+                    </h1>
+                    <p>Upload or paste your cookies.txt file for content you have permission to access.</p>
+                    <p style="margin-top: 0.5rem; font-size: 0.88rem; opacity: 0.85;">Uploaded files are saved automatically to your local app profile. Use Save only for pasted or edited personal cookies.</p>
+                </div>
+
+                <!-- Content -->
+                <div class="cookies-content">
+                    <!-- Upload/Drop Zone -->
+                    <div class="cookie-upload-zone" id="uploadZone">
+                        <input type="file" id="fileInput" accept=".txt" />
+                        <i class="fas fa-folder-open upload-icon"></i>
+                        <div class="upload-text">Click to upload cookies.txt file</div>
+                        <div class="upload-hint">or drag and drop it here</div>
+                        <div class="upload-hint" style="margin-top: 0.5rem; font-size: 0.85rem;">
+                            Supports .txt files exported from browser extensions
+                        </div>
+                    </div>
+
+                    <!-- Separator -->
+                    <div class="cookie-separator">
+                        <span>OR</span>
+                    </div>
+
+                    <!-- Paste Cookies Section -->
+                    <div class="cookie-paste-section">
+                        <h3>
+                            <i class="fas fa-file-alt"></i>
+                            Paste Cookies Content
+                        </h3>
+                        <textarea 
+                            id="cookieInput" 
+                            class="cookie-textarea" 
+                            placeholder="# Netscape HTTP Cookie File&#10;# Export from browser extension&#10;.example.com	TRUE	/	TRUE	1234567890	cookie_name	cookie_value"
+                        ></textarea>
+                    </div>
+
+                    <!-- Instructions -->
+                    <div class="cookie-instructions-box">
+                        <h3>
+                            <i class="fas fa-lightbulb"></i>
+                            How to get cookies:
+                        </h3>
+                        <ol>
+                            <li>Install a browser extension like <strong><a href="https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc" target="_blank" rel="noopener noreferrer" style="color: var(--primary-color); text-decoration: underline;">cookies.txt</a></strong> for Chrome/Firefox</li>
+                            <li>Go to the website where you have permission to access content</li>
+                            <li><strong>Click the extension</strong> and export cookies for the relevant domain</li>
+                            <li><strong>Save the file</strong> and upload it here, or copy-paste the content</li>
+                            <li><strong>Click Save</strong> to apply the cookies</li>
+                        </ol>
+                        <p style="margin-top: 0.8rem; font-size: 0.85rem; opacity: 0.8;"><strong>Note:</strong> Only use this feature for content you have proper authorization and permission to access.</p>
+                </div>
+
+                    <!-- Status Message -->
+                    <div id="cookieStatus" class="cookie-status" role="status" aria-live="polite"></div>
+
+                    <!-- Action Buttons -->
+                    <div class="cookie-actions">
+                        <button id="clearCookiesBtn" class="cookie-btn cookie-btn-clear">
+                            <i class="fas fa-trash"></i>
+                            <span>Clear Cookies</span>
+                        </button>
+                        <button id="saveCookiesBtn" class="cookie-btn cookie-btn-save">
+                            <i class="fas fa-save"></i>
+                            <span>Save Cookies</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // Load theme from localStorage if available
+        (function() {
+            try {
+                const savedTheme = localStorage.getItem('userSettings');
+                if (savedTheme) {
+                    const settings = JSON.parse(savedTheme);
+                    if (settings.themePreset) {
+                        document.documentElement.setAttribute('data-theme', settings.themePreset);
+                    }
+                }
+            } catch (e) {
+                console.error('Error loading theme:', e);
+            }
+        })();
+
+        const cookieInput = document.getElementById('cookieInput');
+        const saveCookiesBtn = document.getElementById('saveCookiesBtn');
+        const clearCookiesBtn = document.getElementById('clearCookiesBtn');
+        const cookieStatus = document.getElementById('cookieStatus');
+        const fileInput = document.getElementById('fileInput');
+        const uploadZone = document.getElementById('uploadZone');
+
+        function showStatus(message, type) {
+            cookieStatus.textContent = message;
+            cookieStatus.className = 'cookie-status ' + (type || '');
+            cookieStatus.style.display = 'block';
+            
+            setTimeout(() => {
+                if (type === 'success') {
+                    cookieStatus.style.display = 'none';
+                    cookieStatus.className = 'cookie-status';
+                }
+            }, 3000);
+        }
+
+        function setSaveButtonState(isSaving, label = 'Save Cookies') {
+            saveCookiesBtn.disabled = isSaving;
+            saveCookiesBtn.innerHTML = isSaving
+                ? '<i class="fas fa-spinner fa-spin"></i> <span>Saving...</span>'
+                : `<i class="fas fa-save"></i> <span>${label}</span>`;
+        }
+
+        cookieInput.addEventListener('input', () => {
+            if (!saveCookiesBtn.disabled) {
+                setSaveButtonState(false);
+            }
+        });
+
+        async function persistCookies(cookies, options = {}) {
+            const {
+                successMessage = 'Cookies saved successfully!',
+                closeAfterSave = false,
+                clearFormAfterSave = false
+            } = options;
+
+            if (!window.electronAPI || !window.electronAPI.saveCookiesTxt) {
+                showStatus('Cookie saving requires Electron. Please use the desktop app.', 'error');
+                return false;
+            }
+
+            const result = await window.electronAPI.saveCookiesTxt(cookies);
+            if (!result.success) {
+                showStatus('Error saving cookies: ' + result.error, 'error');
+                return false;
+            }
+
+            showStatus(successMessage, 'success');
+
+            if (clearFormAfterSave) {
+                cookieInput.value = '';
+                fileInput.value = '';
+            }
+
+            if (closeAfterSave) {
+                setTimeout(() => {
+                    if (window.electronAPI && window.electronAPI.closeWindow) {
+                        window.electronAPI.closeWindow();
+                    } else if (window.close) {
+                        window.close();
+                    }
+                }, 1000);
+            }
+
+            return true;
+        }
+
+        async function handleUploadedFile(file, invalidMessage) {
+            if (!file) return;
+
+            if (!/\.txt$/i.test(file.name)) {
+                showStatus(invalidMessage, 'error');
+                return;
+            }
+
+            try {
+                const text = await file.text();
+                cookieInput.value = text;
+                setSaveButtonState(true);
+                const saved = await persistCookies(text.trim(), {
+                    successMessage: 'File uploaded and cookies saved automatically!'
+                });
+                if (!saved) {
+                    setSaveButtonState(false);
+                    return;
+                }
+                setSaveButtonState(false, 'Saved');
+            } catch (error) {
+                showStatus('Error reading file: ' + error.message, 'error');
+                setSaveButtonState(false);
+            }
+        }
+
+        // File upload handling
+        fileInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            await handleUploadedFile(file, 'Please select a .txt file');
+        });
+
+        // Drag and drop handling
+        uploadZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadZone.classList.add('drag-over');
+        });
+
+        uploadZone.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            uploadZone.classList.remove('drag-over');
+        });
+
+        uploadZone.addEventListener('drop', async (e) => {
+            e.preventDefault();
+            uploadZone.classList.remove('drag-over');
+
+            const file = e.dataTransfer.files[0];
+            await handleUploadedFile(file, 'Please drop a .txt file');
+        });
+
+        // Save cookies
+        saveCookiesBtn.addEventListener('click', async () => {
+            const cookies = cookieInput.value.trim();
+            
+            if (!cookies) {
+                showStatus('Please upload or paste your cookies.', 'error');
+                return;
+            }
+
+            setSaveButtonState(true);
+
+            try {
+                const saved = await persistCookies(cookies, {
+                    successMessage: 'Cookies saved successfully!',
+                    clearFormAfterSave: true,
+                    closeAfterSave: true
+                });
+                if (!saved) {
+                    setSaveButtonState(false);
+                }
+            } catch (error) {
+                showStatus('Error saving cookies: ' + error.message, 'error');
+                setSaveButtonState(false);
+            }
+        });
+
+        // Clear cookies
+        clearCookiesBtn.addEventListener('click', async () => {
+            if (!cookieInput.value.trim()) {
+                showStatus('No cookies to clear.', 'error');
+                return;
+            }
+
+            if (confirm('Are you sure you want to clear the cookies?')) {
+                try {
+                    if (window.electronAPI && window.electronAPI.saveCookiesTxt) {
+                        const cleared = await persistCookies('', {
+                            successMessage: 'Saved cookies cleared from disk.'
+                        });
+                        if (!cleared) {
+                            return;
+                        }
+                    } else {
+                        showStatus('Cookie clearing requires Electron. Please use the desktop app.', 'error');
+                        return;
+                    }
+
+                    cookieInput.value = '';
+                    fileInput.value = '';
+                    setSaveButtonState(false);
+                } catch (error) {
+                    showStatus('Error clearing cookies: ' + error.message, 'error');
+                }
+            }
+        });
+    </script>
+</body>
+</html>

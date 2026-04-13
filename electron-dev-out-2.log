@@ -1,0 +1,74 @@
+
+> simply-ytd@1.0.0 electron:dev
+> cross-env NODE_ENV=development electron "."
+
+
+[electron-main.js] FINAL resourcesBinPath: D:\Completed Projects\Video downloader Website - complete v2.2\bin
+[electron-main.js] FINAL resourcesCookiesPath: D:\Completed Projects\Video downloader Website - complete v2.2\cookies
+[Firewall] Application path for rule: D:\Completed Projects\Video downloader Website - complete v2.2\node_modules\electron\dist\electron.exe
+Starting server...
+[electron-main.js] Running in development mode.
+[electron-main.js] __dirname: D:\Completed Projects\Video downloader Website - complete v2.2
+[electron-main.js] Calculated resourcesBinPath for executables: D:\Completed Projects\Video downloader Website - complete v2.2\bin
+[electron-main.js] Calculated ytdlpPath: D:\Completed Projects\Video downloader Website - complete v2.2\bin\yt-dlp.exe
+[electron-main.js] Calculated ffmpegPath: D:\Completed Projects\Video downloader Website - complete v2.2\bin\ffmpeg.exe
+[electron-main.js] Calculated nodeBinaryPath: D:\Completed Projects\Video downloader Website - complete v2.2\bin\node.exe
+[electron-main.js] Does ytdlp exist at path? true
+[electron-main.js] Does ffmpeg exist at path? true
+[electron-main.js] Does node binary exist at path? true
+Forking server process: D:\Completed Projects\Video downloader Website - complete v2.2\server.js
+[Firewall] Rule "SimplyYTD-Server-Access" not found. Attempting to add...
+[dotenv@17.2.3] injecting env (2) from .env -- tip: 🔄 add secrets lifecycle management: https://dotenvx.com/ops
+[server.js] Server process started.
+[server.js] Received YTDLP_PATH from env:  D:\Completed Projects\Video downloader Website - complete v2.2\bin\yt-dlp.exe
+[server.js] Received FFMPEG_PATH from env:  D:\Completed Projects\Video downloader Website - complete v2.2\bin\ffmpeg.exe
+[server.js] Received NODE_BINARY from env:  D:\Completed Projects\Video downloader Website - complete v2.2\bin\node.exe
+[server.js] FINAL DOWNLOAD_DIR: D:\Completed Projects\Video downloader Website - complete v2.2\downloads
+[PausedJobs] Loaded 1 paused jobs from disk
+[server.js] Effective ytdlpExecutable:  D:\Completed Projects\Video downloader Website - complete v2.2\bin\yt-dlp.exe
+[server.js] Effective ffmpegExecutable:  D:\Completed Projects\Video downloader Website - complete v2.2\bin\ffmpeg.exe
+[server.js] Effective nodeExecutable:  D:\Completed Projects\Video downloader Website - complete v2.2\bin\node.exe
+Backend server running on http://127.0.0.1:9875
+Downloads will be saved to: D:\Completed Projects\Video downloader Website - complete v2.2\downloads
+✅ Periodic auto-update checks started (every 24 hours)
+Sending server_ready message to parent process...
+Message from server process: { type: 'server_ready', port: 9875 }
+Server started on port 9875
+p-limit loaded and limiters initialized.
+Waiting for server to be ready...
+Checking server readiness (attempt 1/100)...
+Server is ready!
+Server is ready, loading URL...
+Client connected: client_1768173856893_ek00n. Total clients: 1
+Client client_1768173856893_ek00n auto-update preference: enabled
+WebSocket server should be ready now
+Using yt-dlp executable: D:\Completed Projects\Video downloader Website - complete v2.2\bin\yt-dlp.exe
+Using ffmpeg executable: D:\Completed Projects\Video downloader Website - complete v2.2\bin\ffmpeg.exe
+[path-exists] C:\Users\FCGLITCHES\Downloads\The World in 4K - Timelapse and Hyperlapse Films exists: true
+[path-exists] C:\Users\FCGLITCHES\Downloads\NIKO OMILANA exists: true
+[path-exists] C:\Users\FCGLITCHES\Videos\Simply YTD\Long dars exists: true
+[path-exists] C:\Users\FCGLITCHES\Videos\Simply YTD\علي التميمي برنامج الأجاويد exists: true
+[path-exists] C:\Users\FCGLITCHES\Downloads\4K Video Most Coolest Dolby Vision HDR 4K 60FPS.mp4 exists: true
+[path-exists] C:\Users\FCGLITCHES\Downloads\Explosive Colors💥Fantastic HDR 4K 120 FPS Dolby Vision - 4K Video.mp4 exists: true
+[path-exists] C:\Users\FCGLITCHES\Downloads\Dolby Vision in 10 Bit - 4K Video HDR 60FPS ULTRA HD.mp4 exists: true
+[path-exists] C:\Users\FCGLITCHES\Downloads\Avatar Fire and Ash Official Trailer.mp4 exists: true
+[path-exists] C:\Users\FCGLITCHES\Downloads\Destroyer Shell Cinematic Marathon.mp4 exists: true
+[path-exists] C:\Users\FCGLITCHES\Downloads\Real 4K HDR 60fps LG Jazz HDR UHD (Chromecast Ultra).mp4 exists: true
+[path-exists] C:\Users\FCGLITCHES\Downloads\The 50mW Violet Laser Is a Game-Changer in Battlefield 6!.mp4 exists: true
+[path-exists] C:\Users\FCGLITCHES\Downloads\ملخص مباراة ريال مدريد وأتليتيكو مدريد (3-2) الدوري الإسباني - الجولة 29.mp4 exists: true
+[path-exists] C:\Users\FCGLITCHES\Downloads\Antoine Semenyo on getting the better of Piero Hincapie 👀.mp4 exists: true
+[Downloads] Active download count: 0
+[auto-launch] Current status: false
+URL loaded, showing window...
+🚀 Server started, checking for yt-dlp updates (auto-update enabled)...
+🔄 Starting tool updates...
+🔄 Checking yt-dlp for updates...
+🔍 Getting version for: D:\Completed Projects\Video downloader Website - complete v2.2\bin\yt-dlp.exe
+📋 Current yt-dlp version: 2026.03.17
+⏰ yt-dlp update check skipped (last checked 0 days ago)
+✅ Tool update check completed
+App before-quit event triggered. Cleaning up...
+Terminating server process and waiting for cleanup...
+Server process exited with code null and signal SIGTERM
+Cleanup complete, quitting application
+Cleanup already in progress, ignoring duplicate before-quit event

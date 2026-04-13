@@ -1,0 +1,57 @@
+{
+  "name": "getvideoslocally",
+  "version": "1.0.0",
+  "description": "GetVideosLocally - Desktop app for downloading and converting videos from 1000+ supported sites",
+  "main": "electron-main.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "test": "node --test tests/**/*.test.js",
+    "dev:electron": "npm run electron:dev",
+    "electron:dev": "cross-env NODE_ENV=development electron \".\"",
+    "electron": "cross-env NODE_ENV=production electron \".\"",
+    "build": "npm run build:installer",
+    "build:portable": "node build-portable.js",
+    "build:installer": "electron-builder --win --x64 -c electron-builder.json",
+    "build:mac": "electron-builder --mac -c electron-builder.json",
+    "build:linux": "electron-builder --linux -c electron-builder.json",
+    "icon:generate": "node generate-icon.js",
+    "icon:verify": "node check-icon-format.js",
+    "icon:verify-exe": "node verify-icon.js"
+  },
+  "keywords": [
+    "getvideoslocally",
+    "multi-site-video-downloader",
+    "video",
+    "downloader",
+    "converter",
+    "1000-plus-sites",
+    "yt-dlp",
+    "electron"
+  ],
+  "author": "FCGLITCHES",
+  "license": "MIT",
+  "dependencies": {
+    "adm-zip": "^0.5.16",
+    "auto-launch": "^5.0.6",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^4.19.2",
+    "get-port": "^7.1.0",
+    "glob": "^7.2.3",
+    "open": "^10.1.2",
+    "p-limit": "^3.1.0",
+    "resend": "^6.6.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "cross-env": "^7.0.3",
+    "electron": "^28.3.3",
+    "electron-builder": "^26.0.12",
+    "electron-icon-builder": "^2.0.1",
+    "electron-packager": "^17.1.2",
+    "rcedit": "^4.0.1",
+    "sharp": "^0.34.4",
+    "to-ico": "^1.1.5"
+  }
+}

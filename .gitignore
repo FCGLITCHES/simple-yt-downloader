@@ -1,0 +1,14 @@
+cookies/
+node_modules/
+downloads/
+dist/
+.cache/
+paused_jobs.json
+*_last_check.json
+.env
+.env.local
+.env.*.local
+!.env.example
+backend/data/.server-token
+SimplyYTD-Portable.zip
+Youtube-feed-customizer_v2.2.zip

@@ -1,0 +1,23 @@
+[Firewall] Could not add firewall rule automatically: Command failed: netsh advfirewall firewall add rule name="SimplyYTD-Server-Access" dir=in action=allow program="D:\Completed Projects\Video downloader Website - complete v2.2\node_modules\electron\dist\electron.exe" enable=yes profile=any
+. This is usually due to lack of admin permissions.
+node:events:495
+      throw er; // Unhandled 'error' event
+      ^
+
+Error: listen EADDRINUSE: address already in use 127.0.0.1:9875
+    at Server.setupListenHandle [as _listen2] (node:net:1817:16)
+    at listenInCluster (node:net:1865:12)
+    at doListen (node:net:2014:7)
+    at process.processTicksAndRejections (node:internal/process/task_queues:83:21)
+Emitted 'error' event on WebSocketServer instance at:
+    at Server.emit (node:events:517:28)
+    at emitErrorNT (node:net:1844:8)
+    at process.processTicksAndRejections (node:internal/process/task_queues:82:21) {
+  code: 'EADDRINUSE',
+  errno: -4091,
+  syscall: 'listen',
+  address: '127.0.0.1',
+  port: 9875
+}
+
+Node.js v18.18.2

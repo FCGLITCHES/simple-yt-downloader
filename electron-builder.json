@@ -1,0 +1,90 @@
+{
+    "$schema": "https://raw.githubusercontent.com/electron-userland/electron-builder/master/packages/app-builder-lib/scheme.json",
+    "appId": "com.getvideoslocally.app",
+    "productName": "GetVideosLocally",
+    "copyright": "Copyright © 2024-2026 FCGLITCHES",
+    "directories": {
+        "output": "dist",
+        "buildResources": "assets"
+    },
+    "files": [
+        "**/*",
+        "!dist/**",
+        "!downloads/**",
+        "!cookies/**",
+        "!backups/**",
+        "!*.zip",
+        "!*.md",
+        "!.git/**",
+        "!.github/**"
+    ],
+    "extraResources": [
+        {
+            "from": "bin",
+            "to": "bin",
+            "filter": [
+                "**/*"
+            ]
+        },
+        {
+            "from": "assets",
+            "to": "assets",
+            "filter": [
+                "**/*"
+            ]
+        },
+        {
+            "from": "public",
+            "to": "public",
+            "filter": [
+                "**/*"
+            ]
+        }
+    ],
+    "asar": true,
+    "asarUnpack": [
+        "node_modules/auto-launch/**",
+        "node_modules/winreg/**",
+        "node_modules/untildify/**"
+    ],
+    "win": {
+        "target": [
+            {
+                "target": "nsis",
+                "arch": [
+                    "x64"
+                ]
+            }
+        ],
+        "icon": "public/Logo1.ico",
+        "signAndEditExecutable": false
+    },
+    "nsis": {
+        "oneClick": false,
+        "allowToChangeInstallationDirectory": true,
+        "createDesktopShortcut": true,
+        "createStartMenuShortcut": true,
+        "shortcutName": "GetVideosLocally",
+        "include": "installer/installer.nsh",
+        "installerIcon": "public/Logo_1.ico",
+        "uninstallerIcon": "public/Logo_1.ico",
+        "installerHeaderIcon": "public/Logo_1.ico",
+        "deleteAppDataOnUninstall": false,
+        "runAfterFinish": true,
+        "perMachine": false
+    },
+    "mac": {
+        "target": [
+            "dmg"
+        ],
+        "icon": "public/Logo_1.ico",
+        "category": "public.app-category.utilities"
+    },
+    "linux": {
+        "target": [
+            "AppImage"
+        ],
+        "icon": "public/Logo_1.ico",
+        "category": "Utility"
+    }
+}

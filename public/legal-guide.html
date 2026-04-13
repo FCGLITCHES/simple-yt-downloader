@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Copyright & Legal Guide - GetVideosLocally</title>
+    <link rel="stylesheet" href="../style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="icon" href="Logo_1.ico" type="image/x-icon">
+    <script>
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+    </script>
+    <style>
+        .legal-container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .legal-section {
+            margin-bottom: 2.5rem;
+        }
+
+        .legal-section h2 {
+            font-size: 1.4rem;
+            margin-bottom: 1rem;
+            color: var(--primary-color);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .legal-section h3 {
+            font-size: 1.1rem;
+            margin: 1.5rem 0 0.75rem;
+            color: var(--text-color);
+        }
+
+        .legal-section p,
+        .legal-section li {
+            line-height: 1.7;
+            color: var(--text-color);
+            opacity: 0.9;
+        }
+
+        .legal-section ul {
+            padding-left: 1.5rem;
+            margin: 0.5rem 0;
+        }
+
+        .legal-section ul li {
+            margin-bottom: 0.5rem;
+        }
+
+        .tip-box {
+            background: linear-gradient(135deg, rgba(34, 197, 94, 0.1), rgba(34, 197, 94, 0.05));
+            border-left: 4px solid #22c55e;
+            padding: 1rem 1.5rem;
+            border-radius: 0 8px 8px 0;
+            margin: 1rem 0;
+        }
+
+        .tip-box.warning {
+            background: linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(245, 158, 11, 0.05));
+            border-left-color: #f59e0b;
+        }
+
+        .tip-box.danger {
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.1), rgba(239, 68, 68, 0.05));
+            border-left-color: #ef4444;
+        }
+
+        .license-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.25rem;
+            margin: 0.75rem 0;
+        }
+
+        .license-card h4 {
+            margin: 0 0 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .license-card p {
+            margin: 0;
+            font-size: 0.95rem;
+        }
+
+        .license-card.safe h4 {
+            color: #22c55e;
+        }
+
+        .license-card.caution h4 {
+            color: #f59e0b;
+        }
+
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 2rem;
+            color: var(--primary-color);
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .back-link:hover {
+            text-decoration: underline;
+        }
+
+        .hero-text {
+            font-size: 1.1rem;
+            margin-bottom: 2rem;
+            opacity: 0.85;
+        }
+
+        .checklist {
+            list-style: none;
+            padding: 0;
+        }
+
+        .checklist li {
+            padding: 0.5rem 0;
+            padding-left: 2rem;
+            position: relative;
+        }
+
+        .checklist li::before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: #22c55e;
+            font-weight: bold;
+        }
+
+        .checklist li.warning::before {
+            content: "⚠";
+            color: #f59e0b;
+        }
+
+        .checklist li.danger::before {
+            content: "✕";
+            color: #ef4444;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="background-shapes">
+        <div class="shape s1"></div>
+        <div class="shape s2"></div>
+        <div class="shape s3"></div>
+    </div>
+
+    <header class="header">
+        <div class="logo-container">
+            <img src="../assets/Logo 1.png" alt="GetVideosLocally logo" class="logo">
+            <span class="logo-text">GetVideosLocally</span>
+        </div>
+    </header>
+
+    <main class="legal-container">
+        <a href="../index.html" class="back-link"><i class="fas fa-arrow-left"></i> Back to App</a>
+
+        <h1><i class="fas fa-balance-scale" style="color: var(--primary-color);"></i> Avoid Legal Problems</h1>
+        <p class="hero-text">GetVideosLocally is a multi-site downloader for 1000+ supported sites. With that reach comes responsibility. This guide helps you use it
+            legally and ethically.</p>
+
+        <div class="legal-section">
+            <h2><i class="fas fa-code-branch"></i> Software License</h2>
+            <div class="license-card safe">
+                <h4><i class="fas fa-scale-balanced"></i> MIT License</h4>
+                <p>GetVideosLocally's source code is released under the MIT License. You can use, modify, and redistribute
+                    the code if you keep the copyright notice and license text with the project.</p>
+            </div>
+
+            <div class="tip-box">
+                <strong>Important distinction:</strong> The MIT License covers the app's code. It does not grant rights
+                to download, redistribute, or commercially exploit third-party videos, audio, or other media.
+            </div>
+        </div>
+
+        <div class="legal-section">
+            <h2><i class="fas fa-check-circle" style="color: #22c55e;"></i> What You CAN Download</h2>
+
+            <div class="license-card safe">
+                <h4><i class="fas fa-creative-commons"></i> Creative Commons Content</h4>
+                <p>Videos explicitly licensed under Creative Commons (CC) licenses. The creator has given permission for
+                    downloading and sharing.</p>
+            </div>
+
+            <div class="license-card safe">
+                <h4><i class="fas fa-user"></i> Your Own Content</h4>
+                <p>Videos you created and uploaded yourself. You own the rights and can download them anytime.</p>
+            </div>
+
+            <div class="license-card safe">
+                <h4><i class="fas fa-handshake"></i> Content with Permission</h4>
+                <p>Videos where the creator has explicitly given you permission to download (in writing is best).</p>
+            </div>
+
+            <div class="tip-box">
+                <strong>💡 Pro Tip:</strong> Look for videos labeled "Creative Commons" or "Free to Use" in the
+                description. Many creators explicitly encourage downloading.
+            </div>
+        </div>
+
+        <div class="legal-section">
+            <h2><i class="fas fa-exclamation-triangle" style="color: #f59e0b;"></i> Be Careful With</h2>
+
+            <div class="license-card caution">
+                <h4><i class="fas fa-question-circle"></i> Standard Licensed Content</h4>
+                <p>Most YouTube videos use "Standard YouTube License." Downloading for personal offline viewing may be
+                    acceptable in some regions, but redistribution is NOT allowed.</p>
+            </div>
+
+            <div class="tip-box warning">
+                <strong>⚠ Important:</strong> Even if you download for "personal use," you should NEVER:
+                <ul style="margin: 0.5rem 0 0;">
+                    <li>Re-upload to any platform</li>
+                    <li>Use in your own videos without permission</li>
+                    <li>Share publicly or sell</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="legal-section">
+            <h2><i class="fas fa-times-circle" style="color: #ef4444;"></i> Never Do This</h2>
+
+            <ul class="checklist">
+                <li class="danger">Download and re-upload someone else's content as your own</li>
+                <li class="danger">Sell or monetize downloaded content without rights</li>
+                <li class="danger">Use copyrighted music/videos in commercial projects</li>
+                <li class="danger">Mass-download entire channels without permission</li>
+                <li class="danger">Circumvent paywalls or member-only content</li>
+            </ul>
+
+            <div class="tip-box danger">
+                <strong>🚫 Consequences:</strong> Copyright infringement can result in DMCA takedowns, account
+                termination, and legal action including fines.
+            </div>
+        </div>
+
+        <div class="legal-section">
+            <h2><i class="fab fa-youtube" style="color: #ff0000;"></i> YouTube License Types</h2>
+
+            <h3>Standard YouTube License</h3>
+            <p>This is the default license for YouTube videos. The uploader retains all rights. YouTube's Terms of
+                Service allow viewing/streaming but do not grant download rights. Whether personal downloads are
+                acceptable depends on your local laws (some countries have "private copying" exceptions).</p>
+
+            <h3>Creative Commons CC BY License</h3>
+            <p>Videos with this license can be freely downloaded, shared, and even modified—as long as you give credit
+                to the original creator. Look for the "CC" badge under the video.</p>
+
+            <div class="tip-box">
+                <strong>How to check:</strong> On YouTube, click "Show More" under the video description. The license
+                type is shown at the bottom.
+            </div>
+        </div>
+
+        <div class="legal-section">
+            <h2><i class="fas fa-globe"></i> Other Websites</h2>
+            <p>GetVideosLocally works with 1000+ supported websites, including but not limited to YouTube. Remember:</p>
+            <ul>
+                <li>Each website has its own Terms of Service</li>
+                <li>Each video may have different licensing</li>
+                <li>Always check the specific rights before downloading</li>
+                <li>When in doubt, ask the content creator directly</li>
+            </ul>
+        </div>
+
+        <div class="legal-section">
+            <h2><i class="fas fa-gavel"></i> Quick Reference</h2>
+            <ul class="checklist">
+                <li>Download your own content anytime</li>
+                <li>Download Creative Commons content (give credit)</li>
+                <li>Download with explicit creator permission</li>
+                <li class="warning">Standard license = personal use only (varies by region)</li>
+                <li class="danger">Never redistribute, sell, or claim ownership</li>
+            </ul>
+        </div>
+
+        <div class="legal-section" style="text-align: center; margin-top: 3rem;">
+            <p style="opacity: 0.7;">Questions or concerns? <a href="contact.html">Contact us</a></p>
+            <p style="opacity: 0.7;">Read our full <a href="terms.html">Terms of Service</a></p>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <p>&copy; 2024-2026 GetVideosLocally. Code licensed under MIT.</p>
+        </div>
+    </footer>
+</body>
+
+</html>

@@ -1,0 +1,31 @@
+
+> simply-ytd@1.0.0 electron:dev
+> cross-env NODE_ENV=development electron "."
+
+
+[electron-main.js] FINAL resourcesBinPath: D:\Completed Projects\Video downloader Website - complete v2.2\bin
+[electron-main.js] FINAL resourcesCookiesPath: D:\Completed Projects\Video downloader Website - complete v2.2\cookies
+[Firewall] Application path for rule: D:\Completed Projects\Video downloader Website - complete v2.2\node_modules\electron\dist\electron.exe
+Starting server...
+[electron-main.js] Running in development mode.
+[electron-main.js] __dirname: D:\Completed Projects\Video downloader Website - complete v2.2
+[electron-main.js] Calculated resourcesBinPath for executables: D:\Completed Projects\Video downloader Website - complete v2.2\bin
+[electron-main.js] Calculated ytdlpPath: D:\Completed Projects\Video downloader Website - complete v2.2\bin\yt-dlp.exe
+[electron-main.js] Calculated ffmpegPath: D:\Completed Projects\Video downloader Website - complete v2.2\bin\ffmpeg.exe
+[electron-main.js] Calculated nodeBinaryPath: D:\Completed Projects\Video downloader Website - complete v2.2\bin\node.exe
+[electron-main.js] Does ytdlp exist at path? true
+[electron-main.js] Does ffmpeg exist at path? true
+[electron-main.js] Does node binary exist at path? true
+Forking server process: D:\Completed Projects\Video downloader Website - complete v2.2\server.js
+[Firewall] Rule "SimplyYTD-Server-Access" not found. Attempting to add...
+[dotenv@17.2.3] injecting env (2) from .env -- tip: ⚙️  specify custom .env file path with { path: '/custom/path/.env' }
+[server.js] Server process started.
+[server.js] Received YTDLP_PATH from env:  D:\Completed Projects\Video downloader Website - complete v2.2\bin\yt-dlp.exe
+[server.js] Received FFMPEG_PATH from env:  D:\Completed Projects\Video downloader Website - complete v2.2\bin\ffmpeg.exe
+[server.js] Received NODE_BINARY from env:  D:\Completed Projects\Video downloader Website - complete v2.2\bin\node.exe
+[server.js] FINAL DOWNLOAD_DIR: D:\Completed Projects\Video downloader Website - complete v2.2\downloads
+[PausedJobs] Loaded 1 paused jobs from disk
+[server.js] Effective ytdlpExecutable:  D:\Completed Projects\Video downloader Website - complete v2.2\bin\yt-dlp.exe
+[server.js] Effective ffmpegExecutable:  D:\Completed Projects\Video downloader Website - complete v2.2\bin\ffmpeg.exe
+[server.js] Effective nodeExecutable:  D:\Completed Projects\Video downloader Website - complete v2.2\bin\node.exe
+Server process exited with code 1 and signal null

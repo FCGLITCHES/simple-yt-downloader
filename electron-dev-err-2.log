@@ -1,0 +1,16 @@
+[Firewall] Could not add firewall rule automatically: Command failed: netsh advfirewall firewall add rule name="SimplyYTD-Server-Access" dir=in action=allow program="D:\Completed Projects\Video downloader Website - complete v2.2\node_modules\electron\dist\electron.exe" enable=yes profile=any
+. This is usually due to lack of admin permissions.
+Error occurred in handler for 'get-userdata-path': Error: No handler registered for 'get-userdata-path'
+    at WebContents.<anonymous> (node:electron/js2c/browser_init:2:78076)
+    at WebContents.emit (node:events:517:28)
+PayloadTooLargeError: request entity too large
+    at readStream (D:\Completed Projects\Video downloader Website - complete v2.2\node_modules\raw-body\index.js:163:17)
+    at getRawBody (D:\Completed Projects\Video downloader Website - complete v2.2\node_modules\raw-body\index.js:116:12)
+    at read (D:\Completed Projects\Video downloader Website - complete v2.2\node_modules\body-parser\lib\read.js:79:3)
+    at jsonParser (D:\Completed Projects\Video downloader Website - complete v2.2\node_modules\body-parser\lib\types\json.js:138:5)
+    at Layer.handle [as handle_request] (D:\Completed Projects\Video downloader Website - complete v2.2\node_modules\express\lib\router\layer.js:95:5)
+    at trim_prefix (D:\Completed Projects\Video downloader Website - complete v2.2\node_modules\express\lib\router\index.js:328:13)
+    at D:\Completed Projects\Video downloader Website - complete v2.2\node_modules\express\lib\router\index.js:286:9
+    at Function.process_params (D:\Completed Projects\Video downloader Website - complete v2.2\node_modules\express\lib\router\index.js:346:12)
+    at next (D:\Completed Projects\Video downloader Website - complete v2.2\node_modules\express\lib\router\index.js:280:10)
+    at expressInit (D:\Completed Projects\Video downloader Website - complete v2.2\node_modules\express\lib\middleware\init.js:40:5)

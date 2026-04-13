@@ -1,0 +1,178 @@
+name: Issue Triage Bot
+
+on:
+  issues:
+    types: [opened, edited, labeled, unlabeled]
+  issue_comment:
+    types: [created]
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Check for diagnostics bundle
+        if: github.event.issue.state == 'open'
+        uses: actions/github-script@v7
+        id: check-diagnostics
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const issue = context.payload.issue;
+            const body = issue.body || '';
+            const hasDiagnostics = body.includes('diagnostics') || 
+                                  body.includes('Diagnostics Bundle') ||
+                                  context.payload.issue.labels?.some(l => l.name === 'has-diagnostics');
+            
+            return { hasDiagnostics: hasDiagnostics || false };
+
+      - name: Add needs-diagnostics label if missing
+        if: github.event.issue.state == 'open' && steps.check-diagnostics.outputs.hasDiagnostics == 'false'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const issue = context.payload.issue;
+            const labels = issue.labels.map(l => l.name);
+            
+            if (!labels.includes('needs-diagnostics') && !labels.includes('has-diagnostics')) {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                labels: ['needs-diagnostics']
+              });
+              
+              // Add comment requesting diagnostics
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                body: `⚠️ **Diagnostics Bundle Required**
+
+This issue requires a diagnostics bundle to help us reproduce and fix the problem.
+
+**To generate your diagnostics bundle:**
+1. Open SimplyYTD
+2. Go to Settings
+3. Click "Generate Diagnostics Bundle"
+4. Upload the generated file to this issue
+
+Issues without diagnostics bundles or reproduction steps may be automatically closed after 7 days if no response is provided.`
+              });
+            }
+
+      - name: Add has-diagnostics label
+        if: github.event.issue.state == 'open' && steps.check-diagnostics.outputs.hasDiagnostics == 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const issue = context.payload.issue;
+            const labels = issue.labels.map(l => l.name);
+            
+            if (!labels.includes('has-diagnostics') && labels.includes('needs-diagnostics')) {
+              await github.rest.issues.removeLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                name: 'needs-diagnostics'
+              });
+              
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                labels: ['has-diagnostics']
+              });
+            }
+
+      - name: Auto-close stale issues without diagnostics
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'needs-diagnostics',
+              per_page: 100
+            });
+
+            const sevenDaysAgo = new Date();
+            sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+            for (const issue of issues) {
+              const createdAt = new Date(issue.created_at);
+              
+              if (createdAt < sevenDaysAgo) {
+                // Check if issue has been updated recently
+                const updatedAt = new Date(issue.updated_at);
+                if (updatedAt < sevenDaysAgo) {
+                  await github.rest.issues.createComment({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: issue.number,
+                    body: `🔒 **Auto-closing due to lack of diagnostics**
+
+This issue is being automatically closed because:
+- No diagnostics bundle was provided after 7 days
+- No reproduction steps were provided
+- No response from the issue author
+
+If you can provide a diagnostics bundle or reproduction steps, feel free to reopen this issue.`
+                  });
+                  
+                  await github.rest.issues.update({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: issue.number,
+                    state: 'closed',
+                    state_reason: 'not_planned'
+                  });
+                }
+              }
+            }
+
+      - name: Label categorization
+        if: github.event.issue.state == 'open'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const issue = context.payload.issue;
+            const title = issue.title.toLowerCase();
+            const body = (issue.body || '').toLowerCase();
+            const labels = issue.labels.map(l => l.name);
+            
+            // Auto-label based on content
+            const newLabels = [];
+            
+            if ((title.includes('crash') || title.includes('error') || body.includes('crash') || body.includes('error')) && !labels.includes('bug')) {
+              newLabels.push('bug');
+            }
+            
+            if ((title.includes('feature') || title.includes('enhancement') || title.includes('request')) && !labels.includes('enhancement')) {
+              newLabels.push('enhancement');
+            }
+            
+            if (title.includes('[bug]') && !labels.includes('bug')) {
+              newLabels.push('bug');
+            }
+            
+            if (newLabels.length > 0) {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                labels: newLabels
+              });
+            }
+

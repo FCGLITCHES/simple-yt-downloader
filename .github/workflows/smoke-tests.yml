@@ -1,0 +1,95 @@
+name: Smoke Tests
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+    branches: [main, master, develop]
+  schedule:
+    # Run daily at 2 AM UTC to catch breakages early
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+jobs:
+  quality-checks:
+    runs-on: windows-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+  smoke-tests:
+    needs: quality-checks
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download test videos metadata
+        # Using permissioned test URLs that you control
+        # These should be your own uploads that won't be removed
+        run: |
+          echo "Testing video info extraction with permissioned test URLs..."
+          node scripts/smoke-test.js
+        env:
+          TEST_YOUTUBE_URL: ${{ secrets.TEST_YOUTUBE_URL }}
+          TEST_TIKTOK_URL: ${{ secrets.TEST_TIKTOK_URL }}
+
+      - name: Verify yt-dlp is available
+        run: |
+          if (Test-Path "bin\yt-dlp.exe") {
+            Write-Host "yt-dlp.exe found"
+            .\bin\yt-dlp.exe --version
+          } else {
+            Write-Host "yt-dlp.exe not found - this is expected in CI without binaries"
+          }
+
+      - name: Verify FFmpeg is available
+        run: |
+          if (Test-Path "bin\ffmpeg.exe") {
+            Write-Host "ffmpeg.exe found"
+            .\bin\ffmpeg.exe -version
+          } else {
+            Write-Host "ffmpeg.exe not found - this is expected in CI without binaries"
+          }
+
+      - name: Check server starts
+        run: |
+          $port = 9875
+          Start-Process node -ArgumentList "server.js" -NoNewWindow -PassThru
+          Start-Sleep -Seconds 5
+          try {
+            $response = Invoke-WebRequest -Uri "http://localhost:$port" -TimeoutSec 5 -UseBasicParsing
+            Write-Host "Server started successfully - Status: $($response.StatusCode)"
+            exit 0
+          } catch {
+            Write-Host "Server health check failed: $_"
+            exit 1
+          } finally {
+            Get-Process -Name node -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+          }
+

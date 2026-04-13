@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Contact - GetVideosLocally</title>
+    <link rel="stylesheet" href="../style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="icon" href="../public/Logo_1.ico" type="image/x-icon">
+    <!-- Ensure theme variables are picked up -->
+    <script>
+        // Apply saved theme immediately to prevent flash
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+    </script>
+</head>
+
+<body>
+    <div class="background-shapes">
+        <div class="shape s1"></div>
+        <div class="shape s2"></div>
+        <div class="shape s3"></div>
+        <div class="shape s4"></div>
+        <div class="shape s5"></div>
+        <div class="shape s6"></div>
+        <div class="shape s7"></div>
+    </div>
+
+    <!-- Minimal Header -->
+    <header class="header">
+        <div class="logo-container">
+            <img src="../assets/Logo 1.png" alt="GetVideosLocally logo" class="logo">
+            <span class="logo-text">GetVideosLocally</span>
+        </div>
+        <!-- Back button removed as requested -->
+    </header>
+
+    <main class="container"
+        style="display: flex; flex-direction: column; align-items: center; min-height: 80vh; padding: 2rem 0;">
+        <div class="card" style="max-width: 700px; width: 100%; text-align: left;">
+            <div class="card-header-row"
+                style="justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                <h2 style="margin: 0;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                        class="downloader-icon video-icon" style="color: var(--primary-color);">
+                        <path
+                            d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.05 12.05 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.03 12.03 0 0 0 2.81.7A2 2 0 0 1 22 16.92z">
+                        </path>
+                    </svg>
+                    Contact Support
+                </h2>
+                <a href="../index.html" class="action-btn secondary"
+                    style="text-decoration: none; font-size: 0.9rem; padding: 0.5rem 1rem; border-radius: 8px; display: inline-flex; align-items: center; gap: 0.5rem;">
+                    <i class="fas fa-arrow-left"></i> Back
+                </a>
+            </div>
+
+            <p class="subtitle" style="text-align: left; margin-bottom: 2rem;">We're here to help! Choose how you'd like
+                to reach us.</p>
+
+            <div class="options-grid" style="grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 2rem;">
+                <!-- GitHub -->
+                <a href="https://github.com/FCGLITCHES/simple-yt-downloader" target="_blank" class="feature-item"
+                    style="text-decoration: none; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 1rem; padding: 1.5rem; background: var(--input-bg); border-radius: 12px; color: var(--text-color); transition: all 0.2s;">
+                    <div
+                        style="width: 50px; height: 50px; background: #24292e; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path
+                                d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22">
+                            </path>
+                        </svg>
+                    </div>
+                    <div>
+                        <div style="font-weight: 700; font-size: 1.1rem; margin-bottom: 0.25rem;">Source Code</div>
+                        <div style="opacity: 0.7; font-size: 0.9rem;">Visit GitHub Repo</div>
+                    </div>
+                </a>
+
+                <!-- Report Bug -->
+                <a href="https://github.com/FCGLITCHES/simple-yt-downloader/issues" target="_blank" class="feature-item"
+                    style="text-decoration: none; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 1rem; padding: 1.5rem; background: var(--input-bg); border-radius: 12px; color: var(--text-color); transition: all 0.2s;">
+                    <div
+                        style="width: 50px; height: 50px; background: var(--error-color); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path>
+                            <line x1="12" y1="9" x2="12" y2="13"></line>
+                            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                        </svg>
+                    </div>
+                    <div>
+                        <div style="font-weight: 700; font-size: 1.1rem; margin-bottom: 0.25rem;">Report a Bug</div>
+                        <div style="opacity: 0.7; font-size: 0.9rem;">Submit Issue on GitHub</div>
+                    </div>
+                </a>
+            </div>
+
+            <div class="email-form-section"
+                style="background: var(--bg-color); border: 1px solid var(--border-color); border-radius: 12px; padding: 2rem;">
+                <h3
+                    style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1.5rem; color: var(--text-color);">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                        style="color: var(--primary-color);">
+                        <rect width="20" height="16" x="2" y="4" rx="2"></rect>
+                        <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"></path>
+                    </svg>
+                    Send us an Email
+                </h3>
+
+                <form id="contactForm">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                        <div class="form-group">
+                            <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Your Email</label>
+                            <input type="email" id="email" required placeholder="john@example.com" class="input-field">
+                        </div>
+                        <div class="form-group">
+                            <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Subject</label>
+                            <select id="type" class="select-field">
+                                <option value="Support">General Support</option>
+                                <option value="Bug">Bug Report</option>
+                                <option value="Feature">Feature Request</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Your Message</label>
+                        <textarea id="message" required placeholder="How can we help you?" class="input-field"
+                            style="height: 120px; resize: vertical;"></textarea>
+                    </div>
+
+                    <div style="text-align: right;">
+                        <button type="submit" id="sendBtn" class="download-btn"
+                            style="width: auto; display: inline-flex; margin-top: 0;">
+                            <span>Send Message</span>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                                fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                stroke-linejoin="round">
+                                <line x1="22" y1="2" x2="11" y2="13"></line>
+                                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                            </svg>
+                        </button>
+                    </div>
+                    <p id="formStatus"
+                        style="margin-top: 1rem; text-align: center; font-size: 0.9rem; min-height: 1.5rem;"></p>
+                </form>
+            </div>
+
+        </div>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <p>&copy; 2024-2026 GetVideosLocally. Code licensed under MIT.</p>
+            <p style="font-size: 0.85rem; opacity: 0.8;">
+                <a href="terms.html">Terms</a> • <a href="legal-guide.html">Copyright Guide</a>
+            </p>
+        </div>
+    </footer>
+
+    <style>
+        .feature-item:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 20px var(--shadow-color);
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+        }
+    </style>
+
+    <script src="/public/local-api-auth.js"></script>
+    <script>
+        document.getElementById('contactForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('sendBtn');
+            const status = document.getElementById('formStatus');
+            const originalText = btn.innerHTML;
+
+            // Loading state
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
+            status.textContent = '';
+            status.style.color = 'var(--text-color)';
+
+            const data = {
+                email: document.getElementById('email').value,
+                type: document.getElementById('type').value,
+                subject: `Support Request - ${document.getElementById('type').value}`,
+                message: document.getElementById('message').value
+            };
+
+            try {
+                // Determine API URL (handle both dev and prod relative paths if needed)
+                // Since this runs in Electron or local server, relative path to root should work 
+                // if served by the same express server. If simply file://, this won't work.
+                // We need to assume the server is running on localhost:9875 usually, 
+                // or we use a relative path if this page is served by the server.
+                // However, in Electron, "file://" protocol is often used.
+                // We should try to find the server port or assumed port.
+
+                let apiUrl = 'http://localhost:9875/api/send-support-email';
+
+                // If we are served via http/s, use relative
+                if (window.location.protocol.startsWith('http')) {
+                    apiUrl = '/api/send-support-email';
+                }
+
+                const response = await window.localApiAuth.authorizedFetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    status.textContent = 'Message sent successfully! We will get back to you soon.';
+                    status.style.color = 'var(--success-color)';
+                    document.getElementById('contactForm').reset();
+                } else {
+                    throw new Error(result.error || 'Failed to send message');
+                }
+            } catch (error) {
+                console.error(error);
+                status.textContent = 'Error: ' + error.message;
+                status.style.color = 'var(--error-color)';
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            }
+        });
+    </script>
+</body>
+
+</html>

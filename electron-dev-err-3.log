@@ -1,0 +1,2 @@
+[Firewall] Could not add firewall rule automatically: Command failed: netsh advfirewall firewall add rule name="SimplyYTD-Server-Access" dir=in action=allow program="D:\Completed Projects\Video downloader Website - complete v2.2\node_modules\electron\dist\electron.exe" enable=yes profile=any
+. This is usually due to lack of admin permissions.

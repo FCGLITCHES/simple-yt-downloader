@@ -1,0 +1,9 @@
+[youtube] Extracting URL: https://www.youtube.com/watch?v=LXb3EKWsInQ
+[youtube] LXb3EKWsInQ: Downloading webpage
+[info] Available formats for LXb3EKWsInQ:
+ID  EXT   RESOLUTION FPS | PROTO | VCODEC MORE INFO
+----------------------------------------------------
+sb3 mhtml 48x27        0 | mhtml | images storyboard
+sb2 mhtml 80x45        0 | mhtml | images storyboard
+sb1 mhtml 160x90       0 | mhtml | images storyboard
+sb0 mhtml 320x180      0 | mhtml | images storyboard

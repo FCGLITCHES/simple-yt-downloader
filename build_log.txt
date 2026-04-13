@@ -1,0 +1,15 @@
+
+> simply-ytd@1.0.0 build:installer
+> electron-builder --win --x64 -c electron-builder.json
+
+  ÔÇó electron-builder  version=26.0.12 os=10.0.26200
+  ÔÇó loaded configuration  file=D:\Completed Projects\Video downloader Website - Copy\electron-builder.json
+  ÔÇó executing @electron/rebuild  electronVersion=28.3.3 arch=x64 buildFromSource=false appDir=./
+  ÔÇó installing native dependencies  arch=x64
+  ÔÇó completed installing native dependencies
+  ÔÇó packaging       platform=win32 arch=x64 electron=28.3.3 appOutDir=dist\win-unpacked
+  ÔÇó updating asar integrity executable resource  executablePath=dist\win-unpacked\SimplyYTD.exe
+  ÔÇó building        target=nsis file=dist\SimplyYTD Setup 1.0.0.exe archs=x64 oneClick=false perMachine=false
+  ÔÇó signing with signtool.exe  path=dist\__uninstaller-nsis-simply-ytd.exe
+  ÔÇó signing with signtool.exe  path=dist\SimplyYTD Setup 1.0.0.exe
+  ÔÇó building block map  blockMapFile=dist\SimplyYTD Setup 1.0.0.exe.blockmap
