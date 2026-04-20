@@ -1223,3 +1223,49 @@
 [2026-04-13T06:35:16.286Z] [INFO] [server] [youtube_tZidcHqGpu4_mbjm2] 📋 YTDLP: [youtube] tZidcHqGpu4: Downloading android vr player API JSON
 [2026-04-13T06:35:16.909Z] [INFO] [server] [youtube_tZidcHqGpu4_mbjm2] 📋 YTDLP: [youtube] tZidcHqGpu4: Downloading player 8a6e7bc4-main
 [2026-04-13T06:35:18.232Z] [INFO] [server] [youtube_tZidcHqGpu4_mbjm2] 📋 YTDLP: [youtube] tZidcHqGpu4: Downloading m3u8 information
+[2026-04-19T05:14:50.815Z] [INFO] [server] [server.js] Server process started.
+[2026-04-19T05:14:50.817Z] [INFO] [server] [server.js] Received YTDLP_PATH from env:  D:\Completed Projects\Video downloader Website - complete v2.2\bin\yt-dlp.exe
+[2026-04-19T05:14:50.817Z] [INFO] [server] [server.js] Received FFMPEG_PATH from env:  D:\Completed Projects\Video downloader Website - complete v2.2\bin\ffmpeg.exe
+[2026-04-19T05:14:50.818Z] [INFO] [server] [server.js] Received NODE_BINARY from env:  D:\Completed Projects\Video downloader Website - complete v2.2\bin\node.exe
+[2026-04-19T05:14:50.880Z] [INFO] [server] [server.js] FINAL DOWNLOAD_DIR: D:\Completed Projects\Video downloader Website - complete v2.2\downloads
+[2026-04-19T05:14:50.890Z] [INFO] [server] [PausedJobs] Loaded 1 paused jobs from disk
+[2026-04-19T05:14:50.890Z] [INFO] [server] [server.js] Effective ytdlpExecutable:  D:\Completed Projects\Video downloader Website - complete v2.2\bin\yt-dlp.exe
+[2026-04-19T05:14:50.891Z] [INFO] [server] [server.js] Effective ffmpegExecutable:  D:\Completed Projects\Video downloader Website - complete v2.2\bin\ffmpeg.exe
+[2026-04-19T05:14:50.891Z] [INFO] [server] [server.js] Effective nodeExecutable:  D:\Completed Projects\Video downloader Website - complete v2.2\bin\node.exe
+[2026-04-19T05:14:50.899Z] [INFO] [server] Backend server running on http://127.0.0.1:9875
+[2026-04-19T05:14:50.899Z] [INFO] [server] Downloads will be saved to: D:\Completed Projects\Video downloader Website - complete v2.2\downloads
+[2026-04-19T05:14:50.899Z] [INFO] [server] ✅ Periodic auto-update checks started (every 24 hours)
+[2026-04-19T05:14:50.900Z] [INFO] [server] Sending server_ready message to parent process...
+[2026-04-19T05:14:50.904Z] [INFO] [server] p-limit loaded and limiters initialized.
+[2026-04-19T05:14:51.406Z] [INFO] [server] WebSocket server should be ready now
+[2026-04-19T05:14:51.406Z] [INFO] [server] Using yt-dlp executable: D:\Completed Projects\Video downloader Website - complete v2.2\bin\yt-dlp.exe
+[2026-04-19T05:14:51.407Z] [INFO] [server] Using ffmpeg executable: D:\Completed Projects\Video downloader Website - complete v2.2\bin\ffmpeg.exe
+[2026-04-19T05:14:52.866Z] [INFO] [server] Client connected: client_1775941133137_abzgh. Total clients: 1
+[2026-04-19T05:14:52.881Z] [INFO] [server] Client client_1775941133137_abzgh auto-update preference: enabled
+[2026-04-19T05:14:59.908Z] [INFO] [server] 🚀 Server started, checking for tool updates (auto-update enabled)...
+[2026-04-19T05:14:59.908Z] [INFO] [server] 🔄 Starting tool updates...
+[2026-04-19T05:14:59.909Z] [INFO] [server] 🔄 Checking yt-dlp for updates...
+[2026-04-19T05:14:59.909Z] [INFO] [server] 🔍 Getting version for: D:\Completed Projects\Video downloader Website - complete v2.2\bin\yt-dlp.exe
+[2026-04-19T05:15:01.466Z] [INFO] [server] 📋 Current yt-dlp version: 2026.03.17
+[2026-04-19T05:15:01.467Z] [INFO] [server] 🔍 Checking for updates and updating if available...
+[2026-04-19T05:15:01.468Z] [INFO] [server] 🔍 Getting version for: D:\Completed Projects\Video downloader Website - complete v2.2\bin\yt-dlp.exe
+[2026-04-19T05:15:05.428Z] [INFO] [server] 🔍 Getting version for: D:\Completed Projects\Video downloader Website - complete v2.2\bin\yt-dlp.exe
+[2026-04-19T05:15:06.934Z] [INFO] [server] ℹ️ yt-dlp: Already up to date
+[2026-04-19T05:15:06.936Z] [INFO] [server] 🔄 Checking FFmpeg for updates...
+[2026-04-19T05:15:06.936Z] [INFO] [server] 🔍 Getting version for: D:\Completed Projects\Video downloader Website - complete v2.2\bin\ffmpeg.exe
+[2026-04-19T05:15:06.990Z] [INFO] [server] 📋 Current FFmpeg version: ffmpeg version 8.1-essentials_build-www.gyan.dev Copyright (c) 2000-2026 the FFmpeg developers
+[2026-04-19T05:15:06.990Z] [INFO] [server] 📥 Checking FFmpeg for new versions...
+[2026-04-19T05:15:06.991Z] [INFO] [server] 🔍 Getting version for: D:\Completed Projects\Video downloader Website - complete v2.2\bin\ffmpeg.exe
+[2026-04-19T05:15:07.041Z] [INFO] [server] 🌐 Fetching latest FFmpeg release info from GitHub...
+[2026-04-19T05:15:07.276Z] [INFO] [server] 📦 Latest FFmpeg version from GitHub: 8.1
+[2026-04-19T05:15:07.277Z] [INFO] [server] 🔄 FFmpeg update available: 8.1. Downloading...
+[2026-04-19T05:15:07.278Z] [INFO] [server] 📥 Downloading FFmpeg 8.1 from https://github.com/GyanD/codexffmpeg/releases/download/8.1/ffmpeg-8.1-essentials_build.zip...
+[2026-04-19T05:15:09.609Z] [INFO] [server] 📦 Extracting FFmpeg archive...
+[2026-04-19T05:15:11.434Z] [INFO] [server] ✅ Extracted: ffmpeg.exe, ffplay.exe, ffprobe.exe to D:\Completed Projects\Video downloader Website - complete v2.2\bin
+[2026-04-19T05:15:11.689Z] [INFO] [server] ✅ FFmpeg binary verified and working after update
+[2026-04-19T05:15:11.700Z] [INFO] [server] 🔍 Getting version for: D:\Completed Projects\Video downloader Website - complete v2.2\bin\ffmpeg.exe
+[2026-04-19T05:15:11.753Z] [INFO] [server] ✅ FFmpeg updated successfully! ffmpeg version 8.1-essentials_build-www.gyan.dev Copyright (c) 2000-2026 the FFmpeg developers → ffmpeg version 8.1-essentials_build-www.gyan.dev Copyright (c) 2000-2026 the FFmpeg developers
+[2026-04-19T05:15:11.754Z] [INFO] [server] ✅ Tool update check completed
+[2026-04-19T05:16:24.993Z] [INFO] [server] Client disconnected: client_1775941133137_abzgh. Total clients: 0
+[2026-04-19T05:16:26.275Z] [INFO] [server] Client connected: client_1775941133137_abzgh. Total clients: 1
+[2026-04-19T05:16:26.279Z] [INFO] [server] Client client_1775941133137_abzgh auto-update preference: enabled
