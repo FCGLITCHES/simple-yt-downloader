@@ -22,6 +22,7 @@ const filesToCopy = [
     'index.html',
     'style.css',
     'preload.js',
+    'ffmpeg-checksums.json',
 ];
 
 

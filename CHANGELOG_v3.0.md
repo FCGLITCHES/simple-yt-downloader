@@ -1,10 +1,22 @@
+# GetVideosLocally v3.0.2 Security Patches
+
+## Required Security Patches
+
+- Marked the in-app release notice with a visible `Required` badge so users know this update should be applied.
+- Added a brief in-app security patch description covering local file handling, FFmpeg update integrity, and firewall access controls.
+- Regenerated release metadata for the `3.0.2` security patch build.
+
 # GetVideosLocally v3.0.1 Security Patch
 
 ## Security Patch
 
 - Bumped the desktop application release version to `3.0.1`.
-- Regenerated portable and setup build metadata for the security patch release.
-- Preserved the v3.0 reliability and UI updates as the baseline for this patch.
+- Added downloads-root path validation for open/delete IPC operations.
+- Changed file and folder deletion to use the Recycle Bin with no permanent fallback.
+- Added exact-origin IPC sender validation for local destructive handlers.
+- Added FFmpeg SHA256 verification through the shipped trust manifest.
+- Changed Windows Firewall access from silent startup mutation to explicit Settings opt-in.
+- Upgraded Electron to `42.1.0` and documented the temporary CommonJS preload sandbox exception.
 
 # GetVideosLocally v3.0
 

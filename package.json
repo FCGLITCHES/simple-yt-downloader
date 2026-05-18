@@ -1,6 +1,6 @@
 {
   "name": "getvideoslocally",
-  "version": "3.0.1",
+  "version": "3.0.2",
   "description": "GetVideosLocally - Desktop app for downloading and converting videos from 1000+ supported sites",
   "main": "electron-main.js",
   "scripts": {
@@ -48,8 +48,8 @@
   },
   "devDependencies": {
     "cross-env": "^7.0.3",
-    "electron": "^28.3.3",
-    "electron-builder": "^26.0.12",
+    "electron": "42.1.0",
+    "electron-builder": "^26.10.0",
     "electron-icon-builder": "^2.0.1",
     "electron-packager": "^17.1.2",
     "rcedit": "^4.0.1",
@@ -58,7 +58,6 @@
     "trim-repeated": "^1.0.0"
   },
   "overrides": {
-    "brace-expansion": "1.1.14",
     "minimist": "0.2.4",
     "path-to-regexp": "0.1.13",
     "qs": "6.15.1"

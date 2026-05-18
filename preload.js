@@ -7,8 +7,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
   getDefaultDownloadFolder: async () => {
     return await ipcRenderer.invoke("getDefaultDownloadFolder");
   },
-  openPathInExplorer: async (folderPath) => {
-    return await ipcRenderer.invoke("openPathInExplorer", folderPath);
+  openPathInExplorer: async (rootPath, folderPath) => {
+    return await ipcRenderer.invoke("openPathInExplorer", rootPath, folderPath);
   },
   readClipboardText: async () => {
     return await ipcRenderer.invoke("readClipboardText");
@@ -38,11 +38,11 @@ contextBridge.exposeInMainWorld("electronAPI", {
   normalizePath: async (filePath) => {
     return await ipcRenderer.invoke("normalize-path", filePath);
   },
-  deleteFile: async (filePath) => {
-    return await ipcRenderer.invoke("delete-file", filePath);
+  deleteFile: async (rootPath, filePath) => {
+    return await ipcRenderer.invoke("delete-file", rootPath, filePath);
   },
-  deleteFolder: async (folderPath) => {
-    return await ipcRenderer.invoke("delete-folder", folderPath);
+  deleteFolder: async (rootPath, folderPath) => {
+    return await ipcRenderer.invoke("delete-folder", rootPath, folderPath);
   },
   resolvePath: async (downloadFolder, relativePath) => {
     return await ipcRenderer.invoke(
@@ -78,6 +78,15 @@ contextBridge.exposeInMainWorld("electronAPI", {
   },
   toggleAutoLaunch: async (enable) => {
     return await ipcRenderer.invoke("toggle-auto-launch", enable);
+  },
+  getFirewallAccessStatus: async () => {
+    return await ipcRenderer.invoke("get-firewall-rule-status");
+  },
+  enableFirewallAccess: async () => {
+    return await ipcRenderer.invoke("enable-firewall-rule");
+  },
+  disableFirewallAccess: async () => {
+    return await ipcRenderer.invoke("disable-firewall-rule");
   },
   // Download count tracking for tray/close confirmation
   updateDownloadCount: async (count) => {

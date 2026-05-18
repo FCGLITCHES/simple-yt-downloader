@@ -73,6 +73,7 @@ const { fork, exec } = require('child_process');
 const fs = require('fs');
 const os = require('os'); // Required for os.platform()
 const net = require('net'); // Required for server readiness check
+const { validateDownloadPath, isDownloadsRoot } = require('./backend/utils/path-validator');
 
 let mainWindow;
 let cookieWindow = null; // Track the cookie helper window
@@ -380,11 +381,6 @@ function destroyTrayIcon() {
 async function createWindow() {
   const lastState = loadWindowState();
 
-  // Try to setup firewall rule on launch
-  setupFirewallRule().catch((error) => {
-    console.warn(`[Firewall] Setup attempt failed: ${error.message}`);
-  });
-
   try {
     console.log('Starting server...');
     const port = await startServer();
@@ -400,6 +396,7 @@ async function createWindow() {
       webPreferences: {
         nodeIntegration: false,
         contextIsolation: true,
+        sandbox: false, // TEMPORARY: preload requires CommonJS - track as follow-up task
         devTools: !app.isPackaged,
         preload: path.join(__dirname, 'preload.js'),
         backgroundThrottling: false // CRITICAL: Prevent freezing when minimized/hidden
@@ -781,6 +778,20 @@ app.on('second-instance', () => {
   mainWindow.focus();
 });
 
+function assertTrustedIpcSender(event) {
+  if (event.sender === mainWindow?.webContents) return;
+
+  const url = event.senderFrame?.url || '';
+  try {
+    const parsed = new URL(url);
+    if (parsed.origin === `http://127.0.0.1:${serverPort}`) return;
+  } catch (_) {
+    // Malformed URL - reject below.
+  }
+
+  throw new Error('Unauthorized IPC caller');
+}
+
 ipcMain.handle('dialog:openFolder', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
     properties: ['openDirectory']
@@ -793,12 +804,26 @@ ipcMain.handle('getDefaultDownloadFolder', async () => {
   return app.getPath('downloads');
 });
 
-ipcMain.handle('openPathInExplorer', async (event, folderPath) => {
-  if (folderPath && typeof folderPath === 'string') {
-    await shell.openPath(folderPath);
-    return true;
+ipcMain.handle('openPathInExplorer', async (event, rootPath, folderPath) => {
+  try {
+    assertTrustedIpcSender(event);
+    const resolved = validateDownloadPath(rootPath, folderPath);
+    const stats = fs.statSync(resolved);
+
+    if (stats.isDirectory()) {
+      const error = await shell.openPath(resolved);
+      if (error) {
+        return { success: false, error };
+      }
+    } else {
+      shell.showItemInFolder(resolved);
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error('[openPathInExplorer]', error.message);
+    return { success: false, error: error.message };
   }
-  return false;
 });
 
 ipcMain.handle('readClipboardText', async () => {
@@ -890,6 +915,7 @@ ipcMain.handle('open-cookies-helper', async () => {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
+      sandbox: false, // TEMPORARY: preload requires CommonJS
       preload: path.join(__dirname, 'preload.js')
     },
     parent: mainWindow,
@@ -1069,44 +1095,49 @@ ipcMain.handle('get-dirname', async (_, filePath) => {
   return path.dirname(filePath);
 });
 
-// Delete file handler
-ipcMain.handle('delete-file', async (event, filePath) => {
+// Delete file handler - Recycle Bin only, no permanent deletion fallback.
+ipcMain.handle('delete-file', async (event, rootPath, filePath) => {
   try {
-    console.log(`[delete-file] Attempting to delete: ${filePath}`);
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
-      console.log(`[delete-file] Successfully deleted: ${filePath}`);
-      return { success: true };
-    } else {
-      console.log(`[delete-file] File not found: ${filePath}`);
-      return { success: false, error: 'File not found' };
+    assertTrustedIpcSender(event);
+    const resolved = validateDownloadPath(rootPath, filePath);
+    const stats = fs.statSync(resolved);
+
+    if (!stats.isFile()) {
+      return { success: false, error: 'Path is not a file' };
     }
+
+    console.log(`[delete-file] Moving to Recycle Bin: ${resolved}`);
+    await shell.trashItem(resolved);
+    console.log(`[delete-file] Successfully moved to Recycle Bin: ${resolved}`);
+    return { success: true };
   } catch (error) {
-    console.error(`[delete-file] Error deleting file ${filePath}:`, error);
+    console.error('[delete-file] Error:', error.message);
     return { success: false, error: error.message };
   }
 });
 
-// Delete folder handler (for playlist folders)
-ipcMain.handle('delete-folder', async (event, folderPath) => {
+// Delete folder handler - Recycle Bin only, no permanent deletion fallback.
+ipcMain.handle('delete-folder', async (event, rootPath, folderPath) => {
   try {
-    console.log(`[delete-folder] Attempting to delete folder: ${folderPath}`);
-    if (fs.existsSync(folderPath)) {
-      const stats = fs.statSync(folderPath);
-      if (stats.isDirectory()) {
-        // Recursively delete folder and all contents
-        fs.rmSync(folderPath, { recursive: true, force: true });
-        console.log(`[delete-folder] Successfully deleted folder: ${folderPath}`);
-        return { success: true };
-      } else {
-        return { success: false, error: 'Path is not a directory' };
-      }
-    } else {
-      console.log(`[delete-folder] Folder not found: ${folderPath}`);
-      return { success: false, error: 'Folder not found' };
+    assertTrustedIpcSender(event);
+    const resolved = validateDownloadPath(rootPath, folderPath);
+    const stats = fs.statSync(resolved);
+
+    if (!stats.isDirectory()) {
+      return { success: false, error: 'Path is not a directory' };
     }
+
+    const resolvedRoot = fs.realpathSync.native(rootPath);
+    if (isDownloadsRoot(resolved, resolvedRoot)) {
+      return { success: false, error: 'Cannot delete the downloads root folder' };
+    }
+
+    console.log(`[delete-folder] Moving to Recycle Bin: ${resolved}`);
+    await shell.trashItem(resolved);
+    console.log(`[delete-folder] Successfully moved to Recycle Bin: ${resolved}`);
+    return { success: true };
   } catch (error) {
-    console.error(`[delete-folder] Error deleting folder ${folderPath}:`, error);
+    console.error('[delete-folder] Error:', error.message);
     return { success: false, error: error.message };
   }
 });
@@ -1276,6 +1307,89 @@ ipcMain.handle('toggle-auto-launch', async (_, enable) => {
     console.error('[auto-launch] Error toggling:', error);
     return { success: false, error: error.message };
   }
+});
+
+// ==================== FIREWALL RULE (EXPLICIT USER OPT-IN) ====================
+
+ipcMain.handle('get-firewall-rule-status', async () => {
+  if (os.platform() !== 'win32') return { exists: false, platform: os.platform() };
+
+  const ruleName = 'GetVideosLocally-Server-Access';
+  const checkCmd = `netsh advfirewall firewall show rule name="${ruleName}"`;
+
+  return new Promise((resolve) => {
+    exec(checkCmd, { windowsHide: true }, (error, stdout) => {
+      resolve({ exists: !error && stdout.includes(ruleName) });
+    });
+  });
+});
+
+ipcMain.handle('enable-firewall-rule', async () => {
+  if (os.platform() !== 'win32') return { success: false, error: 'Only supported on Windows' };
+
+  const ruleName = 'GetVideosLocally-Server-Access';
+  const appPath = app.getPath('exe');
+
+  const { response } = await dialog.showMessageBox(mainWindow, {
+    type: 'question',
+    buttons: ['Allow', 'Cancel'],
+    defaultId: 1,
+    cancelId: 1,
+    title: 'Firewall Access',
+    message: 'Allow GetVideosLocally through Windows Firewall?',
+    detail: `This adds an inbound rule so other devices on your local network can connect to GetVideosLocally for LAN access.\n\nApplication: ${appPath}\n\nYou can remove this rule at any time from Settings or Windows Firewall.`
+  });
+
+  if (response !== 0) {
+    return { success: false, userDenied: true };
+  }
+
+  const addCmd = `netsh advfirewall firewall add rule name="${ruleName}" dir=in action=allow program="${appPath}" enable=yes profile=any`;
+
+  return new Promise((resolve) => {
+    exec(addCmd, { windowsHide: true }, (error) => {
+      if (error) {
+        console.error('[Firewall] Failed to add rule:', error.message);
+        resolve({ success: false, error: error.message });
+      } else {
+        console.log('[Firewall] Rule added successfully');
+        resolve({ success: true });
+      }
+    });
+  });
+});
+
+ipcMain.handle('disable-firewall-rule', async () => {
+  if (os.platform() !== 'win32') return { success: false, error: 'Only supported on Windows' };
+
+  const ruleName = 'GetVideosLocally-Server-Access';
+  const { response } = await dialog.showMessageBox(mainWindow, {
+    type: 'question',
+    buttons: ['Remove', 'Cancel'],
+    defaultId: 1,
+    cancelId: 1,
+    title: 'Firewall Access',
+    message: 'Remove the GetVideosLocally firewall rule?',
+    detail: 'This removes the inbound Windows Firewall rule used for LAN access.'
+  });
+
+  if (response !== 0) {
+    return { success: false, userDenied: true };
+  }
+
+  const deleteCmd = `netsh advfirewall firewall delete rule name="${ruleName}"`;
+
+  return new Promise((resolve) => {
+    exec(deleteCmd, { windowsHide: true }, (error) => {
+      if (error) {
+        console.error('[Firewall] Failed to remove rule:', error.message);
+        resolve({ success: false, error: error.message });
+      } else {
+        console.log('[Firewall] Rule removed successfully');
+        resolve({ success: true });
+      }
+    });
+  });
 });
 
 // ==================== DOWNLOAD COUNT TRACKING ====================

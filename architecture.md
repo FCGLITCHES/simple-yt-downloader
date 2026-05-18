@@ -87,6 +87,24 @@ Holds shared download-runner support logic:
 
 The heavy `yt-dlp` and `ffmpeg` process control still lives in `server.js`, but completion handling is now standardized and routed through one shared service.
 
+### `backend/services/ffmpeg-update-security.js`
+
+Owns the security-sensitive FFmpeg update path:
+
+- loads the shipped `ffmpeg-checksums.json` trust manifest
+- rejects versions that are not in the manifest
+- computes SHA256 for downloaded FFmpeg zip files before extraction
+- extracts binaries into a staging directory before replacing the active tools
+- rolls back backups when files are locked or the post-install FFmpeg check fails
+
+The app never fetches runtime checksums from GitHub. New FFmpeg versions must be added to the shipped manifest by a maintainer.
+
+### `backend/utils/path-validator.js`
+
+Validates renderer-provided file paths before Electron performs local file actions.
+
+`validateDownloadPath(downloadsRoot, targetPath)` resolves both paths through `fs.realpathSync.native`, then rejects traversal, symlink escapes, missing paths, non-string input, and anything outside the configured downloads root.
+
 ### `backend/websocket/client-hub.js`
 
 Owns websocket connection lifecycle and message broadcasting:
@@ -166,3 +184,18 @@ Node is still the right runtime for the current desktop architecture because the
 - simple packaging with the desktop app
 
 FastAPI is still a possible future option if the app becomes a real client/server product, but for the current Electron-first design, the modular Node backend is the lower-risk and more maintainable path.
+
+## Desktop Security Model
+
+Renderer-provided paths for delete and open operations are validated before any filesystem action.
+
+- `delete-file` requires a trusted IPC sender, validates the target inside the downloads root, confirms the target is a file, then sends it to the Recycle Bin with `shell.trashItem`.
+- `delete-folder` requires a trusted IPC sender, validates the target inside the downloads root, confirms the target is a directory, rejects deleting the downloads root itself, then sends it to the Recycle Bin with `shell.trashItem`.
+- `openPathInExplorer` requires a trusted IPC sender, validates the target inside the downloads root, opens directories with `shell.openPath`, and reveals files with `shell.showItemInFolder`.
+- No delete handler has a permanent-deletion fallback.
+
+IPC sender validation allows only the app's main renderer or the exact `http://127.0.0.1:PORT` origin for the active local server port.
+
+Windows Firewall access is explicit opt-in. Startup no longer silently adds firewall rules. Settings query the real `netsh advfirewall` rule state, and enable/disable actions require a native confirmation dialog before running `netsh`.
+
+Electron is pinned to `42.1.0`. `sandbox: false` is documented as temporary compatibility for the current CommonJS preload; migrating the preload to sandbox-compatible APIs remains a follow-up task.

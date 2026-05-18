@@ -432,7 +432,7 @@ const includeAutoCaptionsCheckbox = document.getElementById('includeAutoCaptions
             return;
         }
         if (window.electronAPI && window.electronAPI.openPathInExplorer) {
-            await window.electronAPI.openPathInExplorer(folderPath);
+            await window.electronAPI.openPathInExplorer(folderPath, folderPath);
             return;
         }
         showAlert('Open folder is only available in the desktop app.', 'Not Available');
@@ -1557,15 +1557,15 @@ const includeAutoCaptionsCheckbox = document.getElementById('includeAutoCaptions
                         if (window.electronAPI && window.electronAPI.openPathInExplorer) {
                             try {
                                 let targetPath = fullPath;
+                                const downloadRoot = getDownloadFolder();
                                 if (!targetPath && downloadUrl && window.electronAPI?.resolvePath) {
-                                    const root = getDownloadFolder();
                                     const rel = decodeURIComponent(downloadUrl.replace('/downloads/', ''));
-                                    targetPath = await window.electronAPI.resolvePath(root, rel);
+                                    targetPath = await window.electronAPI.resolvePath(downloadRoot, rel);
                                 }
                                 const folderPath = window.electronAPI?.getDirname && targetPath
                                     ? await window.electronAPI.getDirname(targetPath)
-                                    : getDownloadFolder();
-                                await window.electronAPI.openPathInExplorer(folderPath);
+                                    : downloadRoot;
+                                await window.electronAPI.openPathInExplorer(downloadRoot, folderPath);
                             } catch (e) {
                                 console.error('Open folder failed:', e);
                                 showAlert('Unable to open containing folder.', 'Error');
@@ -2360,7 +2360,8 @@ subtitleMode: 'none',
             subtitleLanguages: 'en.*,en',
 includeAutoCaptions: false,
             smartRetry: true,
-            smartRetryAttempts: 3
+            smartRetryAttempts: 3,
+            lanAccess: false
         };
         const storedSettings = localStorage.getItem('ytdUserSettings');
         let settings = storedSettings ? JSON.parse(storedSettings) : { ...defaults };
@@ -2403,7 +2404,8 @@ subtitleMode: subtitleModeSelect ? subtitleModeSelect.value : 'none',
             subtitleLanguages: subtitleLanguagesInput ? subtitleLanguagesInput.value.trim() || 'en.*,en' : 'en.*,en',
 includeAutoCaptions: includeAutoCaptionsCheckbox ? includeAutoCaptionsCheckbox.checked : false,
             smartRetry: true,
-            smartRetryAttempts: 3
+            smartRetryAttempts: 3,
+            lanAccess: userSettings.lanAccess === true
         };
         localStorage.setItem('ytdUserSettings', JSON.stringify(userSettings));
 
@@ -2558,6 +2560,53 @@ if (includeAutoCaptionsCheckbox) includeAutoCaptionsCheckbox.checked = userSetti
                         console.error('Error getting auto-launch status:', err);
                     });
             }
+        }
+
+        const lanAccessCheckbox = document.getElementById('lanAccess');
+        if (lanAccessCheckbox) {
+            lanAccessCheckbox.checked = userSettings.lanAccess === true;
+
+            if (window.electronAPI && window.electronAPI.getFirewallAccessStatus) {
+                window.electronAPI.getFirewallAccessStatus()
+                    .then(result => {
+                        if (result && result.exists !== undefined) {
+                            lanAccessCheckbox.checked = result.exists;
+                            userSettings.lanAccess = result.exists;
+                            localStorage.setItem('ytdUserSettings', JSON.stringify(userSettings));
+                            window.userSettings = userSettings;
+                        }
+                    })
+                    .catch(err => {
+                        console.error('Error getting firewall status:', err);
+                    });
+            }
+
+            lanAccessCheckbox.onchange = async () => {
+                if (!window.electronAPI) return;
+                const enable = lanAccessCheckbox.checked;
+                lanAccessCheckbox.disabled = true;
+                try {
+                    const result = enable
+                        ? await window.electronAPI.enableFirewallAccess()
+                        : await window.electronAPI.disableFirewallAccess();
+
+                    if (result && result.success) {
+                        userSettings.lanAccess = enable;
+                        localStorage.setItem('ytdUserSettings', JSON.stringify(userSettings));
+                        window.userSettings = userSettings;
+                    } else {
+                        lanAccessCheckbox.checked = !enable;
+                        if (!result?.userDenied) {
+                            console.error('Firewall toggle failed:', result?.error);
+                        }
+                    }
+                } catch (err) {
+                    lanAccessCheckbox.checked = !enable;
+                    console.error('Error toggling firewall rule:', err);
+                } finally {
+                    lanAccessCheckbox.disabled = false;
+                }
+            };
         }
 
         // Add UI scale
@@ -3107,7 +3156,7 @@ if (includeAutoCaptionsCheckbox) includeAutoCaptionsCheckbox.checked = userSetti
                 return;
             }
             if (window.electronAPI && window.electronAPI.openPathInExplorer) {
-                await window.electronAPI.openPathInExplorer(folderPath);
+                await window.electronAPI.openPathInExplorer(folderPath, folderPath);
             } else {
                 console.error('Open folder not available. window.electronAPI:', window.electronAPI);
                 showAlert('Open folder not available. Make sure you are running in Electron.', 'Not Available');
@@ -3506,7 +3555,7 @@ if (includeAutoCaptionsCheckbox) includeAutoCaptionsCheckbox.checked = userSetti
                 return;
             }
             if (window.electronAPI && window.electronAPI.openPathInExplorer) {
-                await window.electronAPI.openPathInExplorer(folderPath);
+                await window.electronAPI.openPathInExplorer(folderPath, folderPath);
             } else {
                 console.error('Open folder not available. window.electronAPI:', window.electronAPI);
                 showAlert('Open folder not available. Make sure you are running in Electron.', 'Not Available');
@@ -4854,7 +4903,7 @@ if (includeAutoCaptionsCheckbox) includeAutoCaptionsCheckbox.checked = userSetti
                     }
                 }
                 if (absPath && window.electronAPI?.deleteFolder) {
-                    await window.electronAPI.deleteFolder(absPath);
+                    await window.electronAPI.deleteFolder(rootFolder, absPath);
                     deletedCount++;
                 }
             } catch (error) {
@@ -4884,7 +4933,7 @@ if (includeAutoCaptionsCheckbox) includeAutoCaptionsCheckbox.checked = userSetti
                                 absPath = item.fullPath;
                             }
                             if (absPath) {
-                                const result = await window.electronAPI.deleteFile(absPath);
+                                const result = await window.electronAPI.deleteFile(rootFolder, absPath);
                                 if (result.success) deletedCount++;
                             }
                         }
@@ -4920,19 +4969,19 @@ if (includeAutoCaptionsCheckbox) includeAutoCaptionsCheckbox.checked = userSetti
 
         if (action === 'play') {
             if (window.electronAPI?.openPathInExplorer) {
-                await window.electronAPI.openPathInExplorer(filePath);
+                await window.electronAPI.openPathInExplorer(getDownloadFolder(), filePath);
             }
         } else if (action === 'folder') {
             if (window.electronAPI?.getDirname && window.electronAPI?.openPathInExplorer) {
                 const folderPath = await window.electronAPI.getDirname(filePath);
-                await window.electronAPI.openPathInExplorer(folderPath);
+                await window.electronAPI.openPathInExplorer(getDownloadFolder(), folderPath);
             }
         } else if (action === 'delete') {
             const confirmed = await confirmDelete('Are you sure you want to delete this file?', 'Delete File');
             if (confirmed) {
                 try {
                     if (window.electronAPI?.deleteFile) {
-                        const result = await window.electronAPI.deleteFile(filePath);
+                        const result = await window.electronAPI.deleteFile(getDownloadFolder(), filePath);
                         if (result.success) {
                             // Remove from history
                             const history = readStoredHistory();
@@ -5014,17 +5063,20 @@ if (includeAutoCaptionsCheckbox) includeAutoCaptionsCheckbox.checked = userSetti
     // ===== UPDATE CHECK & CHANGELOG SYSTEM =====
 const UPDATE_LAST_SEEN_KEY = 'gvl_lastSeenVersion';
 const UPDATE_POPUP_DELAY_MS = 2500;
-const DEFAULT_APP_VERSION = '3.0.0';
+const DEFAULT_APP_VERSION = '3.0.2';
 const FALLBACK_APP_CHANGELOG = {
     version: DEFAULT_APP_VERSION,
-    title: "What's New in v3.0",
-    date: 'April 2026',
+    title: "Security Patches v3.0.2",
+    date: 'May 2026',
+    required: true,
+    badge: 'Required',
+    summary: 'Required security patches for local file handling, FFmpeg update integrity, and firewall access controls.',
     items: [
         { icon: 'fa-compass', color: '#3498db', title: 'New Onboarding Experience', desc: 'The old tutorial modal was replaced with a guided setup flow for download location, format, and notifications.' },
         { icon: 'fa-sliders', color: '#2ecc71', title: 'Cleaner Download Controls', desc: 'Advanced download controls are now tucked away until needed, keeping the main download form focused.' },
         { icon: 'fa-gear', color: '#e74c3c', title: 'Smarter Settings Layout', desc: 'Settings were reorganized, subtitle fields now appear only when relevant, and controls are easier to scan.' },
         { icon: 'fa-clock-rotate-left', color: '#f39c12', title: 'History & Safety Improvements', desc: 'History actions, labels, and bulk controls were refined to reduce accidental clicks and make video lists clearer.' },
-        { icon: 'fa-wand-magic-sparkles', color: '#9b59b6', title: 'Visual Polish & App Refresh', desc: 'Popups, spacing, branding, release notes, and other interface details were refreshed across the app, plus many more refinements.' }
+        { icon: 'fa-shield-halved', color: '#16a085', title: 'Required Security Patches', desc: 'Local file actions are restricted to the downloads folder, deletions use the Recycle Bin, and FFmpeg updates are verified against a shipped checksum manifest.' }
     ]
 };
 let updatePopupTimer = null;
@@ -5053,6 +5105,9 @@ function getValidAppChangelog() {
         version: String(changelog.version || getCurrentAppVersion()),
         title: String(changelog.title || `What's New in v${getCurrentAppVersion()}`),
         date: String(changelog.date || ''),
+        required: changelog.required === true,
+        badge: String(changelog.badge || ''),
+        summary: String(changelog.summary || ''),
         items: normalizedItems.length > 0 ? normalizedItems : FALLBACK_APP_CHANGELOG.items
     };
 }
@@ -5113,6 +5168,12 @@ function showUpdatePopup(changelog, version, storageKey) {
             </div>
         </div>
     `).join('');
+    const requiredBadgeHtml = changelog.required
+        ? `<span class="update-required-badge">${changelog.badge || 'Required'}</span>`
+        : '';
+    const summaryHtml = changelog.summary
+        ? `<p class="onboarding-step-subtitle update-summary">${changelog.summary}</p>`
+        : `<p class="onboarding-step-subtitle">You've been updated to version ${version}. Here's what's new.</p>`;
 
     content.innerHTML = `
         <div class="onboarding-progress-bar">
@@ -5123,8 +5184,11 @@ function showUpdatePopup(changelog, version, storageKey) {
                 <div class="onboarding-success-icon" style="background: linear-gradient(135deg, #9b59b6, #8e44ad);">
                     <i class="fas fa-arrow-up-from-bracket"></i>
                 </div>
-                <h2 class="onboarding-step-title">${changelog.title}</h2>
-                <p class="onboarding-step-subtitle">You've been updated to version ${version}. Here's what's new.</p>
+                <div class="update-title-row">
+                    <h2 class="onboarding-step-title">${changelog.title}</h2>
+                    ${requiredBadgeHtml}
+                </div>
+                ${summaryHtml}
                 <div class="update-items-list">
                     ${itemsHtml}
                 </div>

@@ -10,8 +10,9 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Platform: Windows](https://img.shields.io/badge/Platform-Windows-0078D6.svg)](https://www.microsoft.com/windows)
-[![Electron](https://img.shields.io/badge/Electron-28.3.3-47848F.svg)](https://www.electronjs.org/)
+[![Electron](https://img.shields.io/badge/Electron-42.1.0-47848F.svg)](https://www.electronjs.org/)
 [![yt-dlp](https://img.shields.io/badge/yt--dlp-latest-red.svg)](https://github.com/yt-dlp/yt-dlp)
+[![Security Patch](https://img.shields.io/badge/Security%20Patch-Required-d63031.svg)](#security-patches-v302)
 
 [⭐ Star](https://github.com/FCGLITCHES/simple-yt-downloader) • 
 [🐛 Report Bug](https://github.com/FCGLITCHES/simple-yt-downloader/issues) • 
@@ -51,6 +52,9 @@
 
 ## Features
 
+### Security Patches v3.0.2
+- **Required update:** local file actions are constrained to the configured downloads folder, deletions use the Recycle Bin, FFmpeg updates are verified against a shipped SHA256 manifest, and Windows Firewall access is explicit opt-in.
+
 ### Video & Audio Processing
 - Video format conversion and processing
 - Supports 1000+ websites
@@ -78,6 +82,7 @@
 
 ### Advanced
 - **Authentication support** for content you have permission to access
+- **Security hardening** for local file operations, FFmpeg update integrity, and explicit LAN firewall access
 - **Automatic tool updates** for yt-dlp
 - **Duplicate detection** to skip existing files
 - **Organized playlists** in separate folders

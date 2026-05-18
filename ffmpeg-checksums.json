@@ -1,0 +1,4 @@
+{
+  "_comment": "Trusted SHA256 checksums for ffmpeg-essentials_build.zip from https://github.com/GyanD/codexffmpeg/releases. Each entry must be vetted by the maintainer before shipping. FFmpeg auto-update skips versions not listed here.",
+  "8.1.1": "6f58ce889f59c311410f7d2b18895b33c03456463486f3b1ebc93d97a0f54541"
+}

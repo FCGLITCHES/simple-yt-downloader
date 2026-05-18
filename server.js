@@ -18,7 +18,6 @@ const WebSocket = require("ws");
 const url = require("url");
 const os = require("os");
 const { promisify } = require("util");
-const AdmZip = require("adm-zip");
 const globAsync = promisify(require("glob"));
 const { loadEnv } = require("./backend/config/env");
 const {
@@ -47,6 +46,10 @@ const {
 const {
   createSiteRequestGuard,
 } = require("./backend/services/site-request-guard");
+const {
+  installFfmpegFromZip,
+  loadFfmpegChecksumManifest,
+} = require("./backend/services/ffmpeg-update-security");
 const {
   buildSubtitleArgs,
   computeSiteRetryDelayMs,
@@ -122,6 +125,11 @@ const env = loadEnv(process.env);
   if (!fs.existsSync(DOWNLOAD_DIR)) {
     fs.mkdirSync(DOWNLOAD_DIR, { recursive: true });
   }
+
+  const ffmpegChecksums = loadFfmpegChecksumManifest(
+    path.join(__dirname, "ffmpeg-checksums.json"),
+    logger,
+  );
 
   const PAUSED_JOBS_FILE = path.join(writableDataRoot, "paused_jobs.json");
   const SCHEDULED_JOBS_FILE = path.join(writableDataRoot, "scheduled_jobs.json");
@@ -658,143 +666,14 @@ const env = loadEnv(process.env);
   }
 
   async function downloadAndInstallFFmpeg(downloadUrl, version) {
-    const tmpDir = path.join(os.tmpdir(), `ffmpeg-update-${Date.now()}`);
-    const zipPath = path.join(tmpDir, "ffmpeg-essentials.zip");
-
-    try {
-      fs.mkdirSync(tmpDir, { recursive: true });
-
-      logger.info(`📥 Downloading FFmpeg ${version} from ${downloadUrl}...`);
-
-      await new Promise((resolve, reject) => {
-        const file = fs.createWriteStream(zipPath);
-        const request = https.get(downloadUrl, (response) => {
-          if (
-            response.statusCode >= 300 &&
-            response.statusCode < 400 &&
-            response.headers.location
-          ) {
-            request.destroy();
-            https
-              .get(response.headers.location, (redirectRes) => {
-                redirectRes.pipe(file);
-                file.on("finish", () => file.close(resolve));
-              })
-              .on("error", reject);
-            return;
-          }
-          response.pipe(file);
-          file.on("finish", () => file.close(resolve));
-        });
-        request.on("error", reject);
-        request.setTimeout(120000, () => {
-          request.destroy();
-          reject(new Error("Download timed out"));
-        });
-      });
-
-      logger.info("📦 Extracting FFmpeg archive...");
-      const zip = new AdmZip(zipPath);
-      const zipEntries = zip.getEntries();
-
-      const binDir = path.dirname(ffmpegExecutable);
-      const binFiles = ["ffmpeg.exe", "ffprobe.exe", "ffplay.exe"];
-      const extractedFiles = [];
-
-      for (const entry of zipEntries) {
-        const entryName = entry.entryName;
-        const baseName = path.basename(entryName);
-
-        if (binFiles.includes(baseName) && entryName.includes("/bin/")) {
-          const destPath = path.join(binDir, baseName);
-          const backupPath = destPath + ".bak";
-
-          if (fs.existsSync(destPath)) {
-            try {
-              if (fs.existsSync(backupPath)) {
-                fs.unlinkSync(backupPath);
-              }
-              fs.renameSync(destPath, backupPath);
-            } catch (renameErr) {
-              logger.warn(
-                `⚠️ Could not backup ${baseName} (may be in use): ${renameErr.message}`,
-              );
-              try {
-                fs.unlinkSync(destPath);
-              } catch (delErr) {
-                logger.error(
-                  `❌ Could not remove old ${baseName}: ${delErr.message}`,
-                );
-                continue;
-              }
-            }
-          }
-
-          const entryData = entry.getData();
-          fs.writeFileSync(destPath, entryData);
-          extractedFiles.push(baseName);
-
-          try {
-            if (fs.existsSync(backupPath)) {
-              fs.unlinkSync(backupPath);
-            }
-          } catch (_) {}
-        }
-      }
-
-      if (extractedFiles.length === 0) {
-        return { success: false, error: "No binaries found in archive" };
-      }
-
-      logger.info(`✅ Extracted: ${extractedFiles.join(", ")} to ${binDir}`);
-
-      const isWorking = await testFFmpegWorking();
-      if (!isWorking) {
-        logger.error(
-          "❌ FFmpeg binary not working after update, rolling back...",
-        );
-        for (const baseName of extractedFiles) {
-          const destPath = path.join(binDir, baseName);
-          const backupPath = destPath + ".bak";
-          try {
-            if (fs.existsSync(backupPath)) {
-              fs.renameSync(backupPath, destPath);
-            }
-          } catch (_) {}
-        }
-        return {
-          success: false,
-          error: "FFmpeg binary not working after update",
-        };
-      }
-
-      logger.info("✅ FFmpeg binary verified and working after update");
-      return { success: true, extractedFiles };
-    } catch (error) {
-      logger.error(`❌ FFmpeg download/install error: ${error.message}`);
-
-      for (const baseName of ["ffmpeg.exe", "ffprobe.exe", "ffplay.exe"]) {
-        const destPath = path.join(path.dirname(ffmpegExecutable), baseName);
-        const backupPath = destPath + ".bak";
-        try {
-          if (fs.existsSync(backupPath)) {
-            if (!fs.existsSync(destPath)) {
-              fs.renameSync(backupPath, destPath);
-            } else {
-              fs.unlinkSync(backupPath);
-            }
-          }
-        } catch (_) {}
-      }
-
-      return { success: false, error: error.message };
-    } finally {
-      try {
-        if (fs.existsSync(tmpDir)) {
-          fs.rmSync(tmpDir, { recursive: true, force: true });
-        }
-      } catch (_) {}
-    }
+    return await installFfmpegFromZip({
+      downloadUrl,
+      version,
+      manifest: ffmpegChecksums,
+      binDir: path.dirname(ffmpegExecutable),
+      testFFmpegWorking,
+      logger,
+    });
   }
 
   function compareVersions(v1, v2) {

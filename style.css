@@ -67,6 +67,43 @@
     --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
 }
 
+.settings-help-text {
+    margin: 0.35rem 0 0;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    line-height: 1.45;
+}
+
+.update-title-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 0.65rem;
+}
+
+.update-title-row .onboarding-step-title {
+    margin-bottom: 0;
+}
+
+.update-required-badge {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid rgba(214, 48, 49, 0.35);
+    border-radius: 999px;
+    background: rgba(214, 48, 49, 0.1);
+    color: var(--error-color);
+    font-size: 0.78rem;
+    font-weight: 700;
+    line-height: 1;
+    padding: 0.35rem 0.65rem;
+    text-transform: uppercase;
+}
+
+.update-summary {
+    max-width: 34rem;
+}
+
 [data-theme="dark"] {
     --bg-color: #1f1f1f;
     /* Charcoal */
