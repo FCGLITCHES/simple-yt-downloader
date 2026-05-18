@@ -1,8 +1,8 @@
-version: 3.0.0
+version: 3.0.1
 files:
-  - url: GetVideosLocally-Setup-3.0.0.exe
-    sha512: Pd5xWkTqvkc3x5Y0oZVnSGi0x30SxBh97cGbASa8016RmkkBywIxi5iA+5PdaU7rJ69NDkV2AXIdX8Y8HKCT3Q==
-    size: 332507081
-path: GetVideosLocally-Setup-3.0.0.exe
-sha512: Pd5xWkTqvkc3x5Y0oZVnSGi0x30SxBh97cGbASa8016RmkkBywIxi5iA+5PdaU7rJ69NDkV2AXIdX8Y8HKCT3Q==
-releaseDate: '2026-05-18T14:22:49.306Z'
+  - url: GetVideosLocally-Setup-3.0.1.exe
+    sha512: 4+XBjLK0utDysM4SXeeny6M8Ve05bKEcVj5vPytIF4FBBH4z3FDDizmEEdmQ07qQErTVcyJ12jy4ctIQSjvJYQ==
+    size: 332507223
+path: GetVideosLocally-Setup-3.0.1.exe
+sha512: 4+XBjLK0utDysM4SXeeny6M8Ve05bKEcVj5vPytIF4FBBH4z3FDDizmEEdmQ07qQErTVcyJ12jy4ctIQSjvJYQ==
+releaseDate: '2026-05-18T14:30:39.977Z'

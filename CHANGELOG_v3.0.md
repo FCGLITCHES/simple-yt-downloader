@@ -1,3 +1,11 @@
+# GetVideosLocally v3.0.1 Security Patch
+
+## Security Patch
+
+- Bumped the desktop application release version to `3.0.1`.
+- Regenerated portable and setup build metadata for the security patch release.
+- Preserved the v3.0 reliability and UI updates as the baseline for this patch.
+
 # GetVideosLocally v3.0
 
 ## Highlights
