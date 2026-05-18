@@ -28,6 +28,7 @@ const filesToCopy = [
 
 // Folders to copy (app code only, not resources - those go via extra-resource)
 const foldersToCopy = [
+    'backend',
     'public',
 ];
 

@@ -22,7 +22,10 @@ const AdmZip = require("adm-zip");
 const globAsync = promisify(require("glob"));
 const { loadEnv } = require("./backend/config/env");
 const {
+  detectSiteKeyFromUrl,
+  getSiteDownloadProfile,
   resolveDownloadConcurrency,
+  resolveSiteConcurrency,
 } = require("./backend/config/download-config");
 const { createDownloadState } = require("./backend/state/download-state");
 const { HistoryIndex } = require("./backend/state/history-index");
@@ -37,6 +40,20 @@ const {
   getUniqueFolderPath,
   sanitizeFilename,
 } = require("./backend/services/download-runner");
+const {
+  classifyRuntimeError,
+  createClassifiedError,
+} = require("./backend/services/error-classifier");
+const {
+  createSiteRequestGuard,
+} = require("./backend/services/site-request-guard");
+const {
+  buildSubtitleArgs,
+  computeSiteRetryDelayMs,
+  ensureOrganizedTargetDir,
+  getSiteKeyFromUrl,
+  shouldSmartRetry,
+} = require("./backend/utils/download-job-helpers");
 const { createWebSocketHub } = require("./backend/websocket/client-hub");
 const { registerApiRoutes } = require("./backend/routes/api-routes");
 const {
@@ -80,11 +97,25 @@ const env = loadEnv(process.env);
     port: preferredPort,
     host: "127.0.0.1",
   });
-  let DOWNLOAD_DIR = path.join(__dirname, "downloads");
+  const fallbackUserDataRoot =
+    process.platform === "win32"
+      ? path.join(process.env.APPDATA || os.homedir(), "GetVideosLocally")
+      : path.join(os.homedir(), ".getvideoslocally");
+  let writableDataRoot =
+    env.USER_DATA_PATH || process.env.USER_DATA_PATH || __dirname;
+  if (writableDataRoot.includes("app.asar")) {
+    writableDataRoot = fallbackUserDataRoot;
+  }
+  const runtimeDataDir = path.join(writableDataRoot, "data");
+  let DOWNLOAD_DIR = path.join(writableDataRoot, "downloads");
 
   // Safety: Never allow app.asar in the path
   if (DOWNLOAD_DIR.includes("app.asar") || DOWNLOAD_DIR.includes("app.asa")) {
-    DOWNLOAD_DIR = path.join(process.resourcesPath || __dirname, "downloads");
+    DOWNLOAD_DIR = path.join(fallbackUserDataRoot, "downloads");
+  }
+
+  if (!fs.existsSync(runtimeDataDir)) {
+    fs.mkdirSync(runtimeDataDir, { recursive: true });
   }
 
   logger.info("[server.js] FINAL DOWNLOAD_DIR:", DOWNLOAD_DIR);
@@ -92,10 +123,19 @@ const env = loadEnv(process.env);
     fs.mkdirSync(DOWNLOAD_DIR, { recursive: true });
   }
 
-  const PAUSED_JOBS_FILE = path.join(__dirname, "paused_jobs.json");
-  const HISTORY_INDEX_FILE = path.join(__dirname, "data", "history-index.json");
+  const PAUSED_JOBS_FILE = path.join(writableDataRoot, "paused_jobs.json");
+  const SCHEDULED_JOBS_FILE = path.join(writableDataRoot, "scheduled_jobs.json");
+  const FAILED_JOBS_FILE = path.join(writableDataRoot, "failed_jobs.json");
+  const HISTORY_INDEX_FILE = path.join(runtimeDataDir, "history-index.json");
+  const METADATA_CACHE_FILE = path.join(
+    runtimeDataDir,
+    "metadata-cache.json",
+  );
+  const PLAYLIST_CACHE_FILE = path.join(runtimeDataDir, "playlist-cache.json");
   const downloadState = createDownloadState({
     pausedJobsFile: PAUSED_JOBS_FILE,
+    scheduledJobsFile: SCHEDULED_JOBS_FILE,
+    failedJobsFile: FAILED_JOBS_FILE,
     logger: logger,
   });
   const {
@@ -103,15 +143,25 @@ const env = loadEnv(process.env);
     activeProcesses,
     downloadQueue,
     pausedDownloads,
+    scheduledDownloads,
+    failedDownloads,
     clientAutoUpdateSettings,
+    loadFailedJobs,
     loadPausedJobs,
+    loadScheduledJobs,
+    markDirty,
+    saveFailedJobs,
     savePausedJobs,
+    saveScheduledJobs,
+    saveRuntimeState,
   } = downloadState;
   const historyIndex = new HistoryIndex({
     filePath: HISTORY_INDEX_FILE,
     logger: logger,
   });
   await loadPausedJobs();
+  await loadScheduledJobs();
+  await loadFailedJobs();
   await historyIndex._loadPromise;
 
   // Set up executables with unified env var reading (support legacy names for compatibility)
@@ -150,12 +200,26 @@ const env = loadEnv(process.env);
     nodeExecutable = path.join(__dirname, "bin", "node");
   }
 
+  let ffprobeExecutable = "ffprobe";
+  if (ffmpegExecutable && fs.existsSync(ffmpegExecutable)) {
+    const ffmpegDirectory = path.dirname(ffmpegExecutable);
+    const ffprobeCandidate =
+      process.platform === "win32"
+        ? path.join(ffmpegDirectory, "ffprobe.exe")
+        : path.join(ffmpegDirectory, "ffprobe");
+    if (fs.existsSync(ffprobeCandidate)) {
+      ffprobeExecutable = ffprobeCandidate;
+    }
+  }
+
   global.ytdlpExecutable = ytdlpExecutable;
   global.ffmpegExecutable = ffmpegExecutable;
+  global.ffprobeExecutable = ffprobeExecutable;
   global.nodeExecutable = nodeExecutable;
 
   logger.info("[server.js] Effective ytdlpExecutable: ", ytdlpExecutable);
   logger.info("[server.js] Effective ffmpegExecutable: ", ffmpegExecutable);
+  logger.info("[server.js] Effective ffprobeExecutable: ", ffprobeExecutable);
   logger.info(
     "[server.js] Effective nodeExecutable: ",
     nodeExecutable || "NOT SET - 4K may fail",
@@ -753,7 +817,7 @@ const env = loadEnv(process.env);
 
   function getLastUpdateCheck(tool) {
     try {
-      const checkFile = path.join(__dirname, `${tool}_last_check.json`);
+      const checkFile = path.join(runtimeDataDir, `${tool}_last_check.json`);
       if (fs.existsSync(checkFile)) {
         const data = JSON.parse(fs.readFileSync(checkFile, "utf8"));
         return data.lastCheck || 0;
@@ -766,7 +830,7 @@ const env = loadEnv(process.env);
 
   function setLastUpdateCheck(tool) {
     try {
-      const checkFile = path.join(__dirname, `${tool}_last_check.json`);
+      const checkFile = path.join(runtimeDataDir, `${tool}_last_check.json`);
       const data = { lastCheck: Date.now() };
       fs.writeFileSync(checkFile, JSON.stringify(data, null, 2));
     } catch (error) {
@@ -826,6 +890,12 @@ const env = loadEnv(process.env);
   let autoUpdateInterval = null; // For periodic auto-update checks
   let sendMessageToClient = () => {};
   const safeSendMessageToClient = (...args) => sendMessageToClient(...args);
+  const scheduledDownloadTimers = new Map();
+  const siteRetryState = new Map();
+  const cookieBurstValidationCache = new Map();
+  const siteRequestGuard = createSiteRequestGuard({
+    logger: logger,
+  });
 
   const metadataService = createMetadataService({
     runYtDlpCommand,
@@ -833,13 +903,17 @@ const env = loadEnv(process.env);
     pLimitFactory: null,
     logger: logger,
     initialConcurrency: concurrencySettings,
+    cacheFilePath: METADATA_CACHE_FILE,
   });
+  await metadataService.loadPersistedCache();
 
   const playlistService = createPlaylistService({
     runYtDlpCommand,
     sendMessageToClient: safeSendMessageToClient,
     logger: logger,
+    cacheFilePath: PLAYLIST_CACHE_FILE,
   });
+  await playlistService.ready;
 
   const wsHub = createWebSocketHub({
     WebSocket,
@@ -871,11 +945,421 @@ const env = loadEnv(process.env);
 
   sendMessageToClient = wsHub.sendMessageToClient;
 
+  function applyQueueProfile(profileName) {
+    const normalizedProfile = String(profileName || "balanced").toLowerCase();
+    const profileOverrides =
+      normalizedProfile === "aggressive"
+        ? {
+            singleDownloads: 2,
+            playlistDownloads: 5,
+            metadataSingles: 4,
+            metadataPlaylists: 3,
+          }
+        : normalizedProfile === "conservative"
+          ? {
+              singleDownloads: 1,
+              playlistDownloads: 2,
+              metadataSingles: 1,
+              metadataPlaylists: 1,
+            }
+          : {
+              singleDownloads: 1,
+              playlistDownloads: 3,
+              metadataSingles: 3,
+              metadataPlaylists: 2,
+            };
+
+    concurrencySettings = resolveDownloadConcurrency({
+      ...concurrencySettings,
+      ...profileOverrides,
+    });
+    currentSingleConcurrency = concurrencySettings.singleDownloads;
+    currentPlaylistConcurrency = concurrencySettings.playlistDownloads;
+    if (pLimit) {
+      singleVideoProcessingLimit = pLimit(currentSingleConcurrency);
+      playlistItemProcessingLimit = pLimit(currentPlaylistConcurrency);
+    }
+    metadataService.configureConcurrency(concurrencySettings);
+    return concurrencySettings;
+  }
+
+  function buildRetrySummary(itemId, failedJob) {
+    return {
+      itemId,
+      title: failedJob.title,
+      source: failedJob.source,
+      message: failedJob.message,
+      failedAt: failedJob.failedAt,
+      attempt: failedJob.attempt || 0,
+      siteKey: failedJob.siteKey || getSiteKeyFromUrl(failedJob.videoUrl),
+      videoUrl: failedJob.videoUrl,
+      format: failedJob.format,
+      quality: failedJob.quality,
+    };
+  }
+
+  function getRecoverableDownloads(clientId) {
+    return Array.from(pausedDownloads.entries())
+      .filter(([, jobSpec]) => String(jobSpec.clientId) === String(clientId))
+      .map(([itemId, jobSpec]) => ({
+        itemId,
+        title: jobSpec.title || "Recoverable download",
+        source: jobSpec.source || "youtube",
+        format: jobSpec.format || null,
+        quality: jobSpec.quality || null,
+        pausedAt: jobSpec.pausedAt || null,
+        isPlaylistItem: jobSpec.isPlaylistItem || false,
+        playlistTitle: jobSpec.playlistTitle || null,
+      }));
+  }
+
+  function getScheduledDownloads(clientId) {
+    return Array.from(scheduledDownloads.entries())
+      .filter(([, jobSpec]) => String(jobSpec.clientId) === String(clientId))
+      .map(([scheduleId, jobSpec]) => ({
+        scheduleId,
+        scheduledFor: jobSpec.scheduledFor,
+        createdAt: jobSpec.createdAt,
+        title: jobSpec.previewTitle || jobSpec.url,
+        url: jobSpec.url,
+        format: jobSpec.format,
+        quality: jobSpec.quality,
+        source: jobSpec.source || "youtube",
+        playlistAction: jobSpec.playlistAction || "single",
+      }));
+  }
+
+  function getFailedDownloads(clientId) {
+    return Array.from(failedDownloads.entries())
+      .filter(([, failedJob]) => String(failedJob.clientId) === String(clientId))
+      .map(([itemId, failedJob]) => buildRetrySummary(itemId, failedJob));
+  }
+
+  async function queueFailedDownloadRetry(clientId, itemId) {
+    const failedJob = failedDownloads.get(itemId);
+    if (!failedJob) {
+      throw new Error("Failed download not found.");
+    }
+
+    failedDownloads.delete(itemId);
+    await saveFailedJobs();
+    await handleDownloadRequest(clientId, {
+      url: failedJob.videoUrl,
+      format: failedJob.format,
+      quality: failedJob.quality,
+      source: failedJob.source,
+      playlistAction: failedJob.playlistAction || "single",
+      concurrency: failedJob.concurrency || 1,
+      singleConcurrency: failedJob.singleConcurrency || 1,
+      ...failedJob.settings,
+    });
+
+    return { success: true, itemId };
+  }
+
+  async function retryAllFailedDownloads(clientId) {
+    const failedItems = getFailedDownloads(clientId);
+    for (const item of failedItems) {
+      await queueFailedDownloadRetry(clientId, item.itemId);
+    }
+    return { success: true, count: failedItems.length };
+  }
+
+  async function scheduleDownloadExecution(scheduleId) {
+    const scheduledJob = scheduledDownloads.get(scheduleId);
+    if (!scheduledJob) {
+      return;
+    }
+
+    scheduledDownloads.delete(scheduleId);
+    await saveScheduledJobs();
+    scheduledDownloadTimers.delete(scheduleId);
+    await handleDownloadRequest(scheduledJob.clientId, {
+      url: scheduledJob.url,
+      format: scheduledJob.format,
+      quality: scheduledJob.quality,
+      source: scheduledJob.source,
+      playlistAction: scheduledJob.playlistAction,
+      concurrency: scheduledJob.concurrency,
+      singleConcurrency: scheduledJob.singleConcurrency,
+      selectedPlaylistItems: scheduledJob.selectedPlaylistItems,
+      ...scheduledJob.settings,
+    });
+  }
+
+  function queueScheduledTimer(scheduleId, scheduledFor) {
+    const scheduledTimeMs = new Date(scheduledFor).getTime();
+    if (!Number.isFinite(scheduledTimeMs)) {
+      throw new Error("Invalid scheduled time.");
+    }
+
+    const delayMs = Math.max(0, scheduledTimeMs - Date.now());
+    const existingTimer = scheduledDownloadTimers.get(scheduleId);
+    if (existingTimer) {
+      clearTimeout(existingTimer);
+    }
+
+    const timer = setTimeout(() => {
+      scheduleDownloadExecution(scheduleId).catch((error) => {
+        logger.error(
+          `[Schedule] Failed to execute scheduled job ${scheduleId}:`,
+          error,
+        );
+      });
+    }, delayMs);
+    scheduledDownloadTimers.set(scheduleId, timer);
+  }
+
+  async function createScheduledDownload(clientId, requestData) {
+    const scheduledFor = requestData.scheduledFor;
+    const scheduledTime = new Date(scheduledFor).getTime();
+    if (!scheduledFor || !Number.isFinite(scheduledTime) || scheduledTime <= Date.now()) {
+      throw new Error("Scheduled time must be in the future.");
+    }
+
+    const scheduleId = `schedule_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const scheduledJob = {
+      clientId,
+      url: requestData.url,
+      format: requestData.format,
+      quality: requestData.quality,
+      source: requestData.source || "youtube",
+      playlistAction: requestData.playlistAction || "single",
+      concurrency: requestData.concurrency || 1,
+      singleConcurrency: requestData.singleConcurrency || 1,
+      selectedPlaylistItems: Array.isArray(requestData.selectedPlaylistItems)
+        ? requestData.selectedPlaylistItems
+        : [],
+      previewTitle: requestData.previewTitle || "",
+      scheduledFor: new Date(scheduledTime).toISOString(),
+      createdAt: new Date().toISOString(),
+      settings: { ...requestData },
+    };
+    delete scheduledJob.settings.url;
+    delete scheduledJob.settings.clientId;
+    delete scheduledJob.settings.scheduledFor;
+    delete scheduledJob.settings.previewTitle;
+
+    scheduledDownloads.set(scheduleId, scheduledJob);
+    await saveScheduledJobs();
+    queueScheduledTimer(scheduleId, scheduledJob.scheduledFor);
+    return {
+      success: true,
+      scheduleId,
+      scheduledFor: scheduledJob.scheduledFor,
+    };
+  }
+
+  async function deleteScheduledDownload(clientId, scheduleId) {
+    const scheduledJob = scheduledDownloads.get(scheduleId);
+    if (!scheduledJob || String(scheduledJob.clientId) !== String(clientId)) {
+      throw new Error("Scheduled download not found.");
+    }
+
+    const timer = scheduledDownloadTimers.get(scheduleId);
+    if (timer) {
+      clearTimeout(timer);
+      scheduledDownloadTimers.delete(scheduleId);
+    }
+    scheduledDownloads.delete(scheduleId);
+    await saveScheduledJobs();
+    return { success: true, scheduleId };
+  }
+
+  async function previewPlaylist(clientId, playlistUrl) {
+    const previewId = `playlist_preview_${Date.now()}`;
+    const { items, title } = await playlistService.fetchPlaylistContext(
+      clientId,
+      playlistUrl,
+      previewId,
+    );
+    return {
+      title: title || "Playlist",
+      items: items.map((item, index) => ({
+        id: item.id,
+        title: item.title,
+        index,
+      })),
+    };
+  }
+
+  async function storeFailedDownload(itemId, failedJob) {
+    failedDownloads.set(itemId, failedJob);
+    await saveFailedJobs();
+  }
+
+  async function clearFailedDownload(itemId) {
+    if (!failedDownloads.has(itemId)) {
+      return;
+    }
+    failedDownloads.delete(itemId);
+    await saveFailedJobs();
+  }
+
+  function buildRecoveryJobSpec(itemId, jobData, overrides = {}) {
+    return {
+      clientId: jobData.clientId,
+      itemId,
+      videoUrl: jobData.videoUrl,
+      format: jobData.format,
+      quality: jobData.quality,
+      source: jobData.source || "youtube",
+      settings: jobData.settings || {},
+      isPlaylistItem: jobData.isPlaylistItem || false,
+      playlistIndex: jobData.playlistIndex,
+      playlistFolderPath: jobData.playlistFolderPath,
+      playlistTitle: jobData.playlistTitle,
+      title: jobData.title || "Recoverable download",
+      outputTemplate: jobData.outputTemplate,
+      pausedAt: Date.now(),
+      resumeAttempts: jobData.resumeAttempts || 0,
+      ...overrides,
+    };
+  }
+
+  async function snapshotRecoverableDownloadsForShutdown() {
+    for (const [itemId, queuedItem] of downloadQueue.entries()) {
+      if (queuedItem?.isMeta) {
+        continue;
+      }
+      pausedDownloads.set(itemId, buildRecoveryJobSpec(itemId, queuedItem));
+    }
+
+    for (const [itemId, procInfo] of activeProcesses.entries()) {
+      const jobData = procInfo.itemData || procInfo;
+      pausedDownloads.set(
+        itemId,
+        buildRecoveryJobSpec(itemId, jobData, {
+          outputTemplate: procInfo.outputTemplate || jobData.outputTemplate,
+        }),
+      );
+    }
+
+    await saveRuntimeState();
+  }
+
+  for (const [scheduleId, scheduledJob] of scheduledDownloads.entries()) {
+    try {
+      queueScheduledTimer(scheduleId, scheduledJob.scheduledFor);
+    } catch (error) {
+      logger.warn(
+        `[Schedule] Failed to restore scheduled job ${scheduleId}: ${error.message}`,
+      );
+    }
+  }
+
+  async function probeMediaFile(filePath) {
+    if (!ffprobeExecutable) {
+      return null;
+    }
+
+    return new Promise((resolve) => {
+      const ffprobeProc = spawn(
+        ffprobeExecutable,
+        [
+          "-v",
+          "error",
+          "-print_format",
+          "json",
+          "-show_format",
+          "-show_streams",
+          filePath,
+        ],
+        {
+          stdio: ["ignore", "pipe", "pipe"],
+          windowsHide: true,
+        },
+      );
+
+      let stdout = "";
+      let stderr = "";
+
+      ffprobeProc.stdout.setEncoding("utf8");
+      ffprobeProc.stderr.setEncoding("utf8");
+      ffprobeProc.stdout.on("data", (data) => {
+        stdout += data;
+      });
+      ffprobeProc.stderr.on("data", (data) => {
+        stderr += data;
+      });
+      ffprobeProc.on("error", () => resolve(null));
+      ffprobeProc.on("close", (code) => {
+        if (code !== 0 || !stdout.trim()) {
+          if (stderr.trim()) {
+            logger.warn(`[MediaProbe] ffprobe warning for ${filePath}: ${stderr.trim()}`);
+          }
+          return resolve(null);
+        }
+
+        try {
+          resolve(JSON.parse(stdout));
+        } catch (_error) {
+          resolve(null);
+        }
+      });
+    });
+  }
+
+  async function verifyDownload({
+    expectedFormat = null,
+    filePath,
+    itemId,
+  }) {
+    if (!filePath || !fs.existsSync(filePath)) {
+      throw createClassifiedError({
+        code: "DOWNLOAD_MISSING",
+        message: `Download missing: ${filePath || "unknown file path"}`,
+      });
+    }
+
+    const stats = await fs.promises.stat(filePath);
+    if (!stats.isFile()) {
+      throw createClassifiedError({
+        code: "DOWNLOAD_MISSING",
+        message: `Download missing: ${filePath} is not a file`,
+      });
+    }
+
+    if (stats.size <= 0) {
+      throw createClassifiedError({
+        code: "DOWNLOAD_EMPTY",
+        message: `Download empty: ${filePath} is 0 bytes`,
+      });
+    }
+
+    if (expectedFormat) {
+      const expectedExtension = `.${String(expectedFormat).toLowerCase()}`;
+      const actualExtension = path.extname(filePath).toLowerCase();
+      if (actualExtension && actualExtension !== expectedExtension) {
+        logger.warn(
+          `[${itemId}] Output extension mismatch. Expected ${expectedExtension}, got ${actualExtension} for ${filePath}`,
+        );
+      }
+    }
+
+    const mediaProbe = await probeMediaFile(filePath);
+    if (
+      mediaProbe &&
+      (!Array.isArray(mediaProbe.streams) || mediaProbe.streams.length === 0)
+    ) {
+      throw createClassifiedError({
+        code: "DOWNLOAD_MISSING",
+        message: `Download verification failed: ${filePath} has no readable media streams`,
+      });
+    }
+
+    return {
+      mediaProbe,
+      stats,
+    };
+  }
+
   const downloadCompletionService = createDownloadCompletionService({
     fs,
     pathModule: path,
     downloadDir: DOWNLOAD_DIR,
     formatBytes,
+    verifyDownload,
     sendMessageToClient: safeSendMessageToClient,
     historyIndex,
     logger: logger,
@@ -1002,6 +1486,101 @@ const env = loadEnv(process.env);
     }
   });
 
+  async function preflightYouTubeBurstCookies(
+    clientId,
+    videoUrl,
+    itemId,
+    itemCount,
+  ) {
+    const siteProfile = getSiteDownloadProfile("youtube");
+    if (itemCount < siteProfile.cookieBurstThreshold) {
+      return { ok: true };
+    }
+
+    const cookieFilePath = await getCookiesPath();
+    if (!cookieFilePath) {
+      return { ok: true, mode: "anonymous" };
+    }
+
+    const stats = fs.statSync(cookieFilePath);
+    const cacheKey = `${cookieFilePath}:${stats.size}:${stats.mtimeMs}`;
+    const cached = cookieBurstValidationCache.get(cacheKey);
+    if (cached && Date.now() - cached.checkedAt < 5 * 60 * 1000) {
+      return cached.result;
+    }
+
+    const isValid = await validateCookiesFile(cookieFilePath, stats);
+    if (!isValid) {
+      const result = {
+        ok: false,
+        error: createClassifiedError({
+          code: "COOKIE_INVALID",
+          hasCookies: true,
+          message:
+            "Cookie preflight failed: imported cookies file is not a valid Netscape cookies.txt file.",
+          siteKey: "youtube",
+        }),
+      };
+      cookieBurstValidationCache.set(cacheKey, {
+        checkedAt: Date.now(),
+        result,
+      });
+      return result;
+    }
+
+    try {
+      await runYtDlpCommand(
+        clientId,
+        [
+          "--flat-playlist",
+          "--playlist-items",
+          "1",
+          "--skip-download",
+          "--print",
+          "%(id)s",
+          videoUrl,
+        ],
+        `cookie_preflight_${itemId}`,
+        true,
+      );
+      const result = { ok: true, mode: "cookies" };
+      cookieBurstValidationCache.set(cacheKey, {
+        checkedAt: Date.now(),
+        result,
+      });
+      return result;
+    } catch (error) {
+      const classification =
+        error.classification ||
+        classifyRuntimeError({
+          hasCookies: true,
+          message: error.message,
+          siteKey: "youtube",
+        });
+      if (classification.category === "cookies" || classification.category === "auth") {
+        const result = {
+          ok: false,
+          error: createClassifiedError({
+            code: classification.code,
+            hasCookies: true,
+            message:
+              classification.code === "COOKIE_EXPIRED"
+                ? "Cookie preflight failed: imported cookies appear to be expired."
+                : "Cookie preflight failed before starting the YouTube playlist burst.",
+            siteKey: "youtube",
+          }),
+        };
+        cookieBurstValidationCache.set(cacheKey, {
+          checkedAt: Date.now(),
+          result,
+        });
+        return result;
+      }
+
+      return { ok: true };
+    }
+  }
+
   // ==================== DOWNLOAD REQUEST HANDLING ====================
   async function handleDownloadRequest(clientId, requestData) {
     const {
@@ -1012,6 +1591,7 @@ const env = loadEnv(process.env);
       playlistAction,
       concurrency,
       singleConcurrency,
+      selectedPlaylistItems,
       ...settings
     } = requestData;
 
@@ -1043,13 +1623,27 @@ const env = loadEnv(process.env);
       });
     }
 
-    // Detect playlist for any supported site (yt-dlp handles playlist detection)
-    // Check if URL contains common playlist indicators or use yt-dlp's detection
-    const isPlaylist =
+    applyQueueProfile(settings.queueTuningProfile);
+    const playlistLikelyByUrl =
       videoUrl.includes("list=") ||
       videoUrl.includes("/playlist") ||
-      videoUrl.includes("/videos") ||
-      playlistAction === "full";
+      videoUrl.includes("/videos");
+    const shouldProbePlaylist = playlistAction === "full" || playlistLikelyByUrl;
+    const playlistProbe = shouldProbePlaylist
+      ? await playlistService.probeCollection(
+          clientId,
+          videoUrl,
+          `probe_${Date.now()}`,
+        )
+      : {
+          isPlaylist: false,
+          playlistTitle: null,
+          siteKey: detectSiteKeyFromUrl(videoUrl, source),
+        };
+    const siteKey = playlistProbe.siteKey || detectSiteKeyFromUrl(videoUrl, source);
+    const isPlaylist = playlistAction === "full"
+      ? playlistProbe.isPlaylist !== false
+      : playlistProbe.isPlaylist === true;
 
     if (isPlaylist && playlistAction === "full") {
       const playlistMetaId = `playlist_${source}_${Date.now()}`;
@@ -1069,12 +1663,32 @@ const env = loadEnv(process.env);
 
       let playlistFolderPath = null;
       try {
-        const { items, title: resolvedPlaylistTitle } =
+        const { items: fetchedItems, title: resolvedPlaylistTitle } =
           await playlistService.fetchPlaylistContext(
             clientId,
             videoUrl,
             playlistMetaId,
           );
+        const filteredItems =
+          Array.isArray(selectedPlaylistItems) && selectedPlaylistItems.length > 0
+            ? fetchedItems.filter((item) =>
+                selectedPlaylistItems.includes(String(item.id)),
+              )
+            : fetchedItems;
+        if (filteredItems.length === 0) {
+          throw new Error("No playlist items were selected for download.");
+        }
+        if (siteKey === "youtube") {
+          const cookiePreflight = await preflightYouTubeBurstCookies(
+            clientId,
+            videoUrl,
+            playlistMetaId,
+            filteredItems.length,
+          );
+          if (!cookiePreflight.ok) {
+            throw cookiePreflight.error;
+          }
+        }
         if (downloadQueue.get(playlistMetaId)?.cancelled) {
           logger.info(
             `[${playlistMetaId}] Playlist processing cancelled before starting items.`,
@@ -1085,12 +1699,15 @@ const env = loadEnv(process.env);
         sendMessageToClient(clientId, {
           type: "status",
           itemId: playlistMetaId,
-          message: `Found ${items.length} items in playlist. Queuing downloads...`,
+          message: `Found ${filteredItems.length} items in playlist. Queuing downloads...`,
           source,
         });
 
         const playlistTitle =
-          resolvedPlaylistTitle || items[0]?.title || `Playlist_${Date.now()}`;
+          resolvedPlaylistTitle ||
+          playlistProbe.playlistTitle ||
+          filteredItems[0]?.title ||
+          `Playlist_${Date.now()}`;
 
         // Use user's selected download folder if available, otherwise fall back to DOWNLOAD_DIR
         const baseDownloadFolder =
@@ -1103,9 +1720,21 @@ const env = loadEnv(process.env);
           fs.mkdirSync(baseDownloadFolder, { recursive: true });
         }
 
+        const organizedBaseFolder = await ensureOrganizedTargetDir({
+          fs,
+          baseDir: baseDownloadFolder,
+          videoUrl,
+          videoInfo: {
+            siteKey: getSiteKeyFromUrl(videoUrl),
+          },
+          playlistTitle,
+          isPlaylistItem: true,
+          settings,
+        });
+
         playlistFolderPath = getUniqueFolderPath(
           fs,
-          baseDownloadFolder,
+          organizedBaseFolder,
           playlistTitle,
         );
         if (!fs.existsSync(playlistFolderPath))
@@ -1113,11 +1742,23 @@ const env = loadEnv(process.env);
 
         logger.info(`[Playlist] Saving to folder: ${playlistFolderPath}`);
 
-        const resolvedConcurrency = resolveDownloadConcurrency({
-          ...concurrencySettings,
-          playlistDownloads: concurrency,
+        const playlistRequestContext = resolveSiteConcurrency({
+          videoUrl,
+          source: siteKey,
+          overrides: {
+            ...concurrencySettings,
+            playlistDownloads: concurrency,
+          },
+          adaptiveConcurrency: siteRequestGuard.getAdaptiveConcurrency(
+            siteKey,
+            resolveDownloadConcurrency({
+              ...concurrencySettings,
+              playlistDownloads: concurrency,
+            }),
+          ),
         });
-        const newPlaylistConcurrency = resolvedConcurrency.playlistDownloads;
+        const newPlaylistConcurrency =
+          playlistRequestContext.concurrency.playlistDownloads;
         if (currentPlaylistConcurrency !== newPlaylistConcurrency) {
           logger.info(
             `Updating playlist item concurrency from ${currentPlaylistConcurrency} to: ${newPlaylistConcurrency}`,
@@ -1129,8 +1770,12 @@ const env = loadEnv(process.env);
           };
           playlistItemProcessingLimit = pLimit(newPlaylistConcurrency);
         }
+        metadataService.configureConcurrency(playlistRequestContext.concurrency);
 
-        const downloadPromises = items.map((item, index) => {
+        const prefetchBudget =
+          playlistRequestContext.prefetchVisiblePlaylistItems;
+
+        const downloadPromises = filteredItems.map((item, index) => {
           const individualItemId = `${source}_${item.id}_${Date.now()}_${index}`;
           const itemData = {
             clientId,
@@ -1146,6 +1791,7 @@ const env = loadEnv(process.env);
             title: item.title || `Video ${index + 1}`,
             playlistFolderPath,
             playlistTitle, // Add playlist title to item data
+            siteKey,
           };
           downloadQueue.set(individualItemId, itemData);
           sendMessageToClient(clientId, {
@@ -1159,55 +1805,52 @@ const env = loadEnv(process.env);
             playlistIndex: itemData.playlistIndex || null,
           });
 
-          // Fetch metadata immediately for playlist items so users can confirm they're the right videos
-          schedulePlaylistMetadataPrefetch(individualItemId, async () => {
-            try {
-              // Check if item or playlist was cancelled before fetching
-              if (
-                downloadQueue.get(playlistMetaId)?.cancelled ||
-                downloadQueue.get(individualItemId)?.cancelled
-              ) {
-                return;
+          if (index < prefetchBudget) {
+            schedulePlaylistMetadataPrefetch(individualItemId, async () => {
+              try {
+                if (
+                  downloadQueue.get(playlistMetaId)?.cancelled ||
+                  downloadQueue.get(individualItemId)?.cancelled
+                ) {
+                  return;
+                }
+                const videoInfo = await getVideoInfo(
+                  clientId,
+                  item.id,
+                  individualItemId,
+                  quality,
+                  format,
+                );
+                if (
+                  downloadQueue.get(playlistMetaId)?.cancelled ||
+                  downloadQueue.get(individualItemId)?.cancelled
+                ) {
+                  return;
+                }
+                const currentItemData = downloadQueue.get(individualItemId);
+                if (currentItemData) {
+                  currentItemData.title =
+                    videoInfo.title || currentItemData.title;
+                  markDirty();
+                }
+                sendMessageToClient(clientId, {
+                  type: "item_info",
+                  itemId: individualItemId,
+                  title: videoInfo.title || itemData.title,
+                  source,
+                  format: format,
+                  quality: quality,
+                  thumbnail: videoInfo.thumbnail,
+                  isPlaylistItem: true,
+                  playlistIndex: index,
+                });
+              } catch (error) {
+                logger.info(
+                  `[${individualItemId}] Failed to fetch early metadata: ${error.message}`,
+                );
               }
-              const videoInfo = await getVideoInfo(
-                clientId,
-                item.id,
-                individualItemId,
-                quality,
-                format,
-              );
-              // Check again after fetch in case it was cancelled during fetch
-              if (
-                downloadQueue.get(playlistMetaId)?.cancelled ||
-                downloadQueue.get(individualItemId)?.cancelled
-              ) {
-                return;
-              }
-              // Update the item data with the fetched title
-              const currentItemData = downloadQueue.get(individualItemId);
-              if (currentItemData) {
-                currentItemData.title =
-                  videoInfo.title || currentItemData.title;
-              }
-              // Send metadata to client immediately
-              sendMessageToClient(clientId, {
-                type: "item_info",
-                itemId: individualItemId,
-                title: videoInfo.title || itemData.title,
-                source,
-                format: format,
-                quality: quality,
-                thumbnail: videoInfo.thumbnail,
-                isPlaylistItem: true,
-                playlistIndex: index,
-              });
-            } catch (error) {
-              // Silently fail - metadata will be fetched again when processing starts
-              logger.info(
-                `[${individualItemId}] Failed to fetch early metadata: ${error.message}`,
-              );
-            }
-          });
+            });
+          }
 
           return playlistItemProcessingLimit(async () => {
             if (
@@ -1259,6 +1902,7 @@ const env = loadEnv(process.env);
         source,
         settings,
         isPlaylistItem: isPlaylist && playlistAction === "single",
+        siteKey,
         status: "queued",
         title: `Video: ${videoUrl}`,
       };
@@ -1303,6 +1947,7 @@ const env = loadEnv(process.env);
             const currentItemData = downloadQueue.get(itemId);
             if (currentItemData) {
               currentItemData.title = videoInfo.title || currentItemData.title;
+              markDirty();
             }
             // Send metadata to client immediately
             sendMessageToClient(clientId, {
@@ -1324,11 +1969,22 @@ const env = loadEnv(process.env);
         });
       }
 
-      const resolvedConcurrency = resolveDownloadConcurrency({
-        ...concurrencySettings,
-        singleDownloads: singleConcurrency,
+      const singleRequestContext = resolveSiteConcurrency({
+        videoUrl,
+        source: siteKey,
+        overrides: {
+          ...concurrencySettings,
+          singleDownloads: singleConcurrency,
+        },
+        adaptiveConcurrency: siteRequestGuard.getAdaptiveConcurrency(
+          siteKey,
+          resolveDownloadConcurrency({
+            ...concurrencySettings,
+            singleDownloads: singleConcurrency,
+          }),
+        ),
       });
-      const newSingleConcurrency = resolvedConcurrency.singleDownloads;
+      const newSingleConcurrency = singleRequestContext.concurrency.singleDownloads;
       if (currentSingleConcurrency !== newSingleConcurrency) {
         logger.info(
           `Updating single video concurrency from ${currentSingleConcurrency} to: ${newSingleConcurrency}`,
@@ -1340,6 +1996,7 @@ const env = loadEnv(process.env);
         };
         singleVideoProcessingLimit = pLimit(newSingleConcurrency);
       }
+      metadataService.configureConcurrency(singleRequestContext.concurrency);
 
       singleVideoProcessingLimit(async () => {
         if (downloadQueue.get(itemId)?.cancelled) {
@@ -1375,6 +2032,7 @@ const env = loadEnv(process.env);
           if (item.parentPlaylistId === itemId) item.cancelled = true;
         });
       }
+      markDirty();
       downloadQueue.delete(itemId); // Remove from queue immediately
       sendMessageToClient(clientId, {
         type: "cancel_confirm",
@@ -1405,6 +2063,7 @@ const env = loadEnv(process.env);
     const processInfo = activeProcesses.get(itemId);
     if (processInfo) {
       processInfo.cancelled = true;
+      markDirty();
 
       // Terminate processes
       try {
@@ -1574,6 +2233,7 @@ const env = loadEnv(process.env);
       // IMPORTANT: Set paused flags FIRST before any termination
       processInfo.paused = true;
       processInfo.pausedByUser = true; // Mark as user-initiated pause
+      markDirty();
 
       // Get the full item data for the job spec
       const itemData = queuedItem || processInfo.itemData || {};
@@ -1650,6 +2310,7 @@ const env = loadEnv(process.env);
     } else if (queuedItem) {
       // Download is queued but not started yet - easy to pause
       queuedItem.paused = true;
+      markDirty();
 
       jobSpec = {
         clientId,
@@ -1973,7 +2634,9 @@ const env = loadEnv(process.env);
         format,
       );
       currentVideoTitle = videoInfo.title || currentVideoTitle;
+      itemProcInfo.videoInfo = videoInfo;
       itemProcInfo.thumbnail = videoInfo.thumbnail; // Store thumbnail for complete message
+      markDirty();
       sendMessageToClient(clientId, {
         type: "item_info",
         itemId,
@@ -2029,6 +2692,18 @@ const env = loadEnv(process.env);
         logger.info(
           `[${itemId}] 📁 Using default folder (no settings folder specified): ${targetDir}`,
         );
+      }
+
+      if (!isPlaylistItem || !itemData.playlistFolderPath) {
+        targetDir = await ensureOrganizedTargetDir({
+          fs,
+          baseDir: targetDir,
+          videoUrl,
+          videoInfo,
+          playlistTitle: itemData.playlistTitle,
+          isPlaylistItem,
+          settings,
+        });
       }
 
       const finalBaseFilename = sanitizeFilename(currentVideoTitle);
@@ -2096,6 +2771,7 @@ const env = loadEnv(process.env);
 
       // Store outputTemplate for pause/resume functionality
       itemProcInfo.outputTemplate = outputTemplate;
+      markDirty();
 
       sendMessageToClient(clientId, {
         type: "status",
@@ -2321,6 +2997,11 @@ const env = loadEnv(process.env);
           videoArgs.push("--embed-chapters");
         }
 
+        const subtitleArgs = buildSubtitleArgs(settings, containerFormat);
+        if (subtitleArgs.length > 0) {
+          videoArgs.push(...subtitleArgs);
+        }
+
         videoArgs.push(
           // NOTE: Removed --no-overwrites here because getUniqueFilename() already ensures unique names
           "--no-playlist",
@@ -2455,7 +3136,9 @@ const env = loadEnv(process.env);
       const actualFinalFilenameDisplay = path.basename(finalFilePathValue);
 
       try {
+        await clearFailedDownload(itemId);
         const payload = await downloadCompletionService.createPayloadFromFileStats({
+          expectedFormat: format,
           itemId,
           source,
           targetDir,
@@ -2477,58 +3160,89 @@ const env = loadEnv(process.env);
           error,
         );
 
-        // Check error type and provide helpful guidance
         const errorMsg = error.message || "";
+        const retryAttempt = Number(itemData.retryCount || 0);
+        const siteKey =
+          itemProcInfo.videoInfo?.siteKey ||
+          itemData.siteKey ||
+          getSiteKeyFromUrl(videoUrl);
+        const classification =
+          error.classification ||
+          classifyRuntimeError({
+            hasCookies: errorMsg.toLowerCase().includes("cookie"),
+            message: errorMsg,
+            siteKey,
+          });
 
-        // Cookie format errors
-        const isCookieError =
-          errorMsg.includes("invalid Netscape format") ||
-          errorMsg.includes("no valid cookies") ||
-          errorMsg.includes("cookiejar.LoadError");
-
-        // yt-dlp option errors (outdated yt-dlp or wrong command)
-        const isOptionError =
-          errorMsg.includes("no such option") ||
-          errorMsg.includes("unrecognized arguments");
-
-        // Account/auth errors
-        const isAuthError =
-          errorMsg.includes("account username missing") ||
-          errorMsg.includes("Sign in to confirm") ||
-          errorMsg.includes("requires authentication");
-
-        if (isCookieError) {
+        if (
+          classification.retryable ||
+          shouldSmartRetry({
+            message: errorMsg,
+            attempt: retryAttempt,
+            maxAttempts: Number(settings.smartRetryAttempts || 3),
+            smartRetryEnabled: settings.smartRetry !== false,
+          })
+        ) {
+          const siteFailures = (siteRetryState.get(siteKey) || 0) + 1;
+          siteRetryState.set(siteKey, siteFailures);
+          const delayMs = computeSiteRetryDelayMs({
+            siteKey,
+            attempt: retryAttempt + 1,
+            siteFailures,
+          });
+          const nextRetryItemData = {
+            ...itemData,
+            retryCount: retryAttempt + 1,
+          };
+          downloadQueue.set(itemId, nextRetryItemData);
           sendMessageToClient(clientId, {
-            type: "error",
+            type: "status",
             message:
-              "Cookie file format error. Please re-upload your cookies.txt file via Settings → Import Cookies.",
+              classification.category === "rate_limit"
+                ? `Retrying in ${Math.ceil(delayMs / 1000)}s with rate-limit safe pacing (attempt ${retryAttempt + 1}/${Number(settings.smartRetryAttempts || 3)}).`
+                : `Retrying in ${Math.ceil(delayMs / 1000)}s due to a temporary ${siteKey} issue (attempt ${retryAttempt + 1}/${Number(settings.smartRetryAttempts || 3)}).`,
             itemId,
             source,
           });
-        } else if (isOptionError) {
-          sendMessageToClient(clientId, {
-            type: "error",
-            message:
-              "yt-dlp version is outdated. Please update via Settings → Update Tools.",
-            itemId,
-            source,
-          });
-        } else if (isAuthError) {
-          sendMessageToClient(clientId, {
-            type: "error",
-            message:
-              "This video requires login. Please import cookies via Settings → Import Cookies.",
-            itemId,
-            source,
-          });
-        } else {
-          sendMessageToClient(clientId, {
-            type: "error",
-            message: `Failed: ${error.message}`,
-            itemId,
-            source,
-          });
+          setTimeout(() => {
+            if (!downloadQueue.has(itemId)) {
+              return;
+            }
+            const runRetry = async () => {
+              await processVideo(clientId, itemId, nextRetryItemData);
+            };
+            if (itemData.isPlaylistItem) {
+              playlistItemProcessingLimit(runRetry);
+            } else {
+              singleVideoProcessingLimit(runRetry);
+            }
+          }, delayMs);
+          return;
         }
+
+        await storeFailedDownload(itemId, {
+          clientId,
+          videoUrl,
+          format,
+          quality,
+          source,
+          title: currentVideoTitle,
+          message: classification.userMessage || errorMsg,
+          failedAt: new Date().toISOString(),
+          attempt: retryAttempt,
+          siteKey,
+          playlistAction: itemData.isPlaylistItem ? "full" : "single",
+          concurrency: settings.concurrency || 1,
+          singleConcurrency: settings.singleConcurrency || 1,
+          settings,
+        });
+
+        sendMessageToClient(clientId, {
+          type: "error",
+          message: classification.userMessage || `Failed: ${error.message}`,
+          itemId,
+          source,
+        });
       } else {
         logger.info(
           `[${itemId}] Processing stopped due to cancellation for ${videoUrl}.`,
@@ -2652,7 +3366,7 @@ const env = loadEnv(process.env);
       return cachedCookiesPathResult.path;
     }
 
-    const cookiesDir = env.COOKIES_DIR || path.join(__dirname, "cookies");
+    const cookiesDir = env.COOKIES_DIR || path.join(writableDataRoot, "cookies");
     const cookiesPath = path.join(cookiesDir, "cookies.txt");
 
     if (!fs.existsSync(cookiesDir)) {
@@ -2798,6 +3512,7 @@ const env = loadEnv(process.env);
           currentVideoTitle = videoInfo.title || currentVideoTitle;
           itemProcInfo.title = currentVideoTitle;
           itemProcInfo.thumbnail = videoInfo.thumbnail; // Store thumbnail for complete message
+          markDirty();
 
           sendMessageToClient(clientId, {
             type: "item_info",
@@ -2870,6 +3585,7 @@ const env = loadEnv(process.env);
 
       // Store output template in process info for potential re-pause
       itemProcInfo.outputTemplate = outputTemplate;
+      markDirty();
 
       logger.info(`[${itemId}] 📁 Resume output template: ${outputTemplate}`);
 
@@ -3039,9 +3755,9 @@ const env = loadEnv(process.env);
 
         // Verify file exists
         if (fs.existsSync(finalPath)) {
-          const stats = fs.statSync(finalPath);
-          const fileSizeFormatted = formatBytes(stats.size);
-          const payload = downloadCompletionService.buildPayload({
+          const payload =
+            await downloadCompletionService.createPayloadFromFileStats({
+            expectedFormat: format,
             itemId,
             source,
             targetDir,
@@ -3049,14 +3765,12 @@ const env = loadEnv(process.env);
             itemData,
             itemProcInfo,
             title: currentVideoTitle,
-            message: `Download complete! ${fileSizeFormatted}`,
-            actualSize: fileSizeFormatted,
+            message: "Download complete!",
           });
-
-          downloadCompletionService.sendAndRecord(clientId, payload);
+          await downloadCompletionService.sendAndRecord(clientId, payload);
 
           logger.info(
-            `[${itemId}] ✅ Resume complete: ${finalPath} (${fileSizeFormatted})`,
+            `[${itemId}] ✅ Resume complete: ${finalPath} (${payload.actualSize})`,
           );
         } else {
           throw new Error("Output file not found after download");
@@ -3072,18 +3786,35 @@ const env = loadEnv(process.env);
           `[${itemId}] Resume download error:`,
           downloadError.message,
         );
+        const classification =
+          downloadError.classification ||
+          classifyRuntimeError({
+            hasCookies: downloadError.message?.toLowerCase().includes("cookie"),
+            message: downloadError.message,
+            siteKey: itemData.siteKey || getSiteKeyFromUrl(videoUrl),
+          });
         sendMessageToClient(clientId, {
           type: "error",
-          message: downloadError.message || "Resume failed",
+          message: classification.userMessage || downloadError.message || "Resume failed",
           itemId,
           source,
         });
       }
     } catch (error) {
       logger.error(`[${itemId}] processVideoWithResume error:`, error);
+      const classification =
+        error.classification ||
+        classifyRuntimeError({
+          hasCookies: error.message?.toLowerCase().includes("cookie"),
+          message: error.message,
+          siteKey: itemData.siteKey || getSiteKeyFromUrl(videoUrl),
+        });
       sendMessageToClient(clientId, {
         type: "error",
-        message: error.message || "Resume processing failed",
+        message:
+          classification.userMessage ||
+          error.message ||
+          "Resume processing failed",
         itemId,
         source,
       });
@@ -3100,8 +3831,88 @@ const env = loadEnv(process.env);
     suppressProgress = false,
     itemProcInfoRef = null,
   ) {
+    const candidateUrl =
+      itemProcInfoRef?.videoUrl ||
+      baseArgs.find((arg) => /^https?:\/\//i.test(String(arg))) ||
+      "";
+    const siteKey = detectSiteKeyFromUrl(candidateUrl, itemProcInfoRef?.source);
+    const isInfoOnly =
+      suppressProgress ||
+      baseArgs.includes("--print-json") ||
+      baseArgs.includes("--print");
+    const maxAttempts = siteKey === "youtube" ? (isInfoOnly ? 2 : 3) : 1;
+
+    let attempt = 0;
+    let lastError = null;
+    while (attempt < maxAttempts) {
+      attempt += 1;
+      siteRequestGuard.assertRequestAllowed(siteKey);
+      if (attempt > 1) {
+        await siteRequestGuard.waitForBackoff(siteKey, itemId);
+      }
+
+      try {
+        const result = await runSingleYtDlpCommand(
+          clientId,
+          baseArgs,
+          itemId,
+          suppressProgress,
+          itemProcInfoRef,
+        );
+        siteRequestGuard.recordSuccess(siteKey);
+        if (siteRetryState.has(siteKey)) {
+          siteRetryState.delete(siteKey);
+        }
+        return result;
+      } catch (error) {
+        const classification =
+          error.classification ||
+          classifyRuntimeError({
+            hasCookies: String(error.message || "")
+              .toLowerCase()
+              .includes("cookie"),
+            message: error.message,
+            siteKey,
+          });
+        error.classification = classification;
+        lastError = error;
+
+        if (!classification.shouldBackoff || attempt >= maxAttempts) {
+          break;
+        }
+
+        const backoff = siteRequestGuard.recordFailure(siteKey, classification);
+        if (!suppressProgress) {
+          sendMessageToClient(clientId, {
+            type: "status",
+            itemId,
+            message: backoff.openedCircuit
+              ? "YouTube protection opened a short cooldown to avoid further rate limiting."
+              : `YouTube rate limiting detected. Retrying in ${Math.ceil(
+                  backoff.retryDelayMs / 1000,
+                )}s...`,
+          });
+        }
+      }
+    }
+
+    throw lastError;
+  }
+
+  async function runSingleYtDlpCommand(
+    clientId,
+    baseArgs,
+    itemId,
+    suppressProgress = false,
+    itemProcInfoRef = null,
+  ) {
     logger.info(`[${itemId}] 🚀 Starting yt-dlp command...`);
 
+    const requestUrl =
+      itemProcInfoRef?.videoUrl ||
+      baseArgs.find((arg) => /^https?:\/\//i.test(String(arg))) ||
+      "";
+    const siteKey = detectSiteKeyFromUrl(requestUrl, itemProcInfoRef?.source);
     const isInfoOnly =
       suppressProgress ||
       baseArgs.includes("--print-json") ||
@@ -3695,9 +4506,11 @@ const env = loadEnv(process.env);
         if (currentProcInfo) currentProcInfo.ytdlpProc = null;
         if (!itemProcInfoRef) activeProcesses.delete(itemId);
         reject(
-          new Error(
-            `yt-dlp process failed to start (${ytdlpExecutable}): ${error.message}`,
-          ),
+          createClassifiedError({
+            code: "TOOLING",
+            message: `yt-dlp process failed to start (${ytdlpExecutable}): ${error.message}`,
+            siteKey,
+          }),
         );
       });
 
@@ -3885,7 +4698,15 @@ const env = loadEnv(process.env);
           logger.error(
             `[${itemId}] yt-dlp failed (code ${code}). Error: ${errorMsg}`,
           );
-          reject(new Error(errorMsg.substring(0, 400)));
+          reject(
+            createClassifiedError({
+              code: undefined,
+              hasCookies: cookieArgs.includes("--cookies"),
+              message: errorMsg.substring(0, 400),
+              stderr: stderrData,
+              siteKey,
+            }),
+          );
         }
       });
     });
@@ -3978,6 +4799,14 @@ const env = loadEnv(process.env);
     ffmpegExecutable,
     getVideoInfo,
     historyIndex,
+    getRecoverableDownloads,
+    getScheduledDownloads,
+    createScheduledDownload,
+    deleteScheduledDownload,
+    getFailedDownloads,
+    retryFailedDownload: queueFailedDownloadRetry,
+    retryAllFailedDownloads,
+    previewPlaylist,
     logger: logger,
   });
 
@@ -4073,6 +4902,20 @@ const env = loadEnv(process.env);
       logger.info("Auto-update interval cleared");
     }
 
+    for (const [, timer] of scheduledDownloadTimers.entries()) {
+      clearTimeout(timer);
+    }
+    scheduledDownloadTimers.clear();
+
+    const shutdownSnapshotPromise = snapshotRecoverableDownloadsForShutdown().catch(
+      (error) => {
+        logger.error(
+          "Failed to snapshot recoverable downloads on shutdown:",
+          error,
+        );
+      },
+    );
+
     wss.clients.forEach((clientWs) => {
       const clientEntry = Array.from(clients.entries()).find(
         ([id, cws]) => cws === clientWs,
@@ -4086,13 +4929,15 @@ const env = loadEnv(process.env);
       clientWs.terminate();
     });
 
-    server.close(() => {
+    server.close(async () => {
       logger.info("HTTP server closed.");
+      await shutdownSnapshotPromise;
       activeProcesses.forEach((procInfo, itemId) => {
         logger.info(
           `Terminating active processes for item: ${itemId} during shutdown.`,
         );
         procInfo.cancelled = true;
+        markDirty();
         if (
           procInfo.ytdlpProc &&
           procInfo.ytdlpProc.pid &&

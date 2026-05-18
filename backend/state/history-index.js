@@ -1,7 +1,6 @@
 "use strict";
 
-const fs = require("fs");
-const path = require("path");
+const { readJsonFile, writeJsonAtomic } = require("../utils/json-file");
 
 const HISTORY_INDEX_VERSION = 1;
 const MAX_HISTORY_ITEMS_PER_CLIENT = 500;
@@ -27,18 +26,10 @@ class HistoryIndex {
     }
 
     try {
-      let exists;
-      try {
-        await fs.promises.access(this.filePath);
-        exists = true;
-      } catch {
-        exists = false;
-      }
-      if (!exists) {
+      const raw = await readJsonFile(this.filePath, null);
+      if (!raw) {
         return;
       }
-
-      const raw = JSON.parse(await fs.promises.readFile(this.filePath, "utf8"));
       if (
         raw &&
         typeof raw === "object" &&
@@ -62,11 +53,7 @@ class HistoryIndex {
     }
 
     try {
-      await fs.promises.mkdir(path.dirname(this.filePath), { recursive: true });
-      await fs.promises.writeFile(
-        this.filePath,
-        JSON.stringify(this.state, null, 2),
-      );
+      await writeJsonAtomic(this.filePath, this.state);
     } catch (error) {
       this.logger.error("[HistoryIndex] Failed to save history index:", error);
     }

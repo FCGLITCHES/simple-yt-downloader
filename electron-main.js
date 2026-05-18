@@ -69,7 +69,7 @@ function getAutoLauncher() {
   }
   return autoLauncher;
 }
-const { fork } = require('child_process');
+const { fork, exec } = require('child_process');
 const fs = require('fs');
 const os = require('os'); // Required for os.platform()
 const net = require('net'); // Required for server readiness check
@@ -84,8 +84,13 @@ let tray = null; // System tray
 let activeDownloadCount = 0; // Track active downloads
 let powerSaveBlockerId = null; // Track power save blocker ID
 
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
+if (!gotSingleInstanceLock) {
+  app.quit();
+}
+
 // --- Determine Paths for Packaged App ---
-const isDev = process.env.NODE_ENV !== 'production';
+const isDev = !app.isPackaged && process.env.NODE_ENV !== 'production';
 
 let resourcesBinPath;
 let resourcesCookiesPath;
@@ -190,19 +195,54 @@ function waitForServer(port, maxAttempts = 100) {
   });
 }
 
+function migrateLegacyChromiumCookiesDirectory() {
+  const userDataPath = app.getPath('userData');
+  const cookiesStorePath = path.join(userDataPath, 'Cookies');
+  try {
+    if (!fs.existsSync(cookiesStorePath)) return;
+    const stats = fs.statSync(cookiesStorePath);
+    if (!stats.isDirectory()) return;
+    const backupPath = path.join(userDataPath, `Cookies.legacy-dir.${Date.now()}`);
+    fs.renameSync(cookiesStorePath, backupPath);
+    console.log(`[Startup] Renamed legacy Chromium Cookies directory to: ${backupPath}`);
+  } catch (error) {
+    console.warn(`[Startup] Unable to migrate legacy Chromium Cookies directory: ${error.message}`);
+  }
+}
+
+function isFirewallPermissionError(message = '') {
+  const normalized = String(message).toLowerCase();
+  return normalized.includes('access is denied') ||
+    normalized.includes('requires elevation') ||
+    normalized.includes('requested operation requires elevation') ||
+    normalized.includes('not have sufficient privilege');
+}
+
+function isRunningWithWindowsAdminRights() {
+  if (os.platform() !== 'win32') return Promise.resolve(false);
+  return new Promise((resolve) => {
+    exec('net session', { windowsHide: true }, (error) => {
+      resolve(!error);
+    });
+  });
+}
+
 /**
  * Automatically sets up a Windows Firewall rule for GetVideosLocally.
  * This runs seamlessly to ensure the backend server can communicate.
  */
-function setupFirewallRule() {
-  if (os.platform() !== 'win32') return;
+async function setupFirewallRule() {
+  if (os.platform() !== 'win32' || !app.isPackaged) return;
 
-  const appPath = isDev ? process.execPath : app.getPath('exe');
+  const appPath = app.getPath('exe');
   const ruleName = 'GetVideosLocally-Server-Access';
 
   console.log(`[Firewall] Application path for rule: ${appPath}`);
-
-  const { exec } = require('child_process');
+  const hasAdminRights = await isRunningWithWindowsAdminRights();
+  if (!hasAdminRights) {
+    console.log('[Firewall] Skipping automatic firewall rule setup (administrator privileges required).');
+    return;
+  }
 
   // Check if rule exists, and add it if not. We use the netsh command.
   // This might require admin privileges for some setups, but we try as best-effort.
@@ -215,7 +255,11 @@ function setupFirewallRule() {
       console.log(`[Firewall] Rule "${ruleName}" not found. Attempting to add...`);
       exec(addRuleCmd, (addError, stdout, stderr) => {
         if (addError) {
-          console.warn(`[Firewall] Could not add firewall rule automatically: ${addError.message}. This is usually due to lack of admin permissions.`);
+          if (isFirewallPermissionError(addError.message)) {
+            console.log('[Firewall] Skipping firewall rule setup due to insufficient privileges.');
+            return;
+          }
+          console.warn(`[Firewall] Could not add firewall rule automatically: ${addError.message}`);
         } else {
           console.log(`[Firewall] Successfully added firewall rule for: ${appPath}`);
         }
@@ -337,7 +381,9 @@ async function createWindow() {
   const lastState = loadWindowState();
 
   // Try to setup firewall rule on launch
-  setupFirewallRule();
+  setupFirewallRule().catch((error) => {
+    console.warn(`[Firewall] Setup attempt failed: ${error.message}`);
+  });
 
   try {
     console.log('Starting server...');
@@ -541,6 +587,7 @@ function startServer() {
           FFMPEG_PATH: ffmpegPath,
           NODE_BINARY: nodeBinaryPath,
           COOKIES_DIR: resourcesCookiesPath,
+          USER_DATA_PATH: app.getPath('userData'),
           ELECTRON_RUN_AS_NODE: '1'
         }
       }
@@ -589,6 +636,7 @@ function startServer() {
 
 app.on('ready', async () => {
   try {
+    migrateLegacyChromiumCookiesDirectory();
     await createWindow();
   } catch (error) {
     console.error('Failed to start application:', error);
@@ -722,6 +770,15 @@ app.on('activate', () => {
     }
     createWindow();
   }
+});
+
+app.on('second-instance', () => {
+  if (!mainWindow) return;
+  if (mainWindow.isMinimized()) {
+    mainWindow.restore();
+  }
+  mainWindow.show();
+  mainWindow.focus();
 });
 
 ipcMain.handle('dialog:openFolder', async () => {

@@ -15,6 +15,21 @@
     <link rel="stylesheet" href="./public/fontawesome/css/all.min.css">
     <link rel="stylesheet" href="/style.css">
     <link rel="icon" type="image/x-icon" href="/public/Logo.ico">
+    <script>
+        window.APP_VERSION = '3.0.0';
+        window.APP_CHANGELOG = {
+            version: '3.0.0',
+            title: "What's New in v3.0",
+            date: 'April 2026',
+            items: [
+                { icon: 'fa-compass', color: '#3498db', title: 'New Onboarding Experience', desc: 'The old tutorial modal was replaced with a guided setup flow for download location, format, and notifications.' },
+                { icon: 'fa-sliders', color: '#2ecc71', title: 'Cleaner Download Controls', desc: 'Advanced download controls are now tucked away until needed, keeping the main download form focused.' },
+                { icon: 'fa-gear', color: '#e74c3c', title: 'Smarter Settings Layout', desc: 'Settings were reorganized, subtitle fields now appear only when relevant, and controls are easier to scan.' },
+                { icon: 'fa-clock-rotate-left', color: '#f39c12', title: 'History & Safety Improvements', desc: 'History actions, labels, and bulk controls were refined to reduce accidental clicks and make video lists clearer.' },
+                { icon: 'fa-wand-magic-sparkles', color: '#9b59b6', title: 'Visual Polish & App Refresh', desc: 'Popups, spacing, branding, release notes, and other interface details were refreshed across the app, plus many more refinements.' }
+            ]
+        };
+    </script>
 
 </head>
 
@@ -100,7 +115,7 @@
 
                     <div class="options-grid">
                         <div class="form-group">
-                            <label for="format">Format:</label>
+                            <label for="format">Format</label>
                             <select id="format" class="select-field" aria-label="Select download format">
                                 <optgroup label="Video">
                                     <option value="mp4">MP4</option>
@@ -118,20 +133,8 @@
                             </select>
                         </div>
                         <div class="form-group">
-                            <label for="quality">Quality:</label>
+                            <label for="quality">Quality</label>
                             <select id="quality" class="select-field" aria-label="Select download quality"></select>
-                        </div>
-                    </div>
-
-                    <div class="form-group single-concurrency-options">
-                        <label>Single Video Downloads:</label>
-                        <div class="radio-group">
-                            <input type="radio" id="singleConcurrency1" name="singleConcurrency" value="1" checked>
-                            <label for="singleConcurrency1">1 at a time</label>
-                            <input type="radio" id="singleConcurrency3" name="singleConcurrency" value="3">
-                            <label for="singleConcurrency3">3 at a time</label>
-                            <input type="radio" id="singleConcurrency5" name="singleConcurrency" value="5">
-                            <label for="singleConcurrency5">5 at a time</label>
                         </div>
                     </div>
 
@@ -139,14 +142,14 @@
                         <h4>Playlist Detected</h4>
                         <p>This URL contains multiple videos. Choose how to proceed:</p>
                         <div class="form-group">
-                            <label for="playlistAction">Action:</label>
+                            <label for="playlistAction">Action</label>
                             <select id="playlistAction" class="select-field" aria-label="Playlist download action">
                                 <option value="single">Download Only This Video</option>
                                 <option value="full">Download Entire Playlist</option>
                             </select>
                         </div>
                         <div class="form-group is-hidden-initial" id="concurrencyGroup">
-                            <label for="concurrency">Playlist Concurrent Downloads:</label>
+                            <label for="concurrency">Concurrent downloads</label>
                             <select id="concurrency" class="select-field" aria-label="Playlist concurrent downloads">
                                 <option value="1">1 at a time</option>
                                 <option value="3" selected>3 at a time</option>
@@ -154,6 +157,34 @@
                             </select>
                         </div>
                     </div>
+
+<details id="advancedDownloadOptions" class="advanced-options-panel">
+                        <summary class="advanced-options-summary">
+                            <span>Advanced Options</span>
+                            <i class="fas fa-chevron-down" aria-hidden="true"></i>
+                        </summary>
+                        <div class="advanced-options-body">
+                            <div class="advanced-options-row">
+                                <div class="form-group">
+                                    <label for="singleConcurrencySelect">Concurrent downloads</label>
+                                    <select id="singleConcurrencySelect" class="select-field" aria-label="Number of concurrent downloads">
+                                        <option value="1" selected>1 at a time</option>
+                                        <option value="3">3 at a time</option>
+                                        <option value="5">5 at a time</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="download-plan-row">
+                                <label class="checkbox-label schedule-toggle-label" for="scheduleDownloadToggle">
+                                    <input type="checkbox" id="scheduleDownloadToggle" name="scheduleDownloadToggle">
+                                    <span>Schedule this download</span>
+                                </label>
+                                <input type="datetime-local" id="scheduleDownloadAt"
+                                    class="input-field schedule-download-input is-hidden-initial"
+                                    aria-label="Choose when to start this download">
+                            </div>
+                        </div>
+                    </details>
 
                     <button id="startYoutubeDownloadBtn" class="download-btn">
                         <i class="fas fa-download"></i>
@@ -202,6 +233,8 @@
                         <p class="empty-state-title">No downloads yet</p>
                         <p class="empty-state-subtitle">Paste a video URL above to get started</p>
                     </div>
+                    <button id="retryFailedDownloadsBtn" class="download-btn secondary-btn delete-all-bottom-btn is-hidden-initial"
+                        type="button" title="Retry all failed downloads"><i class="fas fa-rotate-right"></i> Retry Failed</button>
                     <button id="clearYoutubeDownloadsBtn" class="download-btn danger-btn delete-all-bottom-btn"
                         type="button" title="Delete all downloads"><i class="fas fa-trash"></i> Delete All</button>
                 </div>
@@ -326,7 +359,7 @@
                 title="Close settings">&times;</button>
             <h2><i class="fas fa-cog"></i> Settings</h2>
 
-            <div class="settings-layout">
+<div class="settings-layout">
                 <!-- Left Column -->
                 <div class="settings-column">
                     <div class="settings-section">
@@ -362,6 +395,48 @@
                     </div>
 
                     <div class="settings-section">
+                        <h3>Download Options</h3>
+                        <div class="setting-item checkbox-group">
+                            <input type="checkbox" id="numerateFiles" name="numerateFiles">
+                            <label for="numerateFiles">Number playlist files</label>
+                        </div>
+
+                        <div class="setting-item checkbox-group">
+                            <input type="checkbox" id="skipDuplicates" name="skipDuplicates">
+                            <label for="skipDuplicates">Skip duplicates</label>
+                        </div>
+
+                        <div id="subtitleSettingsGroup" class="subtitle-settings-group">
+                            <div class="setting-item">
+                                <label for="subtitleMode">Subtitles:</label>
+                                <select id="subtitleMode" class="select-field">
+                                    <option value="none">Do not download</option>
+                                    <option value="embed">Download and embed when supported</option>
+                                    <option value="separate">Download as separate files</option>
+                                </select>
+                            </div>
+                            <div id="subtitleLanguagesGroup" class="setting-item is-hidden-initial">
+                                <label for="subtitleLanguages">Subtitle languages:</label>
+                                <input type="text" id="subtitleLanguages" class="input-field"
+                                    placeholder="en.*,en">
+                            </div>
+                            <div id="autoCaptionsGroup" class="setting-item checkbox-group is-hidden-initial">
+                                <input type="checkbox" id="includeAutoCaptions" name="includeAutoCaptions">
+                                <label for="includeAutoCaptions">Allow auto-generated captions as fallback</label>
+                            </div>
+                        </div>
+                        <div class="setting-item">
+                            <small>💡 Tip: For best playback with Opus audio, we recommend
+                                <a href="https://mpc-hc.org/" target="_blank" rel="noopener noreferrer" class="tip-link-bold">Media Player
+                                    Classic</a>.
+                            </small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Column -->
+                <div class="settings-column">
+                    <div class="settings-section">
                         <h3>Appearance</h3>
                         <div class="setting-item">
                             <label for="themePreset">Theme:</label>
@@ -383,28 +458,6 @@
                             </div>
                         </div>
 
-                    </div>
-                </div>
-
-                <!-- Right Column -->
-                <div class="settings-column">
-                    <div class="settings-section">
-                        <h3>Download Options</h3>
-                        <div class="setting-item checkbox-group">
-                            <input type="checkbox" id="numerateFiles" name="numerateFiles">
-                            <label for="numerateFiles">Number playlist files</label>
-                        </div>
-
-                        <div class="setting-item checkbox-group">
-                            <input type="checkbox" id="skipDuplicates" name="skipDuplicates">
-                            <label for="skipDuplicates">Skip duplicates</label>
-                        </div>
-                        <div class="setting-item">
-                            <small>💡 Tip: For best playback with Opus audio, we recommend
-                                <a href="https://mpc-hc.org/" target="_blank" rel="noopener noreferrer">Media Player
-                                    Classic</a>.
-                            </small>
-                        </div>
                     </div>
 
                     <div class="settings-section">
@@ -488,7 +541,7 @@
             <!-- Action Buttons -->
             <div class="settings-actions">
                 <button id="openTutorialBtn" class="action-btn secondary">
-                    <i class="fas fa-graduation-cap"></i> Tutorial
+                    <i class="fas fa-graduation-cap"></i> Setup Guide
                 </button>
                 <button id="importCookiesBtn" class="action-btn secondary">
                     <i class="fas fa-cookie-bite"></i> Import Cookies
@@ -505,10 +558,17 @@
 
     <audio id="completionSound" src="./assets/notification.mp3" preload="auto"></audio>
 
-    <!-- Tutorial Modal -->
-    <div id="tutorialModal" class="tutorial-modal is-hidden-initial">
-        <div class="tutorial-modal-content">
-            <div id="tutorialContent"></div>
+    <!-- Onboarding Wizard -->
+    <div id="onboardingModal" class="onboarding-modal is-hidden-initial">
+        <div class="onboarding-modal-content">
+            <div id="onboardingContent"></div>
+        </div>
+    </div>
+
+    <!-- Update Available Modal -->
+    <div id="updateModal" class="onboarding-modal is-hidden-initial">
+        <div class="onboarding-modal-content" style="max-width: min(520px, calc(100vw - 2rem)); width: min(92vw, 520px);">
+            <div id="updateContent"></div>
         </div>
     </div>
 
@@ -579,6 +639,34 @@
                 <button id="supportModalNeverBtn" class="action-btn secondary" type="button">
                     <i class="fas fa-eye-slash"></i>
                     <span>Don't Show Again</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="playlistSelectionModal" class="modal is-hidden-initial" aria-hidden="true">
+        <div class="modal-content playlist-selection-modal">
+            <button id="closePlaylistSelectionBtn" class="modal-close-btn" aria-label="Close playlist selection"
+                title="Close playlist selection">&times;</button>
+            <h2><i class="fas fa-list-check"></i> Choose Playlist Items</h2>
+            <p id="playlistSelectionSummary" class="playlist-selection-summary">
+                Select the videos you want to queue before downloading the playlist.
+            </p>
+            <div class="playlist-selection-actions">
+                <button id="playlistSelectAllBtn" class="action-btn secondary" type="button">
+                    <i class="fas fa-check-double"></i> Select All
+                </button>
+                <button id="playlistClearSelectionBtn" class="action-btn secondary" type="button">
+                    <i class="fas fa-eraser"></i> Clear
+                </button>
+            </div>
+            <div id="playlistSelectionList" class="playlist-selection-list"></div>
+            <div class="playlist-selection-footer">
+                <button id="cancelPlaylistSelectionBtn" class="action-btn secondary" type="button">
+                    <i class="fas fa-times"></i> Cancel
+                </button>
+                <button id="confirmPlaylistSelectionBtn" class="action-btn primary" type="button">
+                    <i class="fas fa-download"></i> Queue Selected
                 </button>
             </div>
         </div>

@@ -16,6 +16,14 @@ function registerApiRoutes(
     ffmpegExecutable,
     getVideoInfo,
     historyIndex,
+    getRecoverableDownloads,
+    getScheduledDownloads,
+    createScheduledDownload,
+    deleteScheduledDownload,
+    getFailedDownloads,
+    retryFailedDownload,
+    retryAllFailedDownloads,
+    previewPlaylist,
     logger = require("../utils/logger").logger,
   },
 ) {
@@ -32,7 +40,7 @@ function registerApiRoutes(
 
     try {
       const data = await resend.emails.send({
-        from: "SimplyYTD App <onboarding@resend.dev>",
+        from: "GetVideosLocally <onboarding@resend.dev>",
         to: [process.env.SUPPORT_EMAIL || "youben2025@gmail.com"],
         subject: `[${type || "Support"}] ${subject || "No Subject"}`,
         reply_to: email,
@@ -49,7 +57,7 @@ function registerApiRoutes(
                                 <td align="center" style="padding: 40px 20px;">
                                     <div style="max-width: 500px; width: 100%; background: transparent;">
                                         <div style="text-align: center; margin-bottom: 40px;">
-                                            <img src="https://raw.githubusercontent.com/FCGLITCHES/simple-yt-downloader/main/assets/Logo%201.png" alt="SimplyYTD" style="width: 64px; height: auto; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.3);">
+                                            <img src="https://raw.githubusercontent.com/FCGLITCHES/simple-yt-downloader/main/assets/Logo%201.png" alt="GetVideosLocally" style="width: 64px; height: auto; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.3);">
                                             <h1 style="margin: 20px 0 5px; font-size: 20px; font-weight: 600; letter-spacing: -0.5px;">Support Request</h1>
                                             <p style="margin: 0; color: #64748b; font-size: 14px;">Incoming message from user</p>
                                         </div>
@@ -74,7 +82,7 @@ function registerApiRoutes(
                                                 <div style="font-size: 15px; line-height: 1.6; color: #e2e8f0; white-space: pre-wrap;">${message}</div>
                                             </div>
                                             <div style="padding: 20px 25px; background-color: #161725; border-top: 1px solid #2d3748; text-align: center;">
-                                                <a href="mailto:${email}?subject=${encodeURIComponent(`Re: [${type || "Support"}] ${subject || "No Subject"}`)}&body=${encodeURIComponent(`Hi,\n\nThanks for contacting SimplyYTD Support.\n\n[YOUR RESPONSE HERE]\n\nBest regards,\nSimplyYTD Team`)}" style="display: inline-block; background-color: #d60017; color: white; padding: 12px 32px; border-radius: 8px; text-decoration: none; font-size: 14px; font-weight: 600; transition: all 0.2s; box-shadow: 0 4px 12px rgba(214, 0, 23, 0.3);">
+                                                <a href="mailto:${email}?subject=${encodeURIComponent(`Re: [${type || "Support"}] ${subject || "No Subject"}`)}&body=${encodeURIComponent(`Hi,\n\nThanks for contacting GetVideosLocally Support.\n\n[YOUR RESPONSE HERE]\n\nBest regards,\nGetVideosLocally Team`)}" style="display: inline-block; background-color: #d60017; color: white; padding: 12px 32px; border-radius: 8px; text-decoration: none; font-size: 14px; font-weight: 600; transition: all 0.2s; box-shadow: 0 4px 12px rgba(214, 0, 23, 0.3);">
                                                     Reply to User
                                                 </a>
                                             </div>
@@ -124,6 +132,25 @@ function registerApiRoutes(
     }
   });
 
+  app.post("/playlist-preview", async (req, res) => {
+    const { url: playlistUrl, clientId } = req.body || {};
+    if (!playlistUrl || !clientId) {
+      return res
+        .status(400)
+        .json({ error: "Playlist URL and clientId are required." });
+    }
+
+    try {
+      const preview = await previewPlaylist(String(clientId), String(playlistUrl));
+      res.json(preview);
+    } catch (error) {
+      logger.error("Error in /playlist-preview:", error);
+      res
+        .status(500)
+        .json({ error: error.message || "Failed to preview playlist." });
+    }
+  });
+
   app.get("/history-index", (req, res) => {
     const clientId = req.query.clientId;
     if (!clientId) {
@@ -133,17 +160,125 @@ function registerApiRoutes(
     res.json(historyIndex.getClientHistory(String(clientId)));
   });
 
-  app.post("/history-index/sync", (req, res) => {
+  app.post("/history-index/sync", async (req, res) => {
     const { clientId, history } = req.body || {};
     if (!clientId) {
       return res.status(400).json({ error: "clientId is required" });
     }
 
-    const synced = historyIndex.syncClientHistory(
-      String(clientId),
-      Array.isArray(history) ? history : [],
-    );
-    res.json(synced);
+    try {
+      const synced = await historyIndex.syncClientHistory(
+        String(clientId),
+        Array.isArray(history) ? history : [],
+      );
+      res.json(synced);
+    } catch (error) {
+      logger.error("[HistoryIndex] Failed to sync client history:", error);
+      res.status(500).json({ error: "Failed to sync history index" });
+    }
+  });
+
+  app.get("/recoverable-downloads", (req, res) => {
+    const clientId = req.query.clientId;
+    if (!clientId) {
+      return res.status(400).json({ error: "clientId is required" });
+    }
+
+    res.json({
+      items: getRecoverableDownloads(String(clientId)),
+    });
+  });
+
+  app.get("/scheduled-downloads", (req, res) => {
+    const clientId = req.query.clientId;
+    if (!clientId) {
+      return res.status(400).json({ error: "clientId is required" });
+    }
+
+    res.json({
+      items: getScheduledDownloads(String(clientId)),
+    });
+  });
+
+  app.post("/scheduled-downloads", async (req, res) => {
+    const { clientId, ...requestData } = req.body || {};
+    if (!clientId) {
+      return res.status(400).json({ error: "clientId is required" });
+    }
+
+    try {
+      const scheduled = await createScheduledDownload(String(clientId), requestData);
+      res.json(scheduled);
+    } catch (error) {
+      logger.error("Error creating scheduled download:", error);
+      res
+        .status(500)
+        .json({ error: error.message || "Failed to create scheduled download." });
+    }
+  });
+
+  app.delete("/scheduled-downloads/:scheduleId", async (req, res) => {
+    const clientId = req.query.clientId;
+    const { scheduleId } = req.params;
+    if (!clientId || !scheduleId) {
+      return res.status(400).json({ error: "clientId and scheduleId are required" });
+    }
+
+    try {
+      const deleted = await deleteScheduledDownload(String(clientId), String(scheduleId));
+      res.json(deleted);
+    } catch (error) {
+      logger.error("Error deleting scheduled download:", error);
+      res
+        .status(500)
+        .json({ error: error.message || "Failed to delete scheduled download." });
+    }
+  });
+
+  app.get("/failed-downloads", (req, res) => {
+    const clientId = req.query.clientId;
+    if (!clientId) {
+      return res.status(400).json({ error: "clientId is required" });
+    }
+
+    res.json({
+      items: getFailedDownloads(String(clientId)),
+    });
+  });
+
+  app.post("/failed-downloads/:itemId/retry", async (req, res) => {
+    const { itemId } = req.params;
+    const { clientId } = req.body || {};
+    if (!clientId || !itemId) {
+      return res.status(400).json({ error: "clientId and itemId are required" });
+    }
+
+    try {
+      const result = await retryFailedDownload(String(clientId), String(itemId));
+      res.json(result);
+    } catch (error) {
+      logger.error("Error retrying failed download:", error);
+      res
+        .status(500)
+        .json({ error: error.message || "Failed to retry download." });
+    }
+  });
+
+  app.post("/failed-downloads/retry-all", async (req, res) => {
+    const { clientId } = req.body || {};
+    if (!clientId) {
+      return res.status(400).json({ error: "clientId is required" });
+    }
+
+    try {
+      const result = await retryAllFailedDownloads(String(clientId));
+      res.json(result);
+    } catch (error) {
+      logger.error("Error retrying all failed downloads:", error);
+      res
+        .status(500)
+        .json({ error: error.message || "Failed to retry failed downloads." });
+    }
   });
 
   app.post("/shutdown", (req, res) => {
@@ -247,7 +382,7 @@ function registerApiRoutes(
         },
       };
 
-      const output = `# SimplyYTD Diagnostics Bundle
+      const output = `# GetVideosLocally Diagnostics Bundle
 Generated: ${diagnostics.timestamp}
 
 ## Application Information

@@ -11,7 +11,7 @@ if (!['youtube', 'history'].includes(activeDownloader)) {
 let userSettings;
 let downloadItemsState;
 let isPowerSaveBlockerActive = false;
-const SUPPORT_POPUP_SESSION_KEY = 'supportPopupSessionShown';
+const SUPPORT_POPUP_LAST_VERSION_KEY = 'gvl_supportPopupLastShownVersion';
 const SUPPORT_DONATION_URL = 'https://donate.stripe.com/6oU00i73R6eh2yc0oU5AQ00';
 const LOCAL_THUMBNAIL_PLACEHOLDER = '/assets/thumbnail-placeholder.svg';
 const SETUP_HEALTH_RUN_KEY = 'gvlSetupHealthHasRun';
@@ -91,7 +91,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         };
 
-        window.SimplyYTDTelemetry = telemetry;
+        window.GetVideosLocallyTelemetry = telemetry;
         if (userSettings.errorTelemetry) {
             telemetry.enable();
         }
@@ -109,6 +109,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const playlistOptionsDiv = document.getElementById('playlistOptions');
     const playlistActionSelect = document.getElementById('playlistAction');
     const playlistConcurrencySelect = document.getElementById('concurrency');
+    const advancedDownloadOptions = document.getElementById('advancedDownloadOptions');
+    const scheduleDownloadToggle = document.getElementById('scheduleDownloadToggle');
+    const scheduleDownloadAt = document.getElementById('scheduleDownloadAt');
     const startYoutubeDownloadBtn = document.getElementById('startYoutubeDownloadBtn');
     const youtubeStatusDiv = document.getElementById('status');
     const failureHelpPanel = document.getElementById('failureHelpPanel');
@@ -121,6 +124,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const youtubeDownloadLinksArea = document.getElementById('downloadLinksArea');
     const emptyDownloadState = document.getElementById('emptyDownloadState');
     const clearYoutubeDownloadsBtn = document.getElementById('clearYoutubeDownloadsBtn');
+    const retryFailedDownloadsBtn = document.getElementById('retryFailedDownloadsBtn');
 
     if (emptyDownloadState) emptyDownloadState.style.display = 'flex';
     if (clearYoutubeDownloadsBtn) clearYoutubeDownloadsBtn.style.display = 'none';
@@ -146,6 +150,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const supportModalDonateBtn = document.getElementById('supportModalDonateBtn');
     const supportModalDismissBtn = document.getElementById('supportModalDismissBtn');
     const supportModalNeverBtn = document.getElementById('supportModalNeverBtn');
+    const playlistSelectionModal = document.getElementById('playlistSelectionModal');
+    const closePlaylistSelectionBtn = document.getElementById('closePlaylistSelectionBtn');
+    const playlistSelectionSummary = document.getElementById('playlistSelectionSummary');
+    const playlistSelectionList = document.getElementById('playlistSelectionList');
+    const playlistSelectAllBtn = document.getElementById('playlistSelectAllBtn');
+    const playlistClearSelectionBtn = document.getElementById('playlistClearSelectionBtn');
+    const confirmPlaylistSelectionBtn = document.getElementById('confirmPlaylistSelectionBtn');
+    const cancelPlaylistSelectionBtn = document.getElementById('cancelPlaylistSelectionBtn');
 
     const maxSpeedInput = document.getElementById('maxSpeed');
     const numerateFilesCheckbox = document.getElementById('numerateFiles');
@@ -154,6 +166,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const notificationSoundCheckbox = document.getElementById('notificationSound');
     const notificationPopupCheckbox = document.getElementById('notificationPopup');
     const keepPcAwakeCheckbox = document.getElementById('keepPcAwake');
+const subtitleModeSelect = document.getElementById('subtitleMode');
+    const subtitleLanguagesInput = document.getElementById('subtitleLanguages');
+const includeAutoCaptionsCheckbox = document.getElementById('includeAutoCaptions');
     const speedUnitDisplaySelect = document.getElementById('speedUnitDisplay');
     const resetSpeedBtn = document.getElementById('resetSpeedBtn');
     const downloadFolderInput = document.getElementById('downloadFolder');
@@ -172,6 +187,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const previewInfoCache = new Map();
     const pendingPreviewRequests = new Map();
     const PREVIEW_INFO_CACHE_TTL = 5 * 60 * 1000;
+    let pendingPlaylistSelectionRequest = null;
 
     const importCookiesBtn = document.getElementById('importCookiesBtn');
     if (importCookiesBtn) {
@@ -1263,6 +1279,15 @@ document.addEventListener('DOMContentLoaded', () => {
         removeBtn.onclick = () => handleRemoveDownloadItem(itemId, source);
         controlButtonsDiv.appendChild(removeBtn);
 
+        const retryBtn = document.createElement('button');
+        retryBtn.className = 'item-control-btn item-retry-btn';
+        retryBtn.innerHTML = '<i class="fas fa-rotate-right"></i>';
+        retryBtn.title = 'Retry this download';
+        retryBtn.setAttribute('aria-label', 'Retry this download');
+        retryBtn.style.display = 'none';
+        retryBtn.onclick = () => handleRetryDownload(itemId);
+        controlButtonsDiv.appendChild(retryBtn);
+
         buttonsDiv.appendChild(controlButtonsDiv);
 
         // Cancel button (below control buttons)
@@ -1289,7 +1314,8 @@ document.addEventListener('DOMContentLoaded', () => {
             domElement: itemDiv,
             isPlaylist: isPlaylistItem, // Store the playlist flag
             thumbnailEl: thumbnailImg,
-            lastAnnouncedProgressBucket: -1
+            lastAnnouncedProgressBucket: -1,
+            retryable: false
         });
 
         updateDownloadStats();
@@ -1492,6 +1518,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const itemState = downloadItemsState.get(itemId);
             if (itemState) {
                 itemState.status = 'complete';
+                itemState.retryable = false;
             }
 
             // Force progress bar to 100% before hiding
@@ -1563,16 +1590,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Update download stats
             updateDownloadStats();
+            updateRetryFailedButtonVisibility();
         }
     }
 
     function updateDownloadItemError(itemId, errorMessage, source) {
         const itemDiv = document.getElementById(`item-${itemId}`);
+        const itemState = downloadItemsState.get(itemId);
         if (itemDiv) {
             updateDownloadItemStatus(itemId, `Error: ${errorMessage}`, source, 'error');
             disableCancelButton(itemId, source);
+            if (itemState) {
+                itemState.retryable = true;
+            }
             showActionButtons(itemId);
         }
+        updateRetryFailedButtonVisibility();
         showFailureHelp(errorMessage);
     }
 
@@ -1610,7 +1643,15 @@ document.addEventListener('DOMContentLoaded', () => {
         progressUpdateCache.delete(`progressBar-${itemId}`);
         progressUpdateCache.delete(`progressBarContainer-${itemId}`);
         updateDownloadStats();
+        updateRetryFailedButtonVisibility();
         console.log(`Removed item ${itemId} from UI and state.`);
+    }
+
+    function updateRetryFailedButtonVisibility() {
+        if (!retryFailedDownloadsBtn) return;
+        const hasRetryableItems = Array.from(downloadItemsState.values()).some((item) => item.retryable === true);
+        setElementHiddenState(retryFailedDownloadsBtn, !hasRetryableItems);
+        retryFailedDownloadsBtn.style.display = hasRetryableItems ? 'inline-flex' : 'none';
     }
 
     function showActionButtons(itemId) {
@@ -1618,6 +1659,37 @@ document.addEventListener('DOMContentLoaded', () => {
         if (itemDiv) {
             const removeBtn = itemDiv.querySelector('.item-remove-btn');
             if (removeBtn) removeBtn.style.display = 'inline-flex';
+            const retryBtn = itemDiv.querySelector('.item-retry-btn');
+            const itemState = downloadItemsState.get(itemId);
+            if (retryBtn) {
+                retryBtn.style.display = itemState?.retryable ? 'inline-flex' : 'none';
+            }
+        }
+    }
+
+    async function handleRetryDownload(itemId) {
+        try {
+            const response = await window.localApiAuth.authorizedFetch(`/failed-downloads/${encodeURIComponent(itemId)}/retry`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ clientId })
+            });
+            if (!response.ok) {
+                const data = await response.json().catch(() => ({}));
+                throw new Error(data.error || `Retry failed with ${response.status}`);
+            }
+            const itemState = downloadItemsState.get(itemId);
+            if (itemState) {
+                itemState.retryable = false;
+                itemState.status = 'queued';
+            }
+            handleRemoveDownloadItem(itemId, 'youtube');
+            updateRetryFailedButtonVisibility();
+            showStatus('Retry requested...', 'youtube', 'success');
+        } catch (error) {
+            showStatus(`Could not retry download: ${error.message}`, 'youtube', 'error');
         }
     }
 
@@ -1737,7 +1809,162 @@ document.addEventListener('DOMContentLoaded', () => {
         return requestPromise;
     }
 
-    async function startDownloadCommon(url, format, quality, source, playlistActionVal, concurrencyVal, singleConcurrencyVal) {
+    async function fetchPlaylistPreview(url) {
+        const response = await window.localApiAuth.authorizedFetch('/playlist-preview', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                url,
+                clientId
+            })
+        });
+        if (!response.ok) {
+            const data = await response.json().catch(() => ({}));
+            throw new Error(data.error || `Playlist preview failed with ${response.status}`);
+        }
+        return response.json();
+    }
+
+    function renderPlaylistSelectionItems(preview) {
+        if (!playlistSelectionList) return;
+        playlistSelectionList.innerHTML = '';
+        preview.items.forEach((item) => {
+            const label = document.createElement('label');
+            label.className = 'playlist-selection-item';
+
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.value = item.id;
+            checkbox.checked = true;
+            checkbox.dataset.playlistId = item.id;
+
+            const text = document.createElement('span');
+            text.textContent = `${item.index + 1}. ${item.title}`;
+
+            label.append(checkbox, text);
+            playlistSelectionList.appendChild(label);
+        });
+    }
+
+    function getSelectedPlaylistItemIds() {
+        if (!playlistSelectionList) return [];
+        return Array.from(playlistSelectionList.querySelectorAll('input[type="checkbox"]:checked'))
+            .map((checkbox) => checkbox.value);
+    }
+
+    async function openPlaylistSelectionFlow(requestPayload) {
+        const preview = await fetchPlaylistPreview(requestPayload.url);
+        pendingPlaylistSelectionRequest = requestPayload;
+        if (playlistSelectionSummary) {
+            playlistSelectionSummary.textContent = `${preview.title} • ${preview.items.length} item${preview.items.length === 1 ? '' : 's'} found.`;
+        }
+        renderPlaylistSelectionItems(preview);
+        if (playlistSelectionModal) {
+            openModalWithFocus(playlistSelectionModal, closePlaylistSelectionBtn || confirmPlaylistSelectionBtn);
+        }
+    }
+
+    function closePlaylistSelectionFlow() {
+        pendingPlaylistSelectionRequest = null;
+        if (playlistSelectionModal) {
+            closeModalWithFocusRestore(playlistSelectionModal);
+        }
+        if (playlistSelectionList) {
+            playlistSelectionList.innerHTML = '';
+        }
+    }
+
+    function createScheduledDownloadItem(schedule) {
+        const itemId = schedule.scheduleId;
+        createDownloadItemStructure(itemId, schedule.title || 'Scheduled download', schedule.source || 'youtube', schedule.playlistAction === 'full');
+        updateDownloadItemStatus(itemId, `Scheduled for ${new Date(schedule.scheduledFor).toLocaleString()}`, schedule.source || 'youtube', 'info');
+        const itemState = downloadItemsState.get(itemId);
+        if (itemState) {
+            itemState.status = 'scheduled';
+            itemState.scheduleId = schedule.scheduleId;
+            itemState.retryable = false;
+        }
+        const itemDiv = document.getElementById(`item-${itemId}`);
+        if (itemDiv) {
+            const pausePlayBtn = itemDiv.querySelector('.item-pause-play-btn');
+            const retryBtn = itemDiv.querySelector('.item-retry-btn');
+            const cancelBtn = itemDiv.querySelector('.item-cancel-btn');
+            const removeBtn = itemDiv.querySelector('.item-remove-btn');
+            if (pausePlayBtn) pausePlayBtn.style.display = 'none';
+            if (retryBtn) retryBtn.style.display = 'none';
+            if (removeBtn) removeBtn.style.display = 'inline-flex';
+            if (cancelBtn) {
+                cancelBtn.textContent = 'Cancel Schedule';
+                cancelBtn.onclick = () => handleDeleteScheduledDownload(schedule.scheduleId);
+            }
+        }
+    }
+
+    async function loadRecoverableDownloads() {
+        try {
+            const [recoverableResponse, scheduledResponse, failedResponse] = await Promise.all([
+                window.localApiAuth.authorizedFetch(`/recoverable-downloads?clientId=${encodeURIComponent(clientId)}`),
+                window.localApiAuth.authorizedFetch(`/scheduled-downloads?clientId=${encodeURIComponent(clientId)}`),
+                window.localApiAuth.authorizedFetch(`/failed-downloads?clientId=${encodeURIComponent(clientId)}`)
+            ]);
+
+            if (recoverableResponse.ok) {
+                const data = await recoverableResponse.json();
+                (data.items || []).forEach((item) => {
+                    createDownloadItemStructure(item.itemId, item.title || 'Recoverable download', item.source || 'youtube', item.isPlaylistItem);
+                    updateDownloadItemStatus(item.itemId, 'Paused. Ready to resume after restart.', item.source || 'youtube', 'info');
+                    const itemState = downloadItemsState.get(item.itemId);
+                    if (itemState) {
+                        itemState.status = 'paused';
+                    }
+                    const itemDiv = document.getElementById(`item-${item.itemId}`);
+                    const pausePlayBtn = itemDiv?.querySelector('.item-pause-play-btn');
+                    if (pausePlayBtn) {
+                        pausePlayBtn.style.display = 'inline-flex';
+                        pausePlayBtn.innerHTML = '<i class="fas fa-play"></i>';
+                        pausePlayBtn.title = 'Resume download';
+                    }
+                });
+            }
+
+            if (scheduledResponse.ok) {
+                const data = await scheduledResponse.json();
+                (data.items || []).forEach((schedule) => {
+                    createScheduledDownloadItem(schedule);
+                });
+            }
+
+            if (failedResponse.ok) {
+                const data = await failedResponse.json();
+                (data.items || []).forEach((failed) => {
+                    createDownloadItemStructure(failed.itemId, failed.title || 'Failed download', failed.source || 'youtube', false);
+                    updateDownloadItemError(failed.itemId, failed.message || 'Download failed', failed.source || 'youtube');
+                });
+            }
+            updateRetryFailedButtonVisibility();
+        } catch (error) {
+            console.warn('Could not load recoverable download state:', error);
+        }
+    }
+
+    async function handleDeleteScheduledDownload(scheduleId) {
+        try {
+            const response = await window.localApiAuth.authorizedFetch(`/scheduled-downloads/${encodeURIComponent(scheduleId)}?clientId=${encodeURIComponent(clientId)}`, {
+                method: 'DELETE'
+            });
+            if (!response.ok) {
+                const data = await response.json().catch(() => ({}));
+                throw new Error(data.error || `Schedule delete failed with ${response.status}`);
+            }
+            handleRemoveDownloadItem(scheduleId, 'youtube');
+        } catch (error) {
+            showStatus(`Could not cancel scheduled download: ${error.message}`, 'youtube', 'error');
+        }
+    }
+
+    async function startDownloadCommon(url, format, quality, source, playlistActionVal, concurrencyVal, singleConcurrencyVal, options = {}) {
         const statusDiv = youtubeStatusDiv;
         if (!url) {
             if (statusDiv) showStatus('Please paste a URL.', source, 'error');
@@ -1768,9 +1995,40 @@ document.addEventListener('DOMContentLoaded', () => {
             playlistAction: playlistActionVal,
             concurrency: concurrencyVal,
             singleConcurrency: singleConcurrencyVal,
+            selectedPlaylistItems: Array.isArray(options.selectedPlaylistItems) ? options.selectedPlaylistItems : [],
             ...userSettings,
             downloadFolder: getDownloadFolder()
         };
+        const scheduledFor = scheduleDownloadToggle?.checked ? scheduleDownloadAt?.value : '';
+        if (scheduledFor) {
+            payload.scheduledFor = scheduledFor;
+            payload.previewTitle = youtubeUrlInput?.value?.trim() || url;
+            const response = await window.localApiAuth.authorizedFetch('/scheduled-downloads', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            });
+            if (!response.ok) {
+                const data = await response.json().catch(() => ({}));
+                throw new Error(data.error || `Scheduling failed with ${response.status}`);
+            }
+            const scheduled = await response.json();
+            createScheduledDownloadItem({
+                scheduleId: scheduled.scheduleId,
+                scheduledFor: scheduled.scheduledFor,
+                title: payload.previewTitle,
+                source,
+                format,
+                quality,
+                playlistAction: playlistActionVal
+            });
+            if (statusDiv) {
+                showStatus(`Download scheduled for ${new Date(scheduled.scheduledFor).toLocaleString()}.`, source, 'success');
+            }
+            return;
+        }
         const normalizedUrl = normalizePreviewUrl(url);
         if (source === 'youtube' && isPreviewableUrl(normalizedUrl) && !isLikelyPlaylistUrl(normalizedUrl) && !getCachedPreviewInfo(normalizedUrl)) {
             fetchVideoInfo(normalizedUrl, source, { showErrors: false }).catch((error) => {
@@ -1809,15 +2067,32 @@ document.addEventListener('DOMContentLoaded', () => {
             const url = youtubeUrlInput.value.trim();
             const format = formatSelect.value;
             const qualityVal = qualitySelect.value;
-            const singleConcurrencyRadio = document.querySelector('input[name="singleConcurrency"]:checked');
-            const singleConcurrency = singleConcurrencyRadio ? singleConcurrencyRadio.value : '1';
+            const singleConcurrencySelect = document.getElementById('singleConcurrencySelect');
+            const singleConcurrency = singleConcurrencySelect ? singleConcurrencySelect.value : '1';
             // Check if playlist options are visible (detected by detectPlaylist function)
             const isPlaylist = playlistOptionsDiv && playlistOptionsDiv.style.display !== 'none';
             const playlistAction = isPlaylist && playlistActionSelect ? playlistActionSelect.value : 'single';
             const concurrency = isPlaylist && playlistAction === 'full' && playlistConcurrencySelect ? playlistConcurrencySelect.value : 1;
 
             // Use 'youtube' source for backwards compatibility, but backend will handle all sites uniformly
-            startDownloadCommon(url, format, qualityVal, 'youtube', playlistAction, parseInt(concurrency), parseInt(singleConcurrency));
+            const requestPayload = {
+                url,
+                format,
+                quality: qualityVal,
+                source: 'youtube',
+                playlistAction,
+                concurrency: parseInt(concurrency),
+                singleConcurrency: parseInt(singleConcurrency)
+            };
+            try {
+                if (isPlaylist && playlistAction === 'full') {
+                    await openPlaylistSelectionFlow(requestPayload);
+                    return;
+                }
+                await startDownloadCommon(url, format, qualityVal, 'youtube', playlistAction, parseInt(concurrency), parseInt(singleConcurrency));
+            } catch (error) {
+                showStatus(`Could not start download: ${error.message}`, 'youtube', 'error');
+            }
         };
     }
 
@@ -1912,6 +2187,58 @@ document.addEventListener('DOMContentLoaded', () => {
         if (initialConcurrencyGroup) {
             initialConcurrencyGroup.style.display = playlistActionSelect.value === 'full' ? 'block' : 'none';
         }
+    }
+
+    if (scheduleDownloadToggle && scheduleDownloadAt) {
+        scheduleDownloadToggle.addEventListener('change', () => {
+            const showScheduler = scheduleDownloadToggle.checked === true;
+            if (showScheduler && advancedDownloadOptions) {
+                advancedDownloadOptions.open = true;
+            }
+            setElementHiddenState(scheduleDownloadAt, !showScheduler);
+            scheduleDownloadAt.style.display = showScheduler ? 'block' : 'none';
+            if (showScheduler && !scheduleDownloadAt.value) {
+                const defaultDate = new Date(Date.now() + 15 * 60 * 1000);
+                const localValue = new Date(defaultDate.getTime() - defaultDate.getTimezoneOffset() * 60000)
+                    .toISOString()
+                    .slice(0, 16);
+                scheduleDownloadAt.value = localValue;
+            }
+        });
+
+        const showScheduler = scheduleDownloadToggle.checked === true;
+        if (advancedDownloadOptions && showScheduler) {
+            advancedDownloadOptions.open = true;
+        }
+        setElementHiddenState(scheduleDownloadAt, !showScheduler);
+        scheduleDownloadAt.style.display = showScheduler ? 'block' : 'none';
+    }
+
+    if (retryFailedDownloadsBtn) {
+        retryFailedDownloadsBtn.addEventListener('click', async () => {
+            try {
+                const response = await window.localApiAuth.authorizedFetch('/failed-downloads/retry-all', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ clientId })
+                });
+                if (!response.ok) {
+                    const data = await response.json().catch(() => ({}));
+                    throw new Error(data.error || `Retry all failed with ${response.status}`);
+                }
+                Array.from(downloadItemsState.entries()).forEach(([itemId, item]) => {
+                    if (item.retryable) {
+                        handleRemoveDownloadItem(itemId, 'youtube');
+                    }
+                });
+                updateRetryFailedButtonVisibility();
+                showStatus('Retrying all failed downloads...', 'youtube', 'success');
+            } catch (error) {
+                showStatus(`Could not retry failed downloads: ${error.message}`, 'youtube', 'error');
+            }
+        });
     }
 
     // --- Tab Management ---
@@ -2028,7 +2355,12 @@ document.addEventListener('DOMContentLoaded', () => {
             autoUpdateTools: true, // Enable auto-updates by default
             errorTelemetry: false, // Opt-in error telemetry (default: disabled for privacy)
             startWithWindows: false, // Start app with Windows (default: disabled)
-            supportPopupDisabled: false
+            supportPopupDisabled: false,
+subtitleMode: 'none',
+            subtitleLanguages: 'en.*,en',
+includeAutoCaptions: false,
+            smartRetry: true,
+            smartRetryAttempts: 3
         };
         const storedSettings = localStorage.getItem('ytdUserSettings');
         let settings = storedSettings ? JSON.parse(storedSettings) : { ...defaults };
@@ -2066,7 +2398,12 @@ document.addEventListener('DOMContentLoaded', () => {
             autoUpdateTools: autoUpdateToolsCheckbox ? autoUpdateToolsCheckbox.checked : true,
             errorTelemetry: errorTelemetryCheckbox ? errorTelemetryCheckbox.checked : false,
             startWithWindows: newStartWithWindows,
-            supportPopupDisabled: userSettings.supportPopupDisabled === true
+            supportPopupDisabled: userSettings.supportPopupDisabled === true,
+subtitleMode: subtitleModeSelect ? subtitleModeSelect.value : 'none',
+            subtitleLanguages: subtitleLanguagesInput ? subtitleLanguagesInput.value.trim() || 'en.*,en' : 'en.*,en',
+includeAutoCaptions: includeAutoCaptionsCheckbox ? includeAutoCaptionsCheckbox.checked : false,
+            smartRetry: true,
+            smartRetryAttempts: 3
         };
         localStorage.setItem('ytdUserSettings', JSON.stringify(userSettings));
 
@@ -2126,11 +2463,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // Update telemetry based on user preference
-        if (window.SimplyYTDTelemetry) {
+        if (window.GetVideosLocallyTelemetry) {
             if (userSettings.errorTelemetry) {
-                window.SimplyYTDTelemetry.enable();
+                window.GetVideosLocallyTelemetry.enable();
             } else {
-                window.SimplyYTDTelemetry.disable();
+                window.GetVideosLocallyTelemetry.disable();
             }
         }
 
@@ -2194,6 +2531,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (downloadFolderInput) downloadFolderInput.value = userSettings.downloadFolder || '';
         if (skipDeleteConfirmationCheckbox) skipDeleteConfirmationCheckbox.checked = userSettings.skipDeleteConfirmation;
         if (themePresetSelect) themePresetSelect.value = userSettings.themePreset;
+if (subtitleModeSelect) subtitleModeSelect.value = userSettings.subtitleMode || 'none';
+        if (subtitleLanguagesInput) subtitleLanguagesInput.value = userSettings.subtitleLanguages || 'en.*,en';
+if (includeAutoCaptionsCheckbox) includeAutoCaptionsCheckbox.checked = userSettings.includeAutoCaptions === true;
 
         // Handle Windows startup checkbox - fetch actual state from system
         const startWithWindowsCheckbox = document.getElementById('startWithWindows');
@@ -2256,13 +2596,26 @@ document.addEventListener('DOMContentLoaded', () => {
         saveSettingsBtn.onclick = saveSettings;
     }
 
-    // Tutorial button
+    // Subtitle mode toggle: hide languages & auto-captions when set to "none"
+    function updateSubtitleVisibility() {
+        const mode = subtitleModeSelect ? subtitleModeSelect.value : 'none';
+        const langGroup = document.getElementById('subtitleLanguagesGroup');
+        const autoGroup = document.getElementById('autoCaptionsGroup');
+        if (langGroup) langGroup.classList.toggle('is-hidden-initial', mode === 'none');
+        if (autoGroup) autoGroup.classList.toggle('is-hidden-initial', mode === 'none');
+    }
+    if (subtitleModeSelect) {
+        subtitleModeSelect.addEventListener('change', updateSubtitleVisibility);
+        updateSubtitleVisibility();
+    }
+
+    // Setup Guide button
     const openTutorialBtn = document.getElementById('openTutorialBtn');
     if (openTutorialBtn) {
         openTutorialBtn.onclick = () => {
             if (settingsModal) settingsModal.style.display = 'none';
-            if (window.openTutorial) {
-                window.openTutorial(0);
+            if (window.openOnboarding) {
+                window.openOnboarding();
             }
         };
     }
@@ -2572,12 +2925,12 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    function markSupportPopupShownForSession() {
-        sessionStorage.setItem(SUPPORT_POPUP_SESSION_KEY, 'true');
+    function markSupportPopupShownForCurrentVersion() {
+        localStorage.setItem(SUPPORT_POPUP_LAST_VERSION_KEY, getCurrentAppVersion());
     }
 
-    function hasSupportPopupBeenShownThisSession() {
-        return sessionStorage.getItem(SUPPORT_POPUP_SESSION_KEY) === 'true';
+    function hasSupportPopupBeenShownForCurrentVersion() {
+        return localStorage.getItem(SUPPORT_POPUP_LAST_VERSION_KEY) === getCurrentAppVersion();
     }
 
     function closeSupportPopup() {
@@ -2588,9 +2941,9 @@ document.addEventListener('DOMContentLoaded', () => {
     function showSupportPopupIfEligible() {
         if (!supportModal) return;
         if (userSettings.supportPopupDisabled === true) return;
-        if (hasSupportPopupBeenShownThisSession()) return;
+        if (hasSupportPopupBeenShownForCurrentVersion()) return;
 
-        markSupportPopupShownForSession();
+        markSupportPopupShownForCurrentVersion();
         openModalWithFocus(supportModal, supportModalDonateBtn || closeSupportModalBtn);
     }
 
@@ -2632,6 +2985,54 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    if (playlistSelectionModal) {
+        const closeSelection = () => closePlaylistSelectionFlow();
+        closePlaylistSelectionBtn?.addEventListener('click', closeSelection);
+        cancelPlaylistSelectionBtn?.addEventListener('click', closeSelection);
+        playlistSelectAllBtn?.addEventListener('click', () => {
+            playlistSelectionList?.querySelectorAll('input[type="checkbox"]').forEach((checkbox) => {
+                checkbox.checked = true;
+            });
+        });
+        playlistClearSelectionBtn?.addEventListener('click', () => {
+            playlistSelectionList?.querySelectorAll('input[type="checkbox"]').forEach((checkbox) => {
+                checkbox.checked = false;
+            });
+        });
+        confirmPlaylistSelectionBtn?.addEventListener('click', async () => {
+            if (!pendingPlaylistSelectionRequest) {
+                closePlaylistSelectionFlow();
+                return;
+            }
+            const selectedIds = getSelectedPlaylistItemIds();
+            if (selectedIds.length === 0) {
+                showStatus('Select at least one playlist item before queueing.', 'youtube', 'error');
+                return;
+            }
+            const request = pendingPlaylistSelectionRequest;
+            closePlaylistSelectionFlow();
+            try {
+                await startDownloadCommon(
+                    request.url,
+                    request.format,
+                    request.quality,
+                    request.source,
+                    request.playlistAction,
+                    request.concurrency,
+                    request.singleConcurrency,
+                    { selectedPlaylistItems: selectedIds }
+                );
+            } catch (error) {
+                showStatus(`Could not queue selected playlist items: ${error.message}`, 'youtube', 'error');
+            }
+        });
+        playlistSelectionModal.addEventListener('click', (event) => {
+            if (event.target === playlistSelectionModal) {
+                closeSelection();
+            }
+        });
+    }
+
     // --- Logo Click Handler ---
     const logoContainer = document.querySelector('.logo-container');
     if (logoContainer) {
@@ -2649,6 +3050,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (document.getElementById('youtubeDownloader')) {
         showTab(activeDownloader);
+        void loadRecoverableDownloads();
     } else if (contactUsTab) {
         showTab('youtube');
     }
@@ -3227,6 +3629,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let historyIndexSyncedFromLocal = false;
     let historyIndexLoadPromise = null;
     let historyIndexSyncPromise = null;
+    let historyIndexRevision = 0;
 
     function readStoredHistory() {
         return JSON.parse(localStorage.getItem('ytdHistory') || '[]');
@@ -3242,16 +3645,20 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         historyIndexLoadPromise = (async () => {
+            const requestRevision = historyIndexRevision;
             try {
-            const response = await window.localApiAuth.authorizedFetch(`/history-index?clientId=${encodeURIComponent(clientId)}`);
+                const response = await window.localApiAuth.authorizedFetch(`/history-index?clientId=${encodeURIComponent(clientId)}`);
                 if (!response.ok) {
                     throw new Error(`History index request failed with ${response.status}`);
                 }
 
                 const data = await response.json();
-                backendHistoryItems = Array.isArray(data.items) ? data.items : [];
+                const nextBackendItems = Array.isArray(data.items) ? data.items : [];
+                if (requestRevision === historyIndexRevision || !Array.isArray(backendHistoryItems)) {
+                    backendHistoryItems = nextBackendItems;
+                }
                 historyIndexHydrated = true;
-                return backendHistoryItems;
+                return Array.isArray(backendHistoryItems) ? backendHistoryItems : nextBackendItems;
             } catch (error) {
                 console.debug('History index fetch fallback:', error.message);
                 return null;
@@ -3263,7 +3670,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return historyIndexLoadPromise;
     }
 
-    async function syncHistoryIndexToBackend(historyItems = readStoredHistory()) {
+    async function syncHistoryIndexToBackend(historyItems = readStoredHistory(), revision = historyIndexRevision) {
         try {
             const response = await window.localApiAuth.authorizedFetch('/history-index/sync', {
                 method: 'POST',
@@ -3281,18 +3688,22 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             const data = await response.json();
-            backendHistoryItems = Array.isArray(data.items) ? data.items : historyItems;
+            const nextBackendItems = Array.isArray(data.items) ? data.items : historyItems;
+            if (revision === historyIndexRevision) {
+                backendHistoryItems = nextBackendItems;
+                historyIndexHydrated = true;
+            }
             historyIndexHydrated = true;
             historyIndexSyncedFromLocal = true;
-            return backendHistoryItems;
+            return Array.isArray(backendHistoryItems) ? backendHistoryItems : nextBackendItems;
         } catch (error) {
             console.debug('History index sync fallback:', error.message);
             return historyItems;
         }
     }
 
-    function queueHistoryIndexSync(historyItems = readStoredHistory()) {
-        historyIndexSyncPromise = syncHistoryIndexToBackend(historyItems)
+    function queueHistoryIndexSync(historyItems = readStoredHistory(), revision = historyIndexRevision) {
+        historyIndexSyncPromise = syncHistoryIndexToBackend(historyItems, revision)
             .catch(() => historyItems)
             .finally(() => {
                 historyIndexSyncPromise = null;
@@ -3303,8 +3714,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function persistStoredHistory(historyItems, { refresh = true } = {}) {
         const nextHistory = Array.isArray(historyItems) ? historyItems.slice(0, 500) : [];
+        historyIndexRevision += 1;
         localStorage.setItem('ytdHistory', JSON.stringify(nextHistory));
-        queueHistoryIndexSync(nextHistory);
+        backendHistoryItems = nextHistory.slice();
+        historyIndexHydrated = true;
+        queueHistoryIndexSync(nextHistory, historyIndexRevision);
         if (refresh) {
             filterAndRenderHistory();
         }
@@ -3830,12 +4244,14 @@ document.addEventListener('DOMContentLoaded', () => {
         bulkSelectionMode = !bulkSelectionMode;
         const bulkActionsDiv = document.getElementById('historyBulkActions');
         const bulkSelectBtn = document.getElementById('bulkSelectBtn');
+        const clearHistoryBtn = document.getElementById('clearHistoryBtn');
         if (bulkSelectionMode) {
             if (bulkActionsDiv) bulkActionsDiv.style.display = 'flex';
             if (bulkSelectBtn) {
                 bulkSelectBtn.innerHTML = '<i class="fas fa-times"></i> Exit Bulk';
                 bulkSelectBtn.classList.add('danger-btn');
             }
+            if (clearHistoryBtn) clearHistoryBtn.style.display = 'none';
             applyBulkMode();
         } else {
             if (bulkActionsDiv) bulkActionsDiv.style.display = 'none';
@@ -3843,6 +4259,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 bulkSelectBtn.innerHTML = '<i class="fas fa-check-square"></i> Bulk Select';
                 bulkSelectBtn.classList.remove('danger-btn');
             }
+            if (clearHistoryBtn) clearHistoryBtn.style.display = '';
             removeBulkMode();
         }
     }
@@ -4586,10 +5003,167 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // ===== TUTORIAL SYSTEM =====
-    initTutorial();
+    // ===== ONBOARDING WIZARD SYSTEM =====
+    initOnboarding();
+
+    // ===== UPDATE CHECK SYSTEM =====
+    initUpdateCheck();
 
     // ===== SCROLL TO TOP BUTTON =====
+
+    // ===== UPDATE CHECK & CHANGELOG SYSTEM =====
+const UPDATE_LAST_SEEN_KEY = 'gvl_lastSeenVersion';
+const UPDATE_POPUP_DELAY_MS = 2500;
+const DEFAULT_APP_VERSION = '3.0.0';
+const FALLBACK_APP_CHANGELOG = {
+    version: DEFAULT_APP_VERSION,
+    title: "What's New in v3.0",
+    date: 'April 2026',
+    items: [
+        { icon: 'fa-compass', color: '#3498db', title: 'New Onboarding Experience', desc: 'The old tutorial modal was replaced with a guided setup flow for download location, format, and notifications.' },
+        { icon: 'fa-sliders', color: '#2ecc71', title: 'Cleaner Download Controls', desc: 'Advanced download controls are now tucked away until needed, keeping the main download form focused.' },
+        { icon: 'fa-gear', color: '#e74c3c', title: 'Smarter Settings Layout', desc: 'Settings were reorganized, subtitle fields now appear only when relevant, and controls are easier to scan.' },
+        { icon: 'fa-clock-rotate-left', color: '#f39c12', title: 'History & Safety Improvements', desc: 'History actions, labels, and bulk controls were refined to reduce accidental clicks and make video lists clearer.' },
+        { icon: 'fa-wand-magic-sparkles', color: '#9b59b6', title: 'Visual Polish & App Refresh', desc: 'Popups, spacing, branding, release notes, and other interface details were refreshed across the app, plus many more refinements.' }
+    ]
+};
+let updatePopupTimer = null;
+
+function getCurrentAppVersion() {
+    const rawVersion = typeof window.APP_VERSION === 'string' ? window.APP_VERSION.trim() : '';
+    return rawVersion || DEFAULT_APP_VERSION;
+}
+
+function getValidAppChangelog() {
+    const changelog = window.APP_CHANGELOG || FALLBACK_APP_CHANGELOG;
+    if (!changelog || !Array.isArray(changelog.items) || changelog.items.length === 0) {
+        return FALLBACK_APP_CHANGELOG;
+    }
+
+    const normalizedItems = changelog.items
+        .filter(item => item && typeof item === 'object')
+        .map((item) => ({
+            icon: String(item.icon || 'fa-circle-info'),
+            color: String(item.color || '#3498db'),
+            title: String(item.title || 'Update'),
+            desc: String(item.desc || 'Latest improvements are now available.')
+        }));
+
+    return {
+        version: String(changelog.version || getCurrentAppVersion()),
+        title: String(changelog.title || `What's New in v${getCurrentAppVersion()}`),
+        date: String(changelog.date || ''),
+        items: normalizedItems.length > 0 ? normalizedItems : FALLBACK_APP_CHANGELOG.items
+    };
+}
+
+function showLatestChangesPopup(options = {}) {
+    const immediate = options.immediate === true;
+    const force = options.force === true;
+    const version = getCurrentAppVersion();
+    const lastSeen = localStorage.getItem(UPDATE_LAST_SEEN_KEY);
+
+    if (!force && lastSeen === version) {
+        return false;
+    }
+
+    const changelog = getValidAppChangelog();
+    window.clearTimeout(updatePopupTimer);
+
+    const openPopup = () => showUpdatePopup(changelog, version, UPDATE_LAST_SEEN_KEY);
+    if (immediate) {
+        openPopup();
+    } else {
+        updatePopupTimer = window.setTimeout(openPopup, UPDATE_POPUP_DELAY_MS);
+    }
+
+    return true;
+}
+
+function initUpdateCheck() {
+    showLatestChangesPopup();
+}
+
+window.resetLastSeenVersion = function resetLastSeenVersion() {
+    localStorage.removeItem(UPDATE_LAST_SEEN_KEY);
+    const currentValue = localStorage.getItem(UPDATE_LAST_SEEN_KEY);
+    console.log(`[UpdateCheck] ${UPDATE_LAST_SEEN_KEY} reset. Current value:`, currentValue);
+    return currentValue;
+};
+
+window.showLatestChangesPopup = function showLatestChangesPopupFromConsole() {
+    const shown = showLatestChangesPopup({ immediate: true, force: true });
+    console.log(`[UpdateCheck] Forced popup trigger result: ${shown ? 'shown' : 'skipped'}`);
+    return shown;
+};
+
+function showUpdatePopup(changelog, version, storageKey) {
+    const modal = document.getElementById('updateModal');
+    const content = document.getElementById('updateContent');
+    if (!modal || !content) return;
+
+    const itemsHtml = changelog.items.map(item => `
+        <div class="update-item">
+            <div class="update-item-icon" style="background: ${item.color}15; color: ${item.color};">
+                <i class="fas ${item.icon}"></i>
+            </div>
+            <div class="update-item-text">
+                <div class="update-item-title">${item.title}</div>
+                <div class="update-item-desc">${item.desc}</div>
+            </div>
+        </div>
+    `).join('');
+
+    content.innerHTML = `
+        <div class="onboarding-progress-bar">
+            <div class="onboarding-progress-fill" style="width: 100%; background: linear-gradient(90deg, #2ecc71, #27ae60);"></div>
+        </div>
+        <div class="onboarding-scroll-area">
+            <div class="onboarding-step-view">
+                <div class="onboarding-success-icon" style="background: linear-gradient(135deg, #9b59b6, #8e44ad);">
+                    <i class="fas fa-arrow-up-from-bracket"></i>
+                </div>
+                <h2 class="onboarding-step-title">${changelog.title}</h2>
+                <p class="onboarding-step-subtitle">You've been updated to version ${version}. Here's what's new.</p>
+                <div class="update-items-list">
+                    ${itemsHtml}
+                </div>
+            </div>
+        </div>
+        <div class="onboarding-nav-bar">
+            <div class="onboarding-nav-info">v${version}</div>
+            <div class="onboarding-nav-actions">
+                <button class="onboarding-btn primary" id="updateDismissBtn">Got it</button>
+            </div>
+        </div>
+    `;
+
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+
+    modal.onclick = (e) => {
+        if (e.target === modal) dismissUpdate(modal, storageKey, version);
+    };
+
+    document.getElementById('updateDismissBtn')?.addEventListener('click', () => {
+        dismissUpdate(modal, storageKey, version);
+    });
+
+    document.addEventListener('keydown', function handler(e) {
+        if (e.key === 'Escape' && modal.style.display === 'flex') {
+            dismissUpdate(modal, storageKey, version);
+            document.removeEventListener('keydown', handler);
+        }
+    });
+}
+
+function dismissUpdate(modal, storageKey, version) {
+    modal.style.display = 'none';
+    document.body.style.overflow = '';
+    localStorage.setItem(storageKey, version);
+}
+
+// ===== SCROLL TO TOP BUTTON =====
     initScrollToTop();
 });
 
@@ -4621,483 +5195,482 @@ function initScrollToTop() {
     toggleScrollButton();
 }
 
-// Tutorial System
-// Tutorial System
-// Tutorial System
-function initTutorial() {
-    const tutorialModal = document.getElementById('tutorialModal');
-    const tutorialContent = document.getElementById('tutorialContent');
-    // closeTutorialBtn removed - now dynamically created in renderStep
+// Onboarding Wizard System
+function initOnboarding() {
+    const modal = document.getElementById('onboardingModal');
+    const content = document.getElementById('onboardingContent');
 
-    if (!tutorialModal || !tutorialContent) return;
+    if (!modal || !content) return;
 
     let currentStep = 0;
 
-    const tutorialSteps = [
-        {
-            title: 'Welcome to SimplyYTD',
-            subtitle: 'Let\'s get you ready for high-quality downloads.',
-            images: [
-                './assets/Tutorial Three 1-1.png'
-            ],
-            content: `
-                <div class="tutorial-content-box primary-border">
-                    <div class="tutorial-section-title"><i class="fas fa-rocket"></i> Fast & Clean</div>
-                    <p>SimplyYTD is pre-configured with all necessary tools (yt-dlp & FFmpeg). No extra installations required!</p>
-                    <ul class="tutorial-step-list">
-                        <li class="tutorial-step-item">
-                            <span class="step-bullet">1</span>
-                            <span>Paste a video URL</span>
-                        </li>
-                    </ul>
-                </div>
-            `
-        },
-        {
-            title: 'Set Download Location',
-            subtitle: 'Choose where your videos and music will be saved.',
-            images: [
-                './assets/Tutorial One 1-2.png',
-                './assets/Tutorial One 2-2.png'
-            ],
-            content: `
-                <div class="tutorial-content-box">
-                    <div class="tutorial-section-title"><i class="fas fa-folder-open"></i> Essential Setup</div>
-                    <ul class="tutorial-step-list">
-                        <li class="tutorial-step-item">
-                            <span class="step-bullet">1</span>
-                            <span>Go to <strong class="tutorial-action-link" data-action="openSettings">Settings</strong> <i class="fas fa-cog"></i></span>
-                        </li>
-                        <li class="tutorial-step-item">
-                            <span class="step-bullet">2</span>
-                            <span>Click <strong>Choose</strong> under Download Location</span>
-                        </li>
-                        <li class="tutorial-step-item">
-                            <span class="step-bullet">3</span>
-                            <span>Select your folder & hit <strong>Save Settings</strong></span>
-                        </li>
-                    </ul>
-                </div>
-            `
-        },
-        {
-            title: 'Authentication Setup',
-            subtitle: 'For content you have permission to access.',
-            images: [
-                './assets/Tutorial Two 1-3.png',
-                './assets/Tutorial Two 2-3.png',
-                './assets/Tutorial Two 3-3.png'
-            ],
-            content: `
-                <div class="tutorial-content-box highlight-border">
-                    <div class="tutorial-section-title"><i class="fas fa-cookie-bite"></i> Using Authentication</div>
-                    <p style="margin-bottom: 10px; font-size: 0.95rem; opacity: 0.9;"><strong>Optional:</strong> Some content requires authentication. To process content you have permission to access:</p>
-                    <ul class="tutorial-step-list">
-                        <li class="tutorial-step-item"><span class="step-bullet">1</span> Click <strong class="tutorial-action-link" data-action="openImportCookies">Import Cookies</strong> in Settings</li>
-                        <li class="tutorial-step-item"><span class="step-bullet">2</span> Export a <strong>cookies.txt</strong> file from your browser (using an extension)</li>
-                        <li class="tutorial-step-item"><span class="step-bullet">3</span> Upload it here and click <strong>Save Cookies</strong></li>
-                    </ul>
-                    <div class="tutorial-tip">💡 Only use this feature for content you have proper authorization to access.</div>
-                </div>
-            `
-        },
-        {
-            title: 'Ready to Get Started!',
-            subtitle: 'You\'re all set to use the video processing features.',
-            images: [
-                './assets/Tutorial Three 1-1.png'
-            ],
-            content: `
-                <div class="tutorial-content-box">
-                    <div class="tutorial-section-title"><i class="fas fa-check-circle"></i> Final Tips</div>
-                    <ul class="tutorial-step-list">
-                        <li class="tutorial-step-item">
-                            <span class="step-bullet"><i class="fas fa-bolt"></i></span>
-                            <span>Select <strong>Highest Quality</strong> for the best experience</span>
-                        </li>
-                        <li class="tutorial-step-item">
-                            <span class="step-bullet"><i class="fas fa-history"></i></span>
-                            <span>Manage all your files in the <strong>History</strong> tab</span>
-                        </li>
-                    </ul>
-                    <button class="tutorial-btn primary download-now-tutorial-btn" style="width: 100%; margin-top: 15px;" data-action="goToDownload">Let's Go!</button>
-                </div>
-            `
-        }
+    const onboardingState = {
+        downloadFolder: '',
+        format: 'mp4',
+        quality: 'highest',
+        notifications: { sound: true, desktop: false }
+    };
+
+    const TOTAL_STEPS = 5;
+
+    const steps = [
+        { id: 'welcome' },
+        { id: 'location' },
+        { id: 'format' },
+        { id: 'notifications' },
+        { id: 'complete' }
     ];
 
-    // Image popup functionality
-    function createImagePopup() {
-        // Remove existing popup if any to avoid duplicates
-        const existingPopup = document.querySelector('.image-popup-modal');
-        if (existingPopup) existingPopup.remove();
-
-        const popup = document.createElement('div');
-        popup.className = 'image-popup-modal';
-        popup.innerHTML = `
-            <div class="image-popup-content">
-                <button class="image-popup-close" aria-label="Close image">&times;</button>
-                <img class="image-popup-img" src="" alt="Full size image" />
-                <button class="image-popup-prev" aria-label="Previous image"><i class="fas fa-chevron-left"></i></button>
-                <button class="image-popup-next" aria-label="Next image"><i class="fas fa-chevron-right"></i></button>
-            </div>
-        `;
-        document.body.appendChild(popup);
-
-        let currentImageIndex = 0;
-        let currentImages = [];
-
-        function openPopup(images, index) {
-            currentImages = images;
-            currentImageIndex = index;
-            const img = popup.querySelector('.image-popup-img');
-            img.src = images[index];
-            popup.style.display = 'flex';
-            document.body.style.overflow = 'hidden';
-            updateButtons();
-        }
-
-        function closePopup() {
-            popup.style.display = 'none';
-            document.body.style.overflow = '';
-        }
-
-        function updateButtons() {
-            const prevBtn = popup.querySelector('.image-popup-prev');
-            const nextBtn = popup.querySelector('.image-popup-next');
-            if (currentImages.length <= 1) {
-                prevBtn.style.display = 'none';
-                nextBtn.style.display = 'none';
-            } else {
-                prevBtn.style.display = 'flex';
-                nextBtn.style.display = 'flex';
-            }
-        }
-
-        function showNext() {
-            if (currentImages.length === 0) return;
-            currentImageIndex = (currentImageIndex + 1) % currentImages.length;
-            popup.querySelector('.image-popup-img').src = currentImages[currentImageIndex];
-        }
-
-        function showPrev() {
-            if (currentImages.length === 0) return;
-            currentImageIndex = (currentImageIndex - 1 + currentImages.length) % currentImages.length;
-            popup.querySelector('.image-popup-img').src = currentImages[currentImageIndex];
-        }
-
-        popup.querySelector('.image-popup-close').onclick = closePopup;
-        popup.querySelector('.image-popup-next').onclick = showNext;
-        popup.querySelector('.image-popup-prev').onclick = showPrev;
-        popup.onclick = (e) => {
-            if (e.target === popup) closePopup();
-        };
-
-        document.addEventListener('keydown', (e) => {
-            if (popup.style.display === 'flex') {
-                if (e.key === 'Escape') closePopup();
-                if (e.key === 'ArrowRight') showNext();
-                if (e.key === 'ArrowLeft') showPrev();
-            }
-        });
-
-        // Touch/swipe support
-        let touchStartX = 0;
-        let touchEndX = 0;
-
-        popup.addEventListener('touchstart', (e) => {
-            touchStartX = e.changedTouches[0].screenX;
-        });
-
-        popup.addEventListener('touchend', (e) => {
-            touchEndX = e.changedTouches[0].screenX;
-            const swipeThreshold = 50;
-            const diff = touchStartX - touchEndX;
-            if (Math.abs(diff) > swipeThreshold) {
-                if (diff > 0) {
-                    showNext();
-                } else {
-                    showPrev();
-                }
-            }
-        });
-
-        return { openPopup };
+    function flashHighlight(element, duration = 1500) {
+        if (!element) return;
+        element.classList.add('onboarding-flash-highlight');
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        setTimeout(() => {
+            element.classList.remove('onboarding-flash-highlight');
+        }, duration);
     }
 
-    const imagePopup = createImagePopup();
-
-    function createCarousel(images, stepIndex) {
-        if (!images || images.length === 0) return '';
-
-        // Store images data for event delegation
-        const imagesJson = JSON.stringify(images);
-
-        if (images.length === 1) {
-            return `
-                <div class="tutorial-carousel-container">
-                    <img src="${images[0]}" class="tutorial-carousel-img" alt="Tutorial Image" 
-                         data-images='${imagesJson}' data-index="0" data-popup="true">
-                </div>
-            `;
+    function getFolderDisplay() {
+        const input = document.getElementById('downloadFolder');
+        if (input && input.value) {
+            onboardingState.downloadFolder = input.value;
+            return input.value;
         }
+        const saved = localStorage.getItem('downloadFolder');
+        if (saved) {
+            onboardingState.downloadFolder = saved;
+            return saved;
+        }
+        return 'Downloads folder';
+    }
 
-        const carouselId = `carousel-${stepIndex}`;
+    function shortenPath(path, maxLen = 45) {
+        if (!path || path.length <= maxLen) return path;
+        return '...' + path.slice(-(maxLen - 3));
+    }
 
+    function renderWelcome() {
         return `
-            <div class="tutorial-carousel-container" id="${carouselId}" data-images='${imagesJson}'>
-                <div class="tutorial-carousel-track">
-                    ${images.map((img, idx) => `
-                        <div class="tutorial-carousel-slide">
-                            <img src="${img}" class="tutorial-carousel-img" alt="Slide ${idx + 1}" 
-                                 data-images='${imagesJson}' data-index="${idx}" data-popup="true">
+            <div class="onboarding-progress-bar">
+                <div class="onboarding-progress-fill" style="width: 20%"></div>
+            </div>
+            <div class="onboarding-step-indicators">
+                ${steps.map((_, i) => `<div class="onboarding-step-dot ${i === 0 ? 'active' : ''}" data-step="${i}"></div>`).join('')}
+            </div>
+            <div class="onboarding-scroll-area">
+                <div class="onboarding-step-view">
+                    <div class="onboarding-welcome-icon">
+                        <i class="fas fa-play"></i>
+                    </div>
+                    <h2 class="onboarding-step-title">Welcome to GetVideosLocally</h2>
+                    <p class="onboarding-step-subtitle">Download videos and audio from 1,000+ supported sites. Fast, private, and entirely on your computer.</p>
+                    <div class="onboarding-features">
+                        <div class="onboarding-feature-card">
+                            <div class="onboarding-feature-icon"><i class="fas fa-bolt"></i></div>
+                            <div class="onboarding-feature-text">Fast downloads with yt-dlp & FFmpeg</div>
                         </div>
-                    `).join('')}
+                        <div class="onboarding-feature-card">
+                            <div class="onboarding-feature-icon"><i class="fas fa-shield-halved"></i></div>
+                            <div class="onboarding-feature-text">100% local &mdash; nothing leaves your machine</div>
+                        </div>
+                        <div class="onboarding-feature-card">
+                            <div class="onboarding-feature-icon"><i class="fas fa-music"></i></div>
+                            <div class="onboarding-feature-text">Video (MP4, MKV) &amp; audio (MP3, FLAC)</div>
+                        </div>
+                        <div class="onboarding-feature-card">
+                            <div class="onboarding-feature-icon"><i class="fas fa-list"></i></div>
+                            <div class="onboarding-feature-text">Full playlist support with batch download</div>
+                        </div>
+                    </div>
                 </div>
-
-                <div class="tutorial-carousel-indicators">
-                    ${images.map((_, idx) => `
-                        <div class="carousel-dot ${idx === 0 ? 'active' : ''}" data-carousel="${carouselId}" data-slide="${idx}"></div>
-                    `).join('')}
+            </div>
+            <div class="onboarding-nav-bar">
+                <div class="onboarding-nav-info">Step 1 of ${TOTAL_STEPS}</div>
+                <div class="onboarding-nav-actions">
+                    <button class="onboarding-btn ghost" data-action="skip">Skip setup</button>
+                    <button class="onboarding-btn primary" data-action="next">Get Started <i class="fas fa-arrow-right"></i></button>
                 </div>
             </div>
         `;
     }
 
-    // Carousel and image popup event delegation
-    function setupCarouselEvents() {
-        document.addEventListener('click', (e) => {
-            // Handle carousel navigation buttons
-            const navBtn = e.target.closest('.carousel-nav-btn');
-            if (navBtn) {
-                e.preventDefault();
-                e.stopPropagation();
-                const carouselId = navBtn.dataset.carousel;
-                const direction = parseInt(navBtn.dataset.dir);
-                if (carouselId && !isNaN(direction)) {
-                    moveSlide(carouselId, direction);
-                }
-                return;
-            }
-
-            // Handle carousel dot indicators
-            const dot = e.target.closest('.carousel-dot');
-            if (dot) {
-                e.preventDefault();
-                e.stopPropagation();
-                const carouselId = dot.dataset.carousel;
-                const slideIndex = parseInt(dot.dataset.slide);
-                if (carouselId && !isNaN(slideIndex)) {
-                    goToSlide(carouselId, slideIndex);
-                }
-                return;
-            }
-
-            // Handle image popup clicks
-            const img = e.target.closest('[data-popup="true"]');
-            if (img) {
-                e.preventDefault();
-                e.stopPropagation();
-                try {
-                    const images = JSON.parse(img.dataset.images);
-                    const index = parseInt(img.dataset.index) || 0;
-                    if (images && images.length > 0) {
-                        imagePopup.openPopup(images, index);
-                    }
-                } catch (err) {
-                    console.error('Error opening image popup:', err);
-                }
-                return;
-            }
-        });
+    function renderLocation() {
+        const currentFolder = getFolderDisplay();
+        const shortFolder = shortenPath(currentFolder);
+        return `
+            <div class="onboarding-progress-bar">
+                <div class="onboarding-progress-fill" style="width: 40%"></div>
+            </div>
+            <div class="onboarding-step-indicators">
+                ${steps.map((_, i) => `<div class="onboarding-step-dot ${i === 1 ? 'active' : ''} ${i < 1 ? 'completed' : ''}" data-step="${i}"></div>`).join('')}
+            </div>
+            <div class="onboarding-scroll-area">
+                <div class="onboarding-step-view">
+                    <div class="onboarding-welcome-icon" style="background: linear-gradient(135deg, #3498db, #2980b9);">
+                        <i class="fas fa-folder-open"></i>
+                    </div>
+                    <h2 class="onboarding-step-title">Where should we save your downloads?</h2>
+                    <p class="onboarding-step-subtitle">Choose a folder on your computer. You can always change this later in Settings.</p>
+                    <div class="onboarding-form">
+                        <div class="onboarding-form-group">
+                            <label for="onboardingFolder">Download location</label>
+                            <div class="onboarding-folder-row">
+                                <input type="text" id="onboardingFolder" class="input-field" readonly value="${shortFolder}" />
+                                <button class="action-btn" id="onboardingChooseFolder" type="button" style="height:44px">
+                                    <i class="fas fa-folder-open"></i> Choose
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="onboarding-tip">
+                        <i class="fas fa-lightbulb"></i>
+                        <span>We'll create the folder for you if it doesn't exist yet.</span>
+                    </div>
+                </div>
+            </div>
+            <div class="onboarding-nav-bar">
+                <div class="onboarding-nav-info">Step 2 of ${TOTAL_STEPS}</div>
+                <div class="onboarding-nav-actions">
+                    <button class="onboarding-btn outline" data-action="prev"><i class="fas fa-arrow-left"></i> Back</button>
+                    <button class="onboarding-btn primary" data-action="next">Continue <i class="fas fa-arrow-right"></i></button>
+                </div>
+            </div>
+        `;
     }
 
-    // Helper functions for carousel
-    function moveSlide(carouselId, direction) {
-        const container = document.getElementById(carouselId);
-        if (!container) return;
-        const dots = container.querySelectorAll('.carousel-dot');
-        const totalSlides = dots.length;
-        let currentIndex = 0;
-        dots.forEach((dot, index) => {
-            if (dot.classList.contains('active')) currentIndex = index;
-        });
-
-        let newIndex = currentIndex + direction;
-        if (newIndex < 0) newIndex = totalSlides - 1;
-        if (newIndex >= totalSlides) newIndex = 0;
-
-        goToSlide(carouselId, newIndex);
+    function renderFormat() {
+        const currentFormat = document.getElementById('format')?.value || onboardingState.format;
+        return `
+            <div class="onboarding-progress-bar">
+                <div class="onboarding-progress-fill" style="width: 60%"></div>
+            </div>
+            <div class="onboarding-step-indicators">
+                ${steps.map((_, i) => `<div class="onboarding-step-dot ${i === 2 ? 'active' : ''} ${i < 2 ? 'completed' : ''}" data-step="${i}"></div>`).join('')}
+            </div>
+            <div class="onboarding-scroll-area">
+                <div class="onboarding-step-view">
+                    <div class="onboarding-welcome-icon" style="background: linear-gradient(135deg, #9b59b6, #8e44ad);">
+                        <i class="fas fa-sliders"></i>
+                    </div>
+                    <h2 class="onboarding-step-title">What do you download most?</h2>
+                    <p class="onboarding-step-subtitle">Pick your go-to format. You can switch anytime.</p>
+                    <div class="onboarding-choices" id="onboardingFormatChoices">
+                        <div class="onboarding-choice-card ${currentFormat === 'mp4' ? 'selected' : ''}" data-format="mp4">
+                            <div class="onboarding-choice-icon"><i class="fas fa-film"></i></div>
+                            <div class="onboarding-choice-label">MP4 Video</div>
+                            <div class="onboarding-choice-desc">Best for video, widely compatible</div>
+                        </div>
+                        <div class="onboarding-choice-card ${currentFormat === 'mp3' ? 'selected' : ''}" data-format="mp3">
+                            <div class="onboarding-choice-icon"><i class="fas fa-music"></i></div>
+                            <div class="onboarding-choice-label">MP3 Audio</div>
+                            <div class="onboarding-choice-desc">Music & podcasts</div>
+                        </div>
+                        <div class="onboarding-choice-card ${currentFormat === 'mkv' ? 'selected' : ''}" data-format="mkv">
+                            <div class="onboarding-choice-icon"><i class="fas fa-file-video"></i></div>
+                            <div class="onboarding-choice-label">MKV Video</div>
+                            <div class="onboarding-choice-desc">Open format, multi-track</div>
+                        </div>
+                        <div class="onboarding-choice-card ${currentFormat === 'flac' ? 'selected' : ''}" data-format="flac">
+                            <div class="onboarding-choice-icon"><i class="fas fa-headphones"></i></div>
+                            <div class="onboarding-choice-label">FLAC Audio</div>
+                            <div class="onboarding-choice-desc">Lossless quality, bigger files</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="onboarding-nav-bar">
+                <div class="onboarding-nav-info">Step 3 of ${TOTAL_STEPS}</div>
+                <div class="onboarding-nav-actions">
+                    <button class="onboarding-btn outline" data-action="prev"><i class="fas fa-arrow-left"></i> Back</button>
+                    <button class="onboarding-btn primary" data-action="next">Continue <i class="fas fa-arrow-right"></i></button>
+                </div>
+            </div>
+        `;
     }
 
-    function goToSlide(carouselId, index) {
-        const container = document.getElementById(carouselId);
-        if (!container) return;
-        const track = container.querySelector('.tutorial-carousel-track');
-        if (track) {
-            track.style.transform = `translateX(-${index * 100}%)`;
-        }
-        const dots = container.querySelectorAll('.carousel-dot');
-        dots.forEach(d => d.classList.remove('active'));
-        if (dots[index]) dots[index].classList.add('active');
+    function renderNotifications() {
+        const soundEnabled = document.getElementById('notificationSound')?.checked ?? onboardingState.notifications.sound;
+        const desktopEnabled = document.getElementById('notificationPopup')?.checked ?? onboardingState.notifications.desktop;
+        return `
+            <div class="onboarding-progress-bar">
+                <div class="onboarding-progress-fill" style="width: 80%"></div>
+            </div>
+            <div class="onboarding-step-indicators">
+                ${steps.map((_, i) => `<div class="onboarding-step-dot ${i === 3 ? 'active' : ''} ${i < 3 ? 'completed' : ''}" data-step="${i}"></div>`).join('')}
+            </div>
+            <div class="onboarding-scroll-area">
+                <div class="onboarding-step-view">
+                    <div class="onboarding-welcome-icon" style="background: linear-gradient(135deg, #f39c12, #e67e22);">
+                        <i class="fas fa-bell"></i>
+                    </div>
+                    <h2 class="onboarding-step-title">Stay in the loop</h2>
+                    <p class="onboarding-step-subtitle">Get notified when your downloads finish. You can adjust these any time in Settings.</p>
+                    <div class="onboarding-toggle-list">
+                        <div class="onboarding-toggle-row">
+                            <div class="onboarding-toggle-info">
+                                <div class="onboarding-toggle-icon"><i class="fas fa-volume-high"></i></div>
+                                <div class="onboarding-toggle-text">
+                                    <div class="onboarding-toggle-label">Sound alerts</div>
+                                    <div class="onboarding-toggle-desc">Play a sound when downloads complete</div>
+                                </div>
+                            </div>
+                            <label class="onboarding-toggle-switch">
+                                <input type="checkbox" id="onboardingSoundToggle" ${soundEnabled ? 'checked' : ''}>
+                                <span class="onboarding-toggle-slider"></span>
+                            </label>
+                        </div>
+                        <div class="onboarding-toggle-row">
+                            <div class="onboarding-toggle-info">
+                                <div class="onboarding-toggle-icon"><i class="fas fa-desktop"></i></div>
+                                <div class="onboarding-toggle-text">
+                                    <div class="onboarding-toggle-label">Desktop notifications</div>
+                                    <div class="onboarding-toggle-desc">Show system notifications when done</div>
+                                </div>
+                            </div>
+                            <label class="onboarding-toggle-switch">
+                                <input type="checkbox" id="onboardingDesktopToggle" ${desktopEnabled ? 'checked' : ''}>
+                                <span class="onboarding-toggle-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                    <p class="onboarding-skip-label">You can change these later in Settings</p>
+                </div>
+            </div>
+            <div class="onboarding-nav-bar">
+                <div class="onboarding-nav-info">Step 4 of ${TOTAL_STEPS}</div>
+                <div class="onboarding-nav-actions">
+                    <button class="onboarding-btn outline" data-action="prev"><i class="fas fa-arrow-left"></i> Back</button>
+                    <button class="onboarding-btn primary" data-action="next">Continue <i class="fas fa-arrow-right"></i></button>
+                </div>
+            </div>
+        `;
     }
 
-    // Initialize carousel events
-    setupCarouselEvents();
+    function renderComplete() {
+        const formatLabels = { mp4: 'MP4 Video', mp3: 'MP3 Audio', mkv: 'MKV Video', flac: 'FLAC Audio', wav: 'WAV Audio', m4a: 'M4A Audio', opus: 'Opus Audio', webm: 'WEBM Video', mov: 'MOV Video' };
+        const formatLabel = formatLabels[onboardingState.format] || onboardingState.format.toUpperCase();
+        const folder = shortenPath(onboardingState.downloadFolder || getFolderDisplay(), 35);
+        const soundOn = document.getElementById('onboardingSoundToggle')?.checked ?? onboardingState.notifications.sound;
+        const desktopOn = document.getElementById('onboardingDesktopToggle')?.checked ?? onboardingState.notifications.desktop;
+        return `
+            <div class="onboarding-progress-bar">
+                <div class="onboarding-progress-fill" style="width: 100%"></div>
+            </div>
+            <div class="onboarding-step-indicators">
+                ${steps.map((_, i) => `<div class="onboarding-step-dot completed" data-step="${i}"></div>`).join('')}
+            </div>
+            <div class="onboarding-scroll-area">
+                <div class="onboarding-step-view">
+                    <div class="onboarding-success-icon">
+                        <i class="fas fa-check"></i>
+                    </div>
+                    <h2 class="onboarding-step-title">You're all set!</h2>
+                    <p class="onboarding-step-subtitle">Your preferences are saved. Paste a video URL to start your first download.</p>
+                    <div class="onboarding-summary">
+                        <div class="onboarding-summary-item">
+                            <span class="onboarding-summary-icon"><i class="fas fa-check"></i></span>
+                            <span class="onboarding-summary-label">Download folder</span>
+                            <span class="onboarding-summary-value">${folder}</span>
+                        </div>
+                        <div class="onboarding-summary-item">
+                            <span class="onboarding-summary-icon"><i class="fas fa-check"></i></span>
+                            <span class="onboarding-summary-label">Default format</span>
+                            <span class="onboarding-summary-value">${formatLabel}</span>
+                        </div>
+                        <div class="onboarding-summary-item">
+                            <span class="onboarding-summary-icon"><i class="fas fa-check"></i></span>
+                            <span class="onboarding-summary-label">Sound alerts</span>
+                            <span class="onboarding-summary-value">${soundOn ? 'On' : 'Off'}</span>
+                        </div>
+                        <div class="onboarding-summary-item">
+                            <span class="onboarding-summary-icon"><i class="fas fa-check"></i></span>
+                            <span class="onboarding-summary-label">Desktop notifications</span>
+                            <span class="onboarding-summary-value">${desktopOn ? 'On' : 'Off'}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="onboarding-nav-bar">
+                <div class="onboarding-nav-info">All done</div>
+                <div class="onboarding-nav-actions">
+                    <button class="onboarding-btn success" data-action="finish"><i class="fas fa-download"></i> Start Downloading</button>
+                </div>
+            </div>
+        `;
+    }
 
     function renderStep(index) {
-        const step = tutorialSteps[index];
-        const imagesHtml = createCarousel(step.images, index);
-        const isLastStep = index === tutorialSteps.length - 1;
+        const renderers = [renderWelcome, renderLocation, renderFormat, renderNotifications, renderComplete];
+        content.innerHTML = renderers[index]();
+        attachStepListeners(index);
+    }
 
-        const html = `
-            <div class="tutorial-header-bar">
-                <div class="tutorial-header-title">
-                    <i class="fas fa-graduation-cap"></i> Quick Start Guide
-                </div>
-                <button id="tutorialCloseBtnTop" class="tutorial-close-btn" aria-label="Close tutorial">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
+    function applyLocationChoice() {
+        const folderInput = document.getElementById('onboardingFolder');
+        if (folderInput && folderInput.value && !folderInput.value.includes('...')) {
+            onboardingState.downloadFolder = folderInput.value;
+        } else {
+            onboardingState.downloadFolder = getFolderDisplay();
+        }
+    }
 
-            <div class="tutorial-steps-container">
-                <div class="tutorial-step-view">
-                    <div class="tutorial-step-header">
-                        <h2 class="tutorial-step-title">${step.title}</h2>
-                        <div class="tutorial-step-subtitle">${step.subtitle}</div>
-                    </div>
-                    
-                    ${imagesHtml}
-                    ${step.content}
-                </div>
-            </div>
+    function applyFormatChoice() {
+        const selected = document.querySelector('.onboarding-choice-card.selected');
+        if (selected) {
+            const format = selected.dataset.format;
+            onboardingState.format = format;
+            const formatSelect = document.getElementById('format');
+            if (formatSelect) {
+                formatSelect.value = format;
+                formatSelect.dispatchEvent(new Event('change'));
+            }
+        }
+    }
 
-            <div class="tutorial-navigation-bar">
-                <div class="tutorial-stepper">
-                    Step ${index + 1} of ${tutorialSteps.length}
-                </div>
-                <div class="tutorial-actions">
-                    <button id="tutorialPrevBtn" class="tutorial-btn outline" ${index === 0 ? 'disabled' : ''}>
-                        Previous
-                    </button>
-                    <button id="tutorialNextBtn" class="tutorial-btn primary">
-                        ${isLastStep ? 'Finish' : 'Next'}
-                    </button>
-                </div>
-            </div>
-        `;
+    function applyNotificationChoices() {
+        const soundToggle = document.getElementById('onboardingSoundToggle');
+        const desktopToggle = document.getElementById('onboardingDesktopToggle');
 
-        tutorialContent.innerHTML = html;
+        if (soundToggle) {
+            onboardingState.notifications.sound = soundToggle.checked;
+            const el = document.getElementById('notificationSound');
+            if (el) el.checked = soundToggle.checked;
+        }
+        if (desktopToggle) {
+            onboardingState.notifications.desktop = desktopToggle.checked;
+            const el = document.getElementById('notificationPopup');
+            if (el) el.checked = desktopToggle.checked;
+        }
+    }
 
-        // Attach Listeners
-        document.getElementById('tutorialPrevBtn')?.addEventListener('click', () => {
-            if (currentStep > 0) {
+    function attachStepListeners(index) {
+        content.querySelector('[data-action="next"]')?.addEventListener('click', () => {
+            if (index === 1) applyLocationChoice();
+            if (index === 2) applyFormatChoice();
+            if (index === 3) applyNotificationChoices();
+            if (index < TOTAL_STEPS - 1) {
+                currentStep++;
+                renderStep(currentStep);
+            }
+        });
+
+        content.querySelector('[data-action="prev"]')?.addEventListener('click', () => {
+            if (index > 0) {
                 currentStep--;
                 renderStep(currentStep);
             }
         });
 
-        document.getElementById('tutorialNextBtn')?.addEventListener('click', () => {
-            if (currentStep < tutorialSteps.length - 1) {
-                currentStep++;
-                renderStep(currentStep);
-            } else {
-                closeTutorial();
-            }
+        content.querySelector('[data-action="skip"]')?.addEventListener('click', closeModal);
+
+        content.querySelector('[data-action="finish"]')?.addEventListener('click', () => {
+            closeModal();
+            setTimeout(() => {
+                const urlInput = document.getElementById('youtubeUrl');
+                if (urlInput) {
+                    flashHighlight(urlInput);
+                    urlInput.focus();
+                }
+            }, 300);
         });
 
-        document.getElementById('tutorialCloseBtnTop')?.addEventListener('click', closeTutorial);
+        content.querySelector('.onboarding-close-btn')?.addEventListener('click', closeModal);
 
-        // Handle clickable tutorial action links
-        setupTutorialActionLinks();
-    }
-
-    // Flash highlight effect for elements
-    function flashHighlight(element, duration = 1500) {
-        if (!element) return;
-        element.classList.add('tutorial-flash-highlight');
-        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        setTimeout(() => {
-            element.classList.remove('tutorial-flash-highlight');
-        }, duration);
-    }
-
-    // Setup tutorial action links
-    function setupTutorialActionLinks() {
-        document.querySelectorAll('.tutorial-action-link').forEach(link => {
-            link.addEventListener('click', (e) => {
-                e.preventDefault();
-                const action = link.dataset.action;
-
-                if (action === 'openSettings') {
-                    // Close tutorial and open settings
-                    closeTutorial();
-                    const settingsModal = document.getElementById('settingsModal');
+        if (index === 1) {
+            document.getElementById('onboardingChooseFolder')?.addEventListener('click', async () => {
+                if (window.electronAPI && window.electronAPI.openFolderDialog) {
+                    try {
+                        const folderPath = await window.electronAPI.openFolderDialog();
+                        if (folderPath) {
+                            const folder = folderPath.replace(/\\/g, '/');
+                            onboardingState.downloadFolder = folder;
+                            const folderInput = document.getElementById('onboardingFolder');
+                            if (folderInput) folderInput.value = shortenPath(folder);
+                            const mainFolderInput = document.getElementById('downloadFolder');
+                            if (mainFolderInput) {
+                                mainFolderInput.value = folder;
+                                localStorage.setItem('downloadFolder', folder);
+                            }
+                        }
+                    } catch (e) {
+                        console.error('Folder selection cancelled or failed:', e);
+                    }
+                } else {
                     const settingsBtn = document.getElementById('settingsBtn');
-                    if (settingsModal) {
+                    const settingsModal = document.getElementById('settingsModal');
+                    if (settingsBtn && settingsModal) {
+                        closeModal();
                         settingsModal.style.display = 'flex';
                         document.body.classList.add('modal-open');
-                        // Flash highlight the settings button area
-                        setTimeout(() => {
-                            flashHighlight(settingsBtn);
-                        }, 300);
-                    }
-                } else if (action === 'openImportCookies') {
-                    // Close tutorial, open settings, and highlight Import Cookies button
-                    closeTutorial();
-                    const settingsModal = document.getElementById('settingsModal');
-                    const importCookiesBtn = document.getElementById('importCookiesBtn');
-                    if (settingsModal) {
-                        settingsModal.style.display = 'flex';
-                        setTimeout(() => {
-                            flashHighlight(importCookiesBtn);
-                        }, 300);
-                    }
-                } else if (action === 'goToDownload') {
-                    // Close tutorial and go to main download page (YouTube tab)
-                    closeTutorial();
-                    const youtubeTab = document.getElementById('youtubeTab');
-                    const downloadBtn = document.getElementById('startYoutubeDownloadBtn');
-                    if (youtubeTab) {
-                        youtubeTab.click();
-                        setTimeout(() => {
-                            flashHighlight(downloadBtn);
-                        }, 300);
+                        setTimeout(() => flashHighlight(settingsBtn), 300);
                     }
                 }
             });
+        }
+
+        if (index === 2) {
+            content.querySelectorAll('.onboarding-choice-card').forEach(card => {
+                card.addEventListener('click', () => {
+                    content.querySelectorAll('.onboarding-choice-card').forEach(c => c.classList.remove('selected'));
+                    card.classList.add('selected');
+                    onboardingState.format = card.dataset.format;
+                });
+            });
+        }
+
+        if (index === 3) {
+            const soundToggle = document.getElementById('onboardingSoundToggle');
+            const desktopToggle = document.getElementById('onboardingDesktopToggle');
+            if (soundToggle) soundToggle.addEventListener('change', () => {
+                onboardingState.notifications.sound = soundToggle.checked;
+            });
+            if (desktopToggle) desktopToggle.addEventListener('change', () => {
+                onboardingState.notifications.desktop = desktopToggle.checked;
+            });
+        }
+
+        content.querySelectorAll('.onboarding-step-dot').forEach(dot => {
+            dot.addEventListener('click', () => {
+                const targetStep = parseInt(dot.dataset.step);
+                if (!isNaN(targetStep) && targetStep < currentStep) {
+                    currentStep = targetStep;
+                    renderStep(currentStep);
+                }
+            });
         });
+
+        modal.onclick = (e) => {
+            if (e.target === modal) closeModal();
+        };
     }
 
-    function openTutorial() {
+    function openModal() {
         currentStep = 0;
         renderStep(currentStep);
-        tutorialModal.style.display = 'flex';
+        modal.style.display = 'flex';
         document.body.style.overflow = 'hidden';
         const settingsModal = document.getElementById('settingsModal');
         if (settingsModal) settingsModal.style.display = 'none';
     }
 
-    function closeTutorial() {
-        tutorialModal.style.display = 'none';
+    function closeModal() {
+        modal.style.display = 'none';
         document.body.style.overflow = '';
         localStorage.setItem('ytdTutorialCompleted', 'true');
+        applyNotificationChoices();
     }
 
-    // Close button is now created dynamically in renderStep
-    const openTutorialBtn = document.getElementById('openTutorialBtn');
-    if (openTutorialBtn) openTutorialBtn.onclick = openTutorial;
+    window.openOnboarding = openModal;
 
-    window.addEventListener('click', (event) => {
-        if (event.target === tutorialModal) closeTutorial();
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && modal.style.display === 'flex') {
+            closeModal();
+        }
     });
 
-    window.openTutorial = openTutorial;
-
-    // Check if first time user
-    const tutorialCompleted = localStorage.getItem('ytdTutorialCompleted');
-    if (!tutorialCompleted) {
-        setTimeout(() => openTutorial(0), 1000);
+    const onboardingCompleted = localStorage.getItem('ytdTutorialCompleted');
+    if (!onboardingCompleted) {
+        setTimeout(() => openModal(), 1000);
     }
 }
 
@@ -5251,7 +5824,17 @@ window.addEventListener('DOMContentLoaded', async () => {
                 closeModalWithFocusRestore(closeConfirmationModal);
             }
             // Existing window.onclick logic for other modals...
-            if (event.target === tutorialModal) closeTutorial();
+            const onboardingModal = document.getElementById('onboardingModal');
+            if (event.target === onboardingModal) {
+                if (window.openOnboarding) {
+                    const closeModal = () => {
+                        onboardingModal.style.display = 'none';
+                        document.body.style.overflow = '';
+                        localStorage.setItem('ytdTutorialCompleted', 'true');
+                    };
+                    closeModal();
+                }
+            }
             const settingsModal = document.getElementById('settingsModal');
             if (event.target === settingsModal) {
                 closeModalWithFocusRestore(settingsModal);

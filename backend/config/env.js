@@ -33,6 +33,7 @@ function loadEnv(rawEnv = process.env, logger = console) {
     ),
     NODE_BINARY: normalizeOptionalString(rawEnv.NODE_BINARY),
     COOKIES_DIR: normalizeOptionalString(rawEnv.COOKIES_DIR),
+    USER_DATA_PATH: normalizeOptionalString(rawEnv.USER_DATA_PATH),
     RESEND_API_KEY: normalizeOptionalString(rawEnv.RESEND_API_KEY),
     SUPPORT_EMAIL: normalizeOptionalString(rawEnv.SUPPORT_EMAIL),
     NODE_ENV: normalizeOptionalString(rawEnv.NODE_ENV) || "production",

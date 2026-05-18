@@ -46,6 +46,7 @@ function createDownloadCompletionService({
   pathModule = path,
   downloadDir,
   formatBytes,
+  verifyDownload,
   sendMessageToClient,
   historyIndex,
   logger = require("../utils/logger").logger,
@@ -143,8 +144,19 @@ function createDownloadCompletionService({
     itemProcInfo,
     title,
     message,
+    expectedFormat = null,
   }) {
-    const stats = await fs.promises.stat(finalFilePath);
+    let verification = null;
+    if (typeof verifyDownload === "function") {
+      verification = await verifyDownload({
+        expectedFormat,
+        filePath: finalFilePath,
+        itemId,
+      });
+    }
+
+    const stats =
+      verification?.stats || (await fs.promises.stat(finalFilePath));
     const actualSize = formatBytes(stats.size);
     return buildPayload({
       itemId,
