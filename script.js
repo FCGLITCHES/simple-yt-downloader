@@ -5072,20 +5072,20 @@ if (includeAutoCaptionsCheckbox) includeAutoCaptionsCheckbox.checked = userSetti
     // ===== UPDATE CHECK & CHANGELOG SYSTEM =====
 const UPDATE_LAST_SEEN_KEY = 'gvl_lastSeenVersion';
 const UPDATE_POPUP_DELAY_MS = 2500;
-const DEFAULT_APP_VERSION = '3.2.0';
+const DEFAULT_APP_VERSION = '3.2.1';
 const FALLBACK_APP_CHANGELOG = {
     version: DEFAULT_APP_VERSION,
-    title: "Smarter Setup v3.2.0",
+    title: "UI Clarity v3.2.1",
     date: 'August 2026',
     required: false,
     badge: 'New',
-    summary: 'A clearer five-step setup now saves your download preferences directly, without detouring through Settings.',
+    summary: 'Typography, setup progress, footer contrast, and compact Settings guidance now share a clearer visual system.',
     items: [
-        { icon: 'fa-wand-magic-sparkles', color: '#ed1736', title: 'Redesigned Five-Step Setup', desc: 'Every onboarding step now shares a clean red-and-white layout, the approved Logo1 brand icon, clearer progress, and smaller actions.' },
-        { icon: 'fa-folder-open', color: '#cf0829', title: 'Choose A Folder Directly', desc: 'Step 2 opens the native Windows folder picker and saves the result immediately to Settings without opening the Settings window.' },
-        { icon: 'fa-sliders', color: '#e84157', title: 'Format And Quality Defaults', desc: 'Step 3 now captures both the preferred download format and its matching quality so the first download is ready to go.' },
-        { icon: 'fa-bell', color: '#f05a72', title: 'Notification Preferences Saved', desc: 'Sound and desktop notification choices now persist from onboarding and appear correctly in Settings.' },
-        { icon: 'fa-font', color: '#aa1230', title: 'Bolder, More Readable Type', desc: 'The locally bundled Manrope typeface, stronger headings, compact controls, and responsive layout improve clarity at desktop and narrow window sizes.' }
+        { icon: 'fa-font', color: '#ed1736', title: 'Manrope Across The App', desc: 'The onboarding typeface now owns the main interface, including the header wordmark and Download Videos from 1000+ Sites heading.' },
+        { icon: 'fa-list-ol', color: '#cf0829', title: 'Flat Setup Progress', desc: 'Onboarding step numbers now use a clean solid treatment without gradients or drop shadows.' },
+        { icon: 'fa-heart', color: '#e84157', title: 'Clearer Support Button', desc: 'Light mode keeps both the heart and Support Me label white and removes the button shadow.' },
+        { icon: 'fa-circle-info', color: '#aa1230', title: 'Compact LAN Guidance', desc: 'The Windows Firewall explanation no longer occupies a permanent Settings row and appears on hover or keyboard focus instead.' },
+        { icon: 'fa-square-check', color: '#c5203b', title: 'Aligned Settings Controls', desc: 'Settings checkboxes and their labels now share a consistent centered line box in every theme.' }
     ]
 };
 let updatePopupTimer = null;

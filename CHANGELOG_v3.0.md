@@ -1,3 +1,15 @@
+# GetVideosLocally v3.2.1
+
+## UI Clarity
+
+- Promoted locally bundled Manrope to the primary application typeface, including the header wordmark and main download heading.
+- Flattened onboarding step numbers by removing their gradients and shadows.
+- Corrected light-mode Support Me contrast so the heart and label stay white, and removed the button shadow.
+- Replaced the permanent LAN discovery explanation with an accessible hover and keyboard-focus tooltip.
+- Removed the conflicting Settings section overflow rule that clipped the new tooltip and created an unnecessary internal scrollbar.
+- Normalized native checkbox sizing, margins, and label line boxes so Settings controls align centrally across themes.
+- Added focused UI-system regressions and desktop visual captures for the main screen, onboarding, and Settings tooltip states.
+
 # GetVideosLocally v3.2.0
 
 ## Smarter Setup

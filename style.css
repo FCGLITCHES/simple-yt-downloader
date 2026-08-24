@@ -67,7 +67,7 @@
     --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
 }
 
-/* Manrope - Local variable font for the setup experience */
+/* Manrope - Local variable font for the primary application type system */
 @font-face {
     font-family: 'Manrope';
     font-style: normal;
@@ -84,6 +84,62 @@
     color: var(--text-muted);
     font-size: 0.9rem;
     line-height: 1.45;
+}
+
+.settings-hover-help-wrap {
+    position: relative;
+    align-items: center;
+}
+
+.settings-help-trigger {
+    display: inline-grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    margin-left: 0.35rem;
+    padding: 0;
+    color: var(--primary-color);
+    background: transparent;
+    border: 0;
+    border-radius: 8px;
+    cursor: help;
+}
+
+.settings-help-trigger:hover,
+.settings-help-trigger:focus-visible {
+    color: var(--btn-primary-hover);
+    background: var(--btn-ghost-hover);
+    outline: 2px solid var(--ring-color);
+    outline-offset: 1px;
+}
+
+.settings-hover-help {
+    position: absolute;
+    z-index: 20;
+    top: calc(100% + 0.4rem);
+    right: 0;
+    width: min(290px, calc(100vw - 3rem));
+    margin: 0;
+    padding: 0.7rem 0.8rem;
+    color: var(--text-color);
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    box-shadow: var(--shadow-md);
+    font-size: 0.78rem;
+    line-height: 1.45;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: translateY(-4px);
+    transition: opacity 150ms ease, transform 150ms ease, visibility 150ms ease;
+}
+
+.settings-hover-help-wrap:hover .settings-hover-help,
+.settings-hover-help-wrap:focus-within .settings-hover-help {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
 }
 
 .update-title-row {
@@ -290,7 +346,7 @@ html {
 }
 
 body {
-    font-family: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    font-family: 'Manrope', 'Segoe UI Variable Text', sans-serif;
     background-color: var(--bg-color);
     color: var(--text-color);
     min-height: 100dvh;
@@ -306,8 +362,9 @@ body {
 }
 
 h1, h2 {
-    font-family: 'DM Serif Display', serif;
-    font-weight: 400;
+    font-family: 'Manrope', 'Segoe UI Variable Display', sans-serif;
+    font-weight: 800;
+    letter-spacing: -0.035em;
 }
 
 .is-hidden-initial,
@@ -420,19 +477,18 @@ body[data-ui-density="compact"] .settings-actions {
 }
 
 .logo-text {
-    font-family: 'DM Serif Display', serif;
+    font-family: 'Manrope', 'Segoe UI Variable Display', sans-serif;
     font-size: 24px;
-    font-weight: 400;
+    font-weight: 800;
     color: #ffffff;
     line-height: 30px;
-    letter-spacing: 0.5px;
+    letter-spacing: -0.04em;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     min-width: 0;
     flex-shrink: 1;
     margin-left: 8px;
-    -webkit-text-stroke: 0.3px currentColor;
 }
 
 .header-buttons {
@@ -4232,6 +4288,7 @@ button {
 .settings-modal {
     --settings-column-width: 25.5rem;
     --settings-grid-gap: 1rem;
+    --settings-checkbox-size: 1rem;
     --settings-shell-width: calc(var(--settings-column-width) + var(--settings-column-width) + var(--settings-grid-gap));
     max-width: min(calc(var(--settings-shell-width) + 2rem), calc(100vw - 2rem));
     width: min(92vw, calc(var(--settings-shell-width) + 2rem));
@@ -4249,6 +4306,28 @@ button {
 .settings-modal h2 {
     flex-shrink: 0;
     margin-bottom: 1rem;
+}
+
+.settings-modal .setting-item.checkbox-group {
+    align-items: center;
+}
+
+.settings-modal .setting-item.checkbox-group input[type="checkbox"] {
+    flex: 0 0 var(--settings-checkbox-size);
+    width: var(--settings-checkbox-size);
+    height: var(--settings-checkbox-size);
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    transform: none;
+}
+
+.settings-modal .setting-item.checkbox-group label {
+    display: flex;
+    align-items: center;
+    min-height: var(--settings-checkbox-size);
+    margin: 0;
+    line-height: 1.25;
 }
 
 .settings-layout {
@@ -4290,8 +4369,7 @@ button {
     max-width: 100%;
     box-sizing: border-box;
     min-width: 0;
-    overflow: hidden;
-    overflow-y: visible;
+    overflow: visible;
     display: flex;
     flex-direction: column;
     min-height: auto;
@@ -5794,16 +5872,16 @@ body {
     border-radius: 15px;
     color: #858b96;
     background: #fff;
-    font: 600 0.9rem "Segoe UI", sans-serif;
+    font: 700 0.9rem 'Manrope', 'Segoe UI Variable Text', sans-serif;
     cursor: pointer;
-    box-shadow: 0 2px 8px rgba(16, 21, 34, 0.03);
+    box-shadow: none;
 }
 
 .setup-step-pill.is-active {
     color: #fff;
     border-color: var(--setup-red);
-    background: linear-gradient(135deg, #ff183d, var(--setup-red-dark));
-    box-shadow: 0 8px 20px rgba(237, 23, 54, 0.22);
+    background: var(--setup-red);
+    box-shadow: none;
 }
 
 .setup-step-pill.is-complete {
@@ -6560,14 +6638,25 @@ body {
     font-size: 0.85rem;
     text-decoration: none;
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: 0 2px 8px rgba(161, 28, 40, 0.3);
+    box-shadow: none;
     margin-left: 0.5rem;
 }
 
 .support-btn:hover {
     background: var(--btn-primary-hover);
     color: #fff;
-    box-shadow: 0 4px 12px rgba(161, 28, 40, 0.5);
+    box-shadow: none;
+}
+
+[data-theme="light"] .footer .support-btn,
+[data-theme="light"] .footer .support-btn:hover,
+[data-theme="light"] .footer .support-btn:focus-visible {
+    color: #fff;
+}
+
+[data-theme="light"] .footer .support-btn i {
+    color: currentColor;
+    font-size: 0.8em;
 }
 
 @media (max-width: 640px) {

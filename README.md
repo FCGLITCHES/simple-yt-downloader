@@ -52,6 +52,13 @@
 
 ## Features
 
+### UI Clarity v3.2.1
+- **Manrope everywhere:** the onboarding typeface is now the primary app font, including the header wordmark and main download heading.
+- **Flatter setup progress:** numbered onboarding steps use solid colors without gradients or shadows.
+- **Cleaner light footer:** Support Me and its heart retain white contrast without a button shadow.
+- **Compact network settings:** LAN and Windows Firewall guidance appears on hover or keyboard focus instead of occupying a permanent row.
+- **Aligned settings controls:** checkboxes and labels now sit on the same visual center line across themes.
+
 ### Smarter Setup v3.2.0
 - **Direct folder selection:** onboarding opens the native folder picker and immediately saves the chosen location to Settings.
 - **Useful first-run defaults:** format, quality, sound, and desktop notification preferences are captured before the first download.

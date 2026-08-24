@@ -8,7 +8,7 @@ const builderConfig = require("../electron-builder.json");
 const packageManifest = require("../package.json");
 const packageLock = require("../package-lock.json");
 
-test("3.2.0 release metadata stays aligned across package and UI boundaries", () => {
+test("3.2.1 release metadata stays aligned across package and UI boundaries", () => {
   const indexHtml = fs.readFileSync(
     path.join(projectRoot, "index.html"),
     "utf8",
@@ -18,15 +18,15 @@ test("3.2.0 release metadata stays aligned across package and UI boundaries", ()
     "utf8",
   );
 
-  assert.equal(packageManifest.version, "3.2.0");
-  assert.equal(packageLock.version, "3.2.0");
-  assert.equal(packageLock.packages[""].version, "3.2.0");
-  assert.match(indexHtml, /window\.APP_VERSION = '3\.2\.0'/);
-  assert.match(rendererScript, /DEFAULT_APP_VERSION = '3\.2\.0'/);
-  assert.match(indexHtml, /Choose A Folder Directly/);
-  assert.match(rendererScript, /Choose A Folder Directly/);
-  assert.match(indexHtml, /Bolder, More Readable Type/);
-  assert.match(rendererScript, /Bolder, More Readable Type/);
+  assert.equal(packageManifest.version, "3.2.1");
+  assert.equal(packageLock.version, "3.2.1");
+  assert.equal(packageLock.packages[""].version, "3.2.1");
+  assert.match(indexHtml, /window\.APP_VERSION = '3\.2\.1'/);
+  assert.match(rendererScript, /DEFAULT_APP_VERSION = '3\.2\.1'/);
+  assert.match(indexHtml, /Manrope Across The App/);
+  assert.match(rendererScript, /Manrope Across The App/);
+  assert.match(indexHtml, /Compact LAN Guidance/);
+  assert.match(rendererScript, /Compact LAN Guidance/);
 });
 
 test("installer packages each resource family exactly once", () => {
