@@ -52,6 +52,9 @@
 
 ## Features
 
+### Consistent Windows Branding v3.1.1
+- **Logo everywhere:** installer, uninstaller, executables, shortcuts, taskbar windows, system tray, and installed-app registration now share the GetVideosLocally icon.
+
 ### Smaller & Cleaner v3.1
 - **44% smaller Windows install:** duplicate resources and the unused FFplay executable were removed without dropping download, conversion, probing, or high-resolution support.
 - **Complete uninstall cleanup:** app caches, settings, logs, queues, updater files, shortcuts, startup entries, and legacy registration are removed.

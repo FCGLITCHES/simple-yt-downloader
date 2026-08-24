@@ -39,6 +39,7 @@
     "node_modules/winreg/**",
     "node_modules/untildify/**"
   ],
+  "afterPack": "scripts/brand-packaged-windows-executable.js",
   "win": {
     "target": [
       {
@@ -46,7 +47,7 @@
         "arch": ["x64"]
       }
     ],
-    "icon": "public/Logo1.ico",
+    "icon": "public/icons/win/icon.ico",
     "signAndEditExecutable": false
   },
   "nsis": {
@@ -56,21 +57,21 @@
     "createStartMenuShortcut": true,
     "shortcutName": "GetVideosLocally",
     "include": "installer/installer.nsh",
-    "installerIcon": "public/Logo_1.ico",
-    "uninstallerIcon": "public/Logo_1.ico",
-    "installerHeaderIcon": "public/Logo_1.ico",
+    "installerIcon": "public/icons/win/icon.ico",
+    "uninstallerIcon": "public/icons/win/icon.ico",
+    "installerHeaderIcon": "public/icons/win/icon.ico",
     "deleteAppDataOnUninstall": false,
     "runAfterFinish": true,
     "perMachine": false
   },
   "mac": {
     "target": ["dmg"],
-    "icon": "public/Logo_1.ico",
+    "icon": "public/icons/mac/icon.icns",
     "category": "public.app-category.utilities"
   },
   "linux": {
     "target": ["AppImage"],
-    "icon": "public/Logo_1.ico",
+    "icon": "public/icons/png",
     "category": "Utility"
   }
 }

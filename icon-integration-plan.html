@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>GetVideosLocally icon integration plan</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --canvas: #f7f9fc;
+        --ink: #172033;
+        --muted: #5e6b82;
+        --line: #dce3ef;
+        --accent: #6f42c1;
+        font-family: "Aptos", "Segoe UI Variable", sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        min-height: 100dvh;
+        margin: 0;
+        background: var(--canvas);
+        color: var(--ink);
+      }
+
+      main {
+        width: min(900px, calc(100% - 40px));
+        margin: 0 auto;
+        padding: 64px 0 80px;
+      }
+
+      h1,
+      h2 {
+        letter-spacing: -0.025em;
+      }
+
+      h1 {
+        max-width: 720px;
+        margin: 0 0 16px;
+        font-size: clamp(2.25rem, 6vw, 4rem);
+        line-height: 1.02;
+      }
+
+      h2 {
+        margin: 42px 0 12px;
+        font-size: 1.3rem;
+      }
+
+      p,
+      li {
+        color: var(--muted);
+        line-height: 1.65;
+      }
+
+      .eyebrow {
+        color: var(--accent);
+        font-size: 0.78rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .surfaces {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 1px;
+        margin: 32px 0;
+        border-block: 1px solid var(--line);
+        background: var(--line);
+      }
+
+      .surface {
+        padding: 22px 18px;
+        background: var(--canvas);
+      }
+
+      code {
+        color: var(--ink);
+        font-family: "Cascadia Code", "JetBrains Mono", monospace;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p class="eyebrow">GetVideosLocally 3.1.1 icon correction</p>
+      <h1>One brand icon across every Windows surface.</h1>
+      <p>
+        Replace the generic Electron mark by embedding the existing
+        multi-resolution GetVideosLocally logo and using that same source at
+        runtime and during packaging.
+      </p>
+
+      <div class="surfaces" aria-label="Icon surfaces in scope">
+        <div class="surface">Installer and uninstaller</div>
+        <div class="surface">Installed and portable executables</div>
+        <div class="surface">Desktop and Start Menu shortcuts</div>
+        <div class="surface">Taskbar and application windows</div>
+        <div class="surface">System tray and notifications</div>
+        <div class="surface">Apps &amp; Features registration</div>
+      </div>
+
+      <h2>Canonical asset</h2>
+      <p>
+        <code>public/icons/win/icon.ico</code> owns Windows branding. It
+        contains 16, 24, 32, 48, 64, 128, and 256 pixel images. macOS and Linux
+        retain their platform-specific icon sets.
+      </p>
+
+      <h2>Implementation</h2>
+      <ol>
+        <li>
+          Brand the packaged Windows executable through the shared post-package
+          resource editor.
+        </li>
+        <li>
+          Use the canonical ICO for NSIS, Electron windows, and tray icons.
+        </li>
+        <li>Set the Windows AppUserModelID to the package app ID.</li>
+        <li>
+          Apply the same icon and package version to portable executables.
+        </li>
+        <li>Add regression checks for every icon ownership boundary.</li>
+      </ol>
+
+      <h2>Acceptance criteria</h2>
+      <ul>
+        <li>The built EXE no longer extracts to the Electron logo.</li>
+        <li>Desktop and Start Menu shortcuts inherit the branded EXE icon.</li>
+        <li>
+          The installer, uninstaller, taskbar, windows, and tray use the brand.
+        </li>
+        <li>
+          Installed registration reports version 3.1.0 with a branded icon.
+        </li>
+        <li>
+          Source tests, icon structure checks, build, install, and Windows UI
+          checks pass.
+        </li>
+      </ul>
+    </main>
+  </body>
+</html>

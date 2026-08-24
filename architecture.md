@@ -214,3 +214,9 @@ The bundled runtime tools are:
 `ffplay.exe` is not a product dependency and is not shipped or installed by FFmpeg updates.
 
 Electron user data is stored under `%APPDATA%\GetVideosLocally`. Caches, cookies, logs, queue state, settings, and updater data are app-owned. Media under its `downloads` child is user-owned. The Windows uninstaller removes app-owned data and asks before deleting downloaded media; choosing No preserves only the downloads folder.
+
+## Application Icon Ownership
+
+Windows branding has one source of truth: `public/icons/win/icon.ico`. The ICO contains 16, 24, 32, 48, 64, 128, and 256 pixel images. `scripts/windows-branding.js` owns the shared resource-editing contract: Electron Builder calls it from its Windows `afterPack` hook, and the portable packaging path calls the same helper.
+
+The Windows builder, NSIS installer/uninstaller, Electron windows, system tray, desktop and Start Menu shortcuts, and Apps & Features registration all inherit this icon. `com.getvideoslocally.app` is both the package app ID and Windows AppUserModelID. macOS uses `public/icons/mac/icon.icns`; Linux uses the PNG icon set under `public/icons/png`.

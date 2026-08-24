@@ -121,7 +121,13 @@ try {
     .replace("^", "")
     .replace("~", "");
 
-  const iconPath = path.join(projectDir, "public", "Logo_1");
+  const iconPath = path.join(
+    projectDir,
+    "public",
+    "icons",
+    "win",
+    "icon.ico",
+  );
   const packagerCmd = [
     "npx -y electron-packager",
     '".build-staging"',

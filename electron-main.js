@@ -5,6 +5,13 @@ const { app, BrowserWindow, ipcMain, dialog, shell, clipboard, powerSaveBlocker,
 app.setName('GetVideosLocally');
 const path = require('path');
 
+const APP_USER_MODEL_ID = 'com.getvideoslocally.app';
+const WINDOWS_BRAND_ICON_PATH = path.join(__dirname, 'public', 'icons', 'win', 'icon.ico');
+
+if (process.platform === 'win32') {
+  app.setAppUserModelId(APP_USER_MODEL_ID);
+}
+
 function isBrokenPipeError(error) {
   return error && (error.code === 'EPIPE' || String(error.message || '').includes('EPIPE'));
 }
@@ -277,11 +284,9 @@ async function setupFirewallRule() {
 function createTrayIcon() {
   if (tray) return; // Already created
 
-  const iconPath = path.join(__dirname, 'public', 'Logo_1.ico');
-
   try {
     // Create tray icon
-    const trayIcon = nativeImage.createFromPath(iconPath);
+    const trayIcon = nativeImage.createFromPath(WINDOWS_BRAND_ICON_PATH);
     tray = new Tray(trayIcon.resize({ width: 16, height: 16 }));
 
     const contextMenu = Menu.buildFromTemplate([
@@ -401,7 +406,7 @@ async function createWindow() {
         preload: path.join(__dirname, 'preload.js'),
         backgroundThrottling: false // CRITICAL: Prevent freezing when minimized/hidden
       },
-      icon: path.join(__dirname, 'public', 'Logo_1.ico')
+      icon: WINDOWS_BRAND_ICON_PATH
     };
 
     // Restore position if available and valid
@@ -922,6 +927,7 @@ ipcMain.handle('open-cookies-helper', async () => {
     modal: false,
     show: true,
     title: 'Import Your Browser Cookies',
+    icon: WINDOWS_BRAND_ICON_PATH,
     minWidth: 320,
     minHeight: 200,
     resizable: true
