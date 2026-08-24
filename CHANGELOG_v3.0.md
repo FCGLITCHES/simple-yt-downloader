@@ -1,4 +1,23 @@
+# GetVideosLocally v3.1.0
+
+## Smaller Installation And Cleaner Uninstall
+
+- Reduced the unpacked Windows application from 1,165.30 MiB to 651.78 MiB, a 44.1% reduction.
+- Reduced the Windows installer from 340.60 MiB to 189.12 MiB, a 44.5% reduction.
+- Removed duplicate packaging of the binary and asset payloads.
+- Removed the unused FFplay executable while retaining FFmpeg, FFprobe, yt-dlp, and Node support.
+- Added current and legacy cleanup for shortcuts, startup entries, registry entries, caches, settings, queues, logs, and updater artifacts.
+- Preserved downloaded videos by default and added explicit confirmation before deleting them during uninstall.
+- Added packaging and uninstall regression coverage.
+
 # GetVideosLocally v3.0.2 Security Patches
+
+## Storage And Uninstall Improvements
+
+- Removed duplicate packaging of binaries and web assets from Windows installer payloads.
+- Stopped shipping the unused FFplay executable while retaining FFmpeg and FFprobe functionality.
+- Updated uninstall cleanup for current and legacy shortcuts, startup entries, registry entries, caches, settings, queues, logs, and updater artifacts.
+- Added an uninstall confirmation before deleting videos in the default app-managed downloads folder.
 
 ## Required Security Patches
 

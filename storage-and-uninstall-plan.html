@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>GetVideosLocally storage and uninstall plan</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --canvas: #f7f9fc;
+        --ink: #172033;
+        --muted: #5e6b82;
+        --line: #dce3ef;
+        --accent: #1a73e8;
+        --success: #188038;
+        font-family: "Aptos", "Segoe UI Variable", sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        min-height: 100dvh;
+        margin: 0;
+        background: var(--canvas);
+        color: var(--ink);
+      }
+
+      main {
+        width: min(920px, calc(100% - 40px));
+        margin: 0 auto;
+        padding: 64px 0 80px;
+      }
+
+      h1,
+      h2 {
+        letter-spacing: -0.025em;
+      }
+
+      h1 {
+        max-width: 720px;
+        margin: 0 0 16px;
+        font-size: clamp(2.25rem, 6vw, 4.25rem);
+        line-height: 1.02;
+      }
+
+      h2 {
+        margin: 48px 0 12px;
+        font-size: 1.35rem;
+      }
+
+      p,
+      li {
+        color: var(--muted);
+        font-size: 1rem;
+        line-height: 1.65;
+      }
+
+      .eyebrow {
+        margin: 0 0 18px;
+        color: var(--accent);
+        font-size: 0.78rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .summary {
+        max-width: 760px;
+        font-size: 1.15rem;
+      }
+
+      .measurements {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 1px;
+        margin: 32px 0;
+        border-block: 1px solid var(--line);
+        background: var(--line);
+      }
+
+      .measurement {
+        padding: 24px 18px;
+        background: var(--canvas);
+      }
+
+      .measurement strong,
+      .measurement span {
+        display: block;
+      }
+
+      .measurement strong {
+        margin-bottom: 4px;
+        color: var(--ink);
+        font-size: 1.65rem;
+      }
+
+      ol,
+      ul {
+        padding-left: 1.25rem;
+      }
+
+      code {
+        color: var(--ink);
+        font-family: "Cascadia Code", "JetBrains Mono", monospace;
+        font-size: 0.9em;
+      }
+
+      .acceptance li::marker {
+        color: var(--success);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p class="eyebrow">GetVideosLocally 3.1.0 release scope</p>
+      <h1>Smaller installs, cleaner uninstalls.</h1>
+      <p class="summary">
+        Reduce the Windows package without removing active download
+        capabilities, and make uninstall remove app-owned files while treating
+        downloaded media as user-owned content.
+      </p>
+
+      <div class="measurements" aria-label="Current storage measurements">
+        <div class="measurement">
+          <strong>1,165 MB</strong>
+          <span>current unpacked installer</span>
+        </div>
+        <div class="measurement">
+          <strong>394 MB</strong>
+          <span>binary folder duplicated in package</span>
+        </div>
+        <div class="measurement">
+          <strong>98 MB</strong>
+          <span>unused ffplay executable</span>
+        </div>
+      </div>
+
+      <h2>Goal and scope</h2>
+      <p>
+        Change Windows installer packaging and uninstall behavior only. Preserve
+        the current runtime architecture and download workflows. Do not delete a
+        user's downloaded videos without a clear uninstall confirmation.
+      </p>
+
+      <h2>Storage ownership</h2>
+      <ul>
+        <li>
+          Installed application files belong to the installer and are always
+          removed.
+        </li>
+        <li>
+          Chromium caches, cookies, logs, queues, settings, and update artifacts
+          are app-owned and are removed on uninstall.
+        </li>
+        <li>
+          <code>%APPDATA%\GetVideosLocally\downloads</code> contains user-owned
+          media. The uninstaller asks whether to delete it and defaults to
+          keeping it.
+        </li>
+      </ul>
+
+      <h2>Implementation</h2>
+      <ol>
+        <li>
+          Replace broad package inclusion with an explicit allowlist, ensuring
+          <code>bin</code>, <code>assets</code>, and <code>public</code> are
+          bundled exactly once.
+        </li>
+        <li>
+          Stop shipping and updating <code>ffplay</code>; retain
+          <code>ffmpeg</code>, <code>ffprobe</code>, <code>yt-dlp</code>, and
+          Node.
+        </li>
+        <li>
+          Replace stale SimplyYTD uninstall hooks with GetVideosLocally cleanup
+          for shortcuts, startup entries, app registry entries, app data, local
+          cache, and temporary update artifacts.
+        </li>
+        <li>
+          Add static packaging tests and uninstall-script tests so duplicate
+          payloads and stale cleanup names cannot return.
+        </li>
+        <li>
+          Update architecture and release documentation with storage ownership
+          and uninstall behavior.
+        </li>
+      </ol>
+
+      <h2>States and fallback</h2>
+      <ul>
+        <li>Default: preserve downloads and remove everything else.</li>
+        <li>
+          Confirmed removal: delete downloads with the remaining app data.
+        </li>
+        <li>
+          Locked file or denied permission: continue uninstalling other entries;
+          Windows may retain only the locked target.
+        </li>
+        <li>
+          Existing installations using the old SimplyYTD identifiers are cleaned
+          for backward compatibility.
+        </li>
+      </ul>
+
+      <h2>Acceptance criteria</h2>
+      <ul class="acceptance">
+        <li>
+          No packaged resource appears both inside <code>app.asar</code> and as
+          an extra resource.
+        </li>
+        <li>
+          <code>ffplay.exe</code> is absent and media probing/conversion
+          dependencies remain present.
+        </li>
+        <li>
+          Current and legacy shortcuts, startup entries, and registry keys are
+          removed.
+        </li>
+        <li>
+          App-generated data is removed; downloads survive unless deletion is
+          confirmed.
+        </li>
+        <li>Targeted tests and the relevant existing Node test suite pass.</li>
+      </ul>
+    </main>
+  </body>
+</html>

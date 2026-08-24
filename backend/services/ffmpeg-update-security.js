@@ -6,7 +6,7 @@ const path = require("path");
 const https = require("https");
 const AdmZip = require("adm-zip");
 
-const FFMPEG_BINARIES = ["ffmpeg.exe", "ffprobe.exe", "ffplay.exe"];
+const FFMPEG_BINARIES = ["ffmpeg.exe", "ffprobe.exe"];
 
 function loadFfmpegChecksumManifest(manifestPath, logger = console) {
   try {
@@ -74,7 +74,9 @@ async function downloadFile(downloadUrl, destinationPath) {
 
         if (response.statusCode !== 200) {
           response.resume();
-          cleanup(new Error(`Download failed with HTTP ${response.statusCode}`));
+          cleanup(
+            new Error(`Download failed with HTTP ${response.statusCode}`),
+          );
           return;
         }
 
@@ -112,7 +114,8 @@ async function installFfmpegFromZip({
     };
   }
 
-  const updateTmpDir = tmpDir || path.join(require("os").tmpdir(), `ffmpeg-update-${Date.now()}`);
+  const updateTmpDir =
+    tmpDir || path.join(require("os").tmpdir(), `ffmpeg-update-${Date.now()}`);
   const zipPath = path.join(updateTmpDir, "ffmpeg-essentials.zip");
   const stageDir = path.join(updateTmpDir, "stage");
   const backups = [];
@@ -231,7 +234,10 @@ function rollbackInstalledFiles(extractedFiles, binDir, backups) {
 function rollbackBackups(backups) {
   for (const backup of backups.reverse()) {
     try {
-      if (!fs.existsSync(backup.destinationPath) && fs.existsSync(backup.backupPath)) {
+      if (
+        !fs.existsSync(backup.destinationPath) &&
+        fs.existsSync(backup.backupPath)
+      ) {
         fs.renameSync(backup.backupPath, backup.destinationPath);
       }
     } catch (_) {}

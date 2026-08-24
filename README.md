@@ -52,6 +52,11 @@
 
 ## Features
 
+### Smaller & Cleaner v3.1
+- **44% smaller Windows install:** duplicate resources and the unused FFplay executable were removed without dropping download, conversion, probing, or high-resolution support.
+- **Complete uninstall cleanup:** app caches, settings, logs, queues, updater files, shortcuts, startup entries, and legacy registration are removed.
+- **Downloaded videos stay protected:** uninstall keeps downloaded media by default and asks before deleting it.
+
 ### Security Patches v3.0.2
 - **Required update:** local file actions are constrained to the configured downloads folder, deletions use the Recycle Bin, FFmpeg updates are verified against a shipped SHA256 manifest, and Windows Firewall access is explicit opt-in.
 

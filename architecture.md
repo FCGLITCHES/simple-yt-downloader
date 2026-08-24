@@ -199,3 +199,18 @@ IPC sender validation allows only the app's main renderer or the exact `http://1
 Windows Firewall access is explicit opt-in. Startup no longer silently adds firewall rules. Settings query the real `netsh advfirewall` rule state, and enable/disable actions require a native confirmation dialog before running `netsh`.
 
 Electron is pinned to `42.1.0`. `sandbox: false` is documented as temporary compatibility for the current CommonJS preload; migrating the preload to sandbox-compatible APIs remains a follow-up task.
+
+## Package And Storage Ownership
+
+The Windows package uses an explicit application-file allowlist. `public` is stored inside `app.asar`, while `bin` and `assets` are external resources because executables and runtime assets need normal filesystem paths. A resource must not be present in both locations.
+
+The bundled runtime tools are:
+
+- `yt-dlp.exe` for extraction and downloads
+- `ffmpeg.exe` for media conversion and merging
+- `ffprobe.exe` for media validation and duration probing
+- `node.exe` as the JavaScript runtime passed to yt-dlp
+
+`ffplay.exe` is not a product dependency and is not shipped or installed by FFmpeg updates.
+
+Electron user data is stored under `%APPDATA%\GetVideosLocally`. Caches, cookies, logs, queue state, settings, and updater data are app-owned. Media under its `downloads` child is user-owned. The Windows uninstaller removes app-owned data and asks before deleting downloaded media; choosing No preserves only the downloads folder.

@@ -1,6 +1,6 @@
 {
   "name": "getvideoslocally",
-  "version": "3.0.2",
+  "version": "3.1.0",
   "description": "GetVideosLocally - Desktop app for downloading and converting videos from 1000+ supported sites",
   "main": "electron-main.js",
   "scripts": {

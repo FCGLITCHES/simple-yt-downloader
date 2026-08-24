@@ -5063,20 +5063,19 @@ if (includeAutoCaptionsCheckbox) includeAutoCaptionsCheckbox.checked = userSetti
     // ===== UPDATE CHECK & CHANGELOG SYSTEM =====
 const UPDATE_LAST_SEEN_KEY = 'gvl_lastSeenVersion';
 const UPDATE_POPUP_DELAY_MS = 2500;
-const DEFAULT_APP_VERSION = '3.0.2';
+const DEFAULT_APP_VERSION = '3.1.0';
 const FALLBACK_APP_CHANGELOG = {
     version: DEFAULT_APP_VERSION,
-    title: "Security Patches v3.0.2",
-    date: 'May 2026',
-    required: true,
-    badge: 'Required',
-    summary: 'Required security patches for local file handling, FFmpeg update integrity, and firewall access controls.',
+    title: "Smaller & Cleaner v3.1",
+    date: 'August 2026',
+    required: false,
+    badge: 'New',
+    summary: 'A much smaller Windows install with safer, more complete uninstall cleanup.',
     items: [
-        { icon: 'fa-compass', color: '#3498db', title: 'New Onboarding Experience', desc: 'The old tutorial modal was replaced with a guided setup flow for download location, format, and notifications.' },
-        { icon: 'fa-sliders', color: '#2ecc71', title: 'Cleaner Download Controls', desc: 'Advanced download controls are now tucked away until needed, keeping the main download form focused.' },
-        { icon: 'fa-gear', color: '#e74c3c', title: 'Smarter Settings Layout', desc: 'Settings were reorganized, subtitle fields now appear only when relevant, and controls are easier to scan.' },
-        { icon: 'fa-clock-rotate-left', color: '#f39c12', title: 'History & Safety Improvements', desc: 'History actions, labels, and bulk controls were refined to reduce accidental clicks and make video lists clearer.' },
-        { icon: 'fa-shield-halved', color: '#16a085', title: 'Required Security Patches', desc: 'Local file actions are restricted to the downloads folder, deletions use the Recycle Bin, and FFmpeg updates are verified against a shipped checksum manifest.' }
+        { icon: 'fa-hard-drive', color: '#3498db', title: '44% Smaller Installation', desc: 'Duplicate packaged resources and the unused FFplay executable were removed, cutting the installed footprint from about 1.14 GiB to 652 MiB.' },
+        { icon: 'fa-broom', color: '#2ecc71', title: 'Cleaner Uninstall', desc: 'Uninstall now clears app caches, settings, logs, queues, updater files, shortcuts, startup entries, and legacy registration.' },
+        { icon: 'fa-folder-open', color: '#f39c12', title: 'Downloads Stay Protected', desc: 'Downloaded videos are kept by default, with a clear confirmation before the uninstaller removes them.' },
+        { icon: 'fa-film', color: '#9b59b6', title: 'Core Tools Retained', desc: 'FFmpeg, FFprobe, yt-dlp, and Node remain bundled so download, probing, conversion, and high-resolution workflows continue to work.' }
     ]
 };
 let updatePopupTimer = null;

@@ -1,24 +1,25 @@
-const AdmZip = require('adm-zip');
-const path = require('path');
-const fs = require('fs');
+const AdmZip = require("adm-zip");
+const path = require("path");
+const fs = require("fs");
 
 const zip = new AdmZip();
-const productName = 'GetVideosLocally';
-const buildFolder = path.join(__dirname, 'dist', `${productName}-win32-x64`);
-const zipFileName = `${productName}-Portable.zip`;
+const productName = "GetVideosLocally";
+const { version } = require("./package.json");
+const buildFolder = path.join(__dirname, "dist", `${productName}-win32-x64`);
+const zipFileName = `${productName}-Portable-${version}.zip`;
 
 if (!fs.existsSync(buildFolder)) {
-    console.error(`❌ Build folder not found: ${buildFolder}`);
-    process.exit(1);
+  console.error(`❌ Build folder not found: ${buildFolder}`);
+  process.exit(1);
 }
 
 console.log(`📦 Zipping build folder: ${buildFolder}...`);
 
 try {
-    zip.addLocalFolder(buildFolder);
-    zip.writeZip(zipFileName);
-    console.log(`✅ Successfully created ${zipFileName}`);
+  zip.addLocalFolder(buildFolder);
+  zip.writeZip(zipFileName);
+  console.log(`✅ Successfully created ${zipFileName}`);
 } catch (error) {
-    console.error(`❌ Failed to create zip: ${error.message}`);
-    process.exit(1);
+  console.error(`❌ Failed to create zip: ${error.message}`);
+  process.exit(1);
 }
