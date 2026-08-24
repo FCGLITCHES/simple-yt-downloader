@@ -2,10 +2,9 @@
 const fs = require('fs');
 const path = require('path');
 const sharp = require('sharp');
-const toIco = require('to-ico');
 
-const pngPath = path.resolve(__dirname, 'public', 'Logo_1.png');
-const icoPath = path.resolve(__dirname, 'public', 'Logo_1.ico');
+const pngPath = path.resolve(__dirname, 'assets', 'Logo 1.png');
+const icoPath = path.resolve(__dirname, 'public', 'Logo1.ico');
 
 console.log('🎨 Generating multi-size ICO file...\n');
 console.log('   Source PNG:', pngPath);
@@ -17,40 +16,75 @@ if (!fs.existsSync(pngPath)) {
 }
 
 // Sizes for ICO file (Windows compatible sizes)
-const sizes = [16, 32, 48, 64, 128, 256];
+const sizes = [16, 24, 32, 48, 64, 128, 256];
+
+function encodeIcoImageDirectoryEntry(size, imageBuffer, imageOffset) {
+  const entry = Buffer.alloc(16);
+  entry.writeUInt8(size >= 256 ? 0 : size, 0);
+  entry.writeUInt8(size >= 256 ? 0 : size, 1);
+  entry.writeUInt8(0, 2);
+  entry.writeUInt8(0, 3);
+  entry.writeUInt16LE(1, 4);
+  entry.writeUInt16LE(32, 6);
+  entry.writeUInt32LE(imageBuffer.length, 8);
+  entry.writeUInt32LE(imageOffset, 12);
+  return entry;
+}
+
+function createIcoFromPngBuffers(iconImages) {
+  const headerLength = 6;
+  const entryLength = 16;
+  const imageDirectoryLength = iconImages.length * entryLength;
+  const header = Buffer.alloc(headerLength);
+  header.writeUInt16LE(0, 0);
+  header.writeUInt16LE(1, 2);
+  header.writeUInt16LE(iconImages.length, 4);
+
+  let imageOffset = headerLength + imageDirectoryLength;
+  const entries = iconImages.map(({ size, buffer }) => {
+    const entry = encodeIcoImageDirectoryEntry(size, buffer, imageOffset);
+    imageOffset += buffer.length;
+    return entry;
+  });
+
+  return Buffer.concat([
+    header,
+    ...entries,
+    ...iconImages.map(({ buffer }) => buffer)
+  ]);
+}
 
 console.log('\n📐 Resizing PNG to multiple sizes:', sizes.join(', '));
 console.log('   Processing images...\n');
 
 // Resize PNG to each size and collect buffers
 Promise.all(
-  sizes.map(size => 
+  sizes.map(size =>
     sharp(pngPath)
-      .resize(size, size, { 
+      .resize(size, size, {
         fit: 'contain',
         background: { r: 0, g: 0, b: 0, alpha: 0 }
       })
       .png()
       .toBuffer()
+      .then(buffer => ({ size, buffer }))
   )
 )
-  .then(buffers => {
-    console.log('   ✓ Generated', buffers.length, 'sized versions');
+  .then(iconImages => {
+    console.log('   ✓ Generated', iconImages.length, 'sized versions');
     console.log('   Creating ICO file...\n');
-    
-    // Convert buffers to ICO
-    // Note: to-ico may have issues with large sizes, so we'll use only standard sizes
-    return toIco(buffers.slice(0, 5)); // Use first 5 sizes (up to 128)
+
+    return createIcoFromPngBuffers(iconImages);
   })
   .then(icoBuffer => {
     // Write ICO file
     fs.writeFileSync(icoPath, icoBuffer);
-    
+
     const stats = fs.statSync(icoPath);
     console.log('✅ ICO file generated successfully!');
     console.log('   Output size:', stats.size, 'bytes');
     console.log('   Location:', icoPath);
-    console.log('   Contains sizes: 16, 32, 48, 64, 128');
+    console.log('   Contains sizes:', sizes.join(', '));
     console.log('\n💡 The ICO file now contains multiple sizes for better Windows compatibility.');
     console.log('   You can now rebuild the app: npm run build');
   })

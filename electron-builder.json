@@ -47,7 +47,7 @@
         "arch": ["x64"]
       }
     ],
-    "icon": "public/icons/win/icon.ico",
+    "icon": "public/Logo1.ico",
     "signAndEditExecutable": false
   },
   "nsis": {
@@ -57,21 +57,21 @@
     "createStartMenuShortcut": true,
     "shortcutName": "GetVideosLocally",
     "include": "installer/installer.nsh",
-    "installerIcon": "public/icons/win/icon.ico",
-    "uninstallerIcon": "public/icons/win/icon.ico",
-    "installerHeaderIcon": "public/icons/win/icon.ico",
+    "installerIcon": "public/Logo1.ico",
+    "uninstallerIcon": "public/Logo1.ico",
+    "installerHeaderIcon": "public/Logo1.ico",
     "deleteAppDataOnUninstall": false,
     "runAfterFinish": true,
     "perMachine": false
   },
   "mac": {
     "target": ["dmg"],
-    "icon": "public/icons/mac/icon.icns",
+    "icon": "public/Logo1.ico",
     "category": "public.app-category.utilities"
   },
   "linux": {
     "target": ["AppImage"],
-    "icon": "public/icons/png",
+    "icon": "public/Logo1.ico",
     "category": "Utility"
   }
 }

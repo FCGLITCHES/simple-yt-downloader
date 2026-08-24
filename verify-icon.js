@@ -9,7 +9,7 @@ const exePath = path.resolve(
   "GetVideosLocally-win32-x64",
   "GetVideosLocally.exe",
 );
-const iconPath = path.resolve(__dirname, "public", "icons", "win", "icon.ico");
+const iconPath = path.resolve(__dirname, "public", "Logo1.ico");
 
 console.log("🔍 Verifying icon setup...\n");
 

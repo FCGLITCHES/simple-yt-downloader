@@ -8,7 +8,7 @@ const builderConfig = require("../electron-builder.json");
 const packageManifest = require("../package.json");
 const packageLock = require("../package-lock.json");
 
-test("3.1.1 release metadata stays aligned across package and UI boundaries", () => {
+test("3.1.2 release metadata stays aligned across package and UI boundaries", () => {
   const indexHtml = fs.readFileSync(
     path.join(projectRoot, "index.html"),
     "utf8",
@@ -18,11 +18,11 @@ test("3.1.1 release metadata stays aligned across package and UI boundaries", ()
     "utf8",
   );
 
-  assert.equal(packageManifest.version, "3.1.1");
-  assert.equal(packageLock.version, "3.1.1");
-  assert.equal(packageLock.packages[""].version, "3.1.1");
-  assert.match(indexHtml, /window\.APP_VERSION = '3\.1\.1'/);
-  assert.match(rendererScript, /DEFAULT_APP_VERSION = '3\.1\.1'/);
+  assert.equal(packageManifest.version, "3.1.2");
+  assert.equal(packageLock.version, "3.1.2");
+  assert.equal(packageLock.packages[""].version, "3.1.2");
+  assert.match(indexHtml, /window\.APP_VERSION = '3\.1\.2'/);
+  assert.match(rendererScript, /DEFAULT_APP_VERSION = '3\.1\.2'/);
   assert.match(indexHtml, /Logo Everywhere/);
   assert.match(rendererScript, /Logo Everywhere/);
   assert.match(indexHtml, /44% Smaller Installation/);
@@ -43,7 +43,7 @@ test("installer packages each resource family exactly once", () => {
 });
 
 test("Windows brand icon owns executable, installer, window, and tray surfaces", () => {
-  const canonicalIcon = "public/icons/win/icon.ico";
+  const canonicalIcon = "public/Logo1.ico";
   const electronMain = fs.readFileSync(
     path.join(projectRoot, "electron-main.js"),
     "utf8",
@@ -74,25 +74,25 @@ test("Windows brand icon owns executable, installer, window, and tray surfaces",
   assert.equal(builderConfig.nsis.installerIcon, canonicalIcon);
   assert.equal(builderConfig.nsis.uninstallerIcon, canonicalIcon);
   assert.equal(builderConfig.nsis.installerHeaderIcon, canonicalIcon);
-  assert.equal(builderConfig.mac.icon, "public/icons/mac/icon.icns");
-  assert.equal(builderConfig.linux.icon, "public/icons/png");
+  assert.equal(builderConfig.mac.icon, canonicalIcon);
+  assert.equal(builderConfig.linux.icon, canonicalIcon);
   assert.match(electronMain, /app\.setAppUserModelId\(APP_USER_MODEL_ID\)/);
   assert.match(
     electronMain,
-    /path\.join\(__dirname, 'public', 'icons', 'win', 'icon\.ico'\)/,
+    /path\.join\(__dirname, 'public', 'Logo1\.ico'\)/,
   );
   assert.match(electronMain, /new Tray\(trayIcon\.resize/);
   assert.equal(
     (electronMain.match(/icon: WINDOWS_BRAND_ICON_PATH/g) || []).length,
     2,
   );
-  assert.match(windowsBranding, /"icons",\s*"win",\s*"icon\.ico"/);
+  assert.match(windowsBranding, /"public",\s*"Logo1\.ico"/);
   assert.match(windowsBranding, /["']product-version["']: version/);
   assert.match(portableIconScript, /brandWindowsExecutable\(exePath\)/);
   assert.match(afterPackBranding, /brandWindowsExecutable\(executablePath\)/);
   assert.match(
     iconVerifier,
-    /["']icons["'],\s*["']win["'],\s*["']icon\.ico["']/,
+    /["']public["'],\s*["']Logo1\.ico["']/,
   );
 });
 
@@ -114,9 +114,22 @@ test("portable release ZIP includes the package version", () => {
   );
   assert.match(
     portableBuildScript,
-    /"public",\s*"icons",\s*"win",\s*"icon\.ico"/,
+    /"public",\s*"Logo1\.ico"/,
   );
-  assert.doesNotMatch(portableBuildScript, /Logo_1/);
+  assert.doesNotMatch(portableBuildScript, /Logo_1|public[\\/]icons/);
+});
+
+test("public branding keeps only the canonical Logo1 icon", () => {
+  const publicBrandAssets = fs
+    .readdirSync(path.join(projectRoot, "public"), { withFileTypes: true })
+    .filter(
+      (entry) =>
+        entry.name.toLowerCase().includes("logo") ||
+        entry.name.toLowerCase() === "icons",
+    )
+    .map((entry) => entry.name);
+
+  assert.deepEqual(publicBrandAssets, ["Logo1.ico"]);
 });
 
 test("runtime tool payload excludes unused ffplay", () => {

@@ -1,9 +1,10 @@
-# GetVideosLocally v3.1.1
+# GetVideosLocally v3.1.2
 
-## Windows Branding Correction
+## Approved Brand Logo Correction
 
-- Replaced the generic Electron executable icon with the GetVideosLocally brand icon.
-- Unified the icon used by the installer, uninstaller, installed and portable executables, desktop and Start Menu shortcuts, taskbar windows, cookie helper, system tray, and Apps & Features registration.
+- Made `public/Logo1.ico` the sole public brand asset and removed conflicting logo files.
+- Replaced the generic or incorrect executable icons with the approved GetVideosLocally brand icon.
+- Unified the icon used by web favicons, the installer, uninstaller, installed and portable executables, desktop and Start Menu shortcuts, taskbar windows, cookie helper, system tray, and Apps & Features registration.
 - Added the Windows AppUserModelID so taskbar and notification identity matches the installed application.
 - Corrected portable executable version metadata to use the package version.
 - Added icon ownership and packaging regressions.

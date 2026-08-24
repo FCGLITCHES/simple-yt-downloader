@@ -8,9 +8,7 @@ const windowsIconPath = path.resolve(
   __dirname,
   "..",
   "public",
-  "icons",
-  "win",
-  "icon.ico",
+  "Logo1.ico",
 );
 
 const brandWindowsExecutable = async (executablePath) => {

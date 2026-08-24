@@ -5063,16 +5063,16 @@ if (includeAutoCaptionsCheckbox) includeAutoCaptionsCheckbox.checked = userSetti
     // ===== UPDATE CHECK & CHANGELOG SYSTEM =====
 const UPDATE_LAST_SEEN_KEY = 'gvl_lastSeenVersion';
 const UPDATE_POPUP_DELAY_MS = 2500;
-const DEFAULT_APP_VERSION = '3.1.1';
+const DEFAULT_APP_VERSION = '3.1.2';
 const FALLBACK_APP_CHANGELOG = {
     version: DEFAULT_APP_VERSION,
-    title: "Branding Fix v3.1.1",
+    title: "Correct Brand Logo v3.1.2",
     date: 'August 2026',
     required: false,
     badge: 'New',
-    summary: 'The GetVideosLocally logo now appears consistently across Windows and the smaller 3.1 package remains intact.',
+    summary: 'The approved Logo1 icon now appears consistently across Windows and the smaller 3.1 package remains intact.',
     items: [
-        { icon: 'fa-icons', color: '#6f42c1', title: 'Logo Everywhere', desc: 'The branded icon is now embedded in the executable, installer, uninstaller, desktop and Start Menu shortcuts, taskbar windows, system tray, and Apps & Features entry.' },
+        { icon: 'fa-icons', color: '#6f42c1', title: 'Correct Logo Everywhere', desc: 'The approved Logo1 icon is now the sole public brand asset and is embedded in the executable, installer, uninstaller, desktop and Start Menu shortcuts, taskbar windows, system tray, web favicons, and Apps & Features entry.' },
         { icon: 'fa-hard-drive', color: '#3498db', title: '44% Smaller Installation', desc: 'Duplicate packaged resources and the unused FFplay executable were removed, cutting the installed footprint from about 1.14 GiB to 652 MiB.' },
         { icon: 'fa-broom', color: '#2ecc71', title: 'Cleaner Uninstall', desc: 'Uninstall now clears app caches, settings, logs, queues, updater files, shortcuts, startup entries, and legacy registration.' },
         { icon: 'fa-folder-open', color: '#f39c12', title: 'Downloads Stay Protected', desc: 'Downloaded videos are kept by default, with a clear confirmation before the uninstaller removes them.' },

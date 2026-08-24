@@ -2,7 +2,7 @@
 const fs = require("fs");
 const path = require("path");
 
-const iconPath = path.resolve(__dirname, "public", "icons", "win", "icon.ico");
+const iconPath = path.resolve(__dirname, "public", "Logo1.ico");
 
 console.log("🔍 Checking ICO file format...\n");
 console.log("   Icon path:", iconPath);
@@ -97,7 +97,7 @@ if (recommendedSizes < 2) {
     "   1. Use an online ICO converter (like https://convertio.co/png-ico/)",
   );
   console.error(
-    "   2. Or use ImageMagick: magick convert Logo_1.png -define icon:auto-resize=256,128,64,48,32,16 Logo_1.ico",
+    "   Canonical source: public/Logo1.ico",
   );
   process.exit(1);
 } else {

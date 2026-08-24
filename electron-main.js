@@ -6,7 +6,7 @@ app.setName('GetVideosLocally');
 const path = require('path');
 
 const APP_USER_MODEL_ID = 'com.getvideoslocally.app';
-const WINDOWS_BRAND_ICON_PATH = path.join(__dirname, 'public', 'icons', 'win', 'icon.ico');
+const WINDOWS_BRAND_ICON_PATH = path.join(__dirname, 'public', 'Logo1.ico');
 
 if (process.platform === 'win32') {
   app.setAppUserModelId(APP_USER_MODEL_ID);

@@ -217,6 +217,6 @@ Electron user data is stored under `%APPDATA%\GetVideosLocally`. Caches, cookies
 
 ## Application Icon Ownership
 
-Windows branding has one source of truth: `public/icons/win/icon.ico`. The ICO contains 16, 24, 32, 48, 64, 128, and 256 pixel images. `scripts/windows-branding.js` owns the shared resource-editing contract: Electron Builder calls it from its Windows `afterPack` hook, and the portable packaging path calls the same helper.
+Application branding has one source of truth: `public/Logo1.ico`. The ICO contains 16, 24, 32, 48, 64, 128, and 256 pixel images. `scripts/windows-branding.js` owns the shared Windows resource-editing contract: Electron Builder calls it from its Windows `afterPack` hook, and the portable packaging path calls the same helper.
 
-The Windows builder, NSIS installer/uninstaller, Electron windows, system tray, desktop and Start Menu shortcuts, and Apps & Features registration all inherit this icon. `com.getvideoslocally.app` is both the package app ID and Windows AppUserModelID. macOS uses `public/icons/mac/icon.icns`; Linux uses the PNG icon set under `public/icons/png`.
+The builders, NSIS installer/uninstaller, Electron windows, system tray, desktop and Start Menu shortcuts, web favicons, and Apps & Features registration all reference this icon. `com.getvideoslocally.app` is both the package app ID and Windows AppUserModelID. No alternate logo files are kept under `public`.
