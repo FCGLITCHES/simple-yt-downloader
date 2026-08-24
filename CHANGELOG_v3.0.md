@@ -1,3 +1,14 @@
+# GetVideosLocally v3.2.0
+
+## Smarter Setup
+
+- Redesigned all five onboarding steps with a consistent red-and-white layout, approved `Logo1.ico` branding, clearer progress, and compact actions.
+- Changed Step 2 so Choose opens the native Windows folder picker directly and immediately persists the selected path to Settings.
+- Added format-aware preferred quality selection to Step 3 and persisted both defaults for the main download form.
+- Persisted sound and desktop notification choices from Step 4.
+- Bundled the open-source Manrope font locally for bolder, modern, offline-readable onboarding typography.
+- Added desktop and compact-width visual verification plus onboarding, persistence, startup-order, and packaging regressions.
+
 # GetVideosLocally v3.1.2
 
 ## Approved Brand Logo Correction

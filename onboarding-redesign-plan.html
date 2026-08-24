@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>GetVideosLocally Onboarding Redesign</title>
+    <style>
+      :root {
+        font-family: "Segoe UI", system-ui, sans-serif;
+        color: #101522;
+        background: #f4f5f7;
+      }
+      body {
+        min-height: 100dvh;
+        margin: 0;
+        display: grid;
+        place-items: center;
+      }
+      main {
+        width: min(760px, calc(100% - 40px));
+        background: #fff;
+        border: 1px solid #f0d4d8;
+        border-top: 4px solid #eb1736;
+        border-radius: 22px;
+        padding: 36px;
+        box-shadow: 0 24px 70px rgba(40, 14, 20, 0.12);
+      }
+      h1 {
+        margin: 0 0 10px;
+      }
+      p {
+        color: #616875;
+        line-height: 1.6;
+      }
+      ol {
+        margin: 28px 0 0;
+        padding-left: 22px;
+      }
+      li + li {
+        margin-top: 12px;
+      }
+      code {
+        color: #ce1230;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Onboarding redesign</h1>
+      <p>
+        A five-step, responsive light onboarding flow based on the supplied red
+        reference, using <code>public/Logo1.ico</code> as the brand source.
+      </p>
+      <ol>
+        <li>Use one shared header, numbered progress rail, and footer.</li>
+        <li>
+          Give every step a left-aligned task and a red contextual visual.
+        </li>
+        <li>Use bundled Manrope typography with bold, readable headings.</li>
+        <li>Reduce action buttons to compact 38–40px controls.</li>
+        <li>Select and save the download folder without opening Settings.</li>
+        <li>Persist format, quality, and notification preferences.</li>
+        <li>Verify all five steps at desktop and compact viewport sizes.</li>
+      </ol>
+    </main>
+  </body>
+</html>

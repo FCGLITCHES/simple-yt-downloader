@@ -2154,7 +2154,15 @@ const includeAutoCaptionsCheckbox = document.getElementById('includeAutoCaptions
 
     if (formatSelect && qualitySelect) {
         formatSelect.addEventListener('change', () => populateQualityOptions(qualitySelect, formatSelect.value, 'youtube', true));
+        const savedFormat = userSettings.defaultFormat || formatSelect.value;
+        if (Array.from(formatSelect.options).some(option => option.value === savedFormat)) {
+            formatSelect.value = savedFormat;
+        }
         populateQualityOptions(qualitySelect, formatSelect.value, 'youtube');
+        const savedQuality = userSettings.defaultQuality || 'highest';
+        if (Array.from(qualitySelect.options).some(option => option.value === savedQuality)) {
+            qualitySelect.value = savedQuality;
+        }
     }
     function detectPlaylist() {
         if (!youtubeUrlInput || !playlistOptionsDiv) return;
@@ -2348,6 +2356,8 @@ const includeAutoCaptionsCheckbox = document.getElementById('includeAutoCaptions
             notificationPopup: true,
             speedUnitDisplay: 'Mbps',
             downloadFolder: '',
+            defaultFormat: 'mp4',
+            defaultQuality: 'highest',
             skipDeleteConfirmation: false,
             themePreset: 'light',
             keepPcAwake: true,
@@ -2392,6 +2402,8 @@ includeAutoCaptions: false,
             notificationPopup: notificationPopupCheckbox ? notificationPopupCheckbox.checked : true,
             speedUnitDisplay: speedUnitDisplaySelect ? speedUnitDisplaySelect.value : 'Mbps',
             downloadFolder: downloadFolderInput ? downloadFolderInput.value : '',
+            defaultFormat: userSettings.defaultFormat || 'mp4',
+            defaultQuality: userSettings.defaultQuality || 'highest',
             skipDeleteConfirmation: skipDeleteConfirmationCheckbox ? skipDeleteConfirmationCheckbox.checked : false,
             themePreset: themePresetSelect ? themePresetSelect.value : 'light',
             keepPcAwake: keepPcAwakeCheckbox ? keepPcAwakeCheckbox.checked : true,
@@ -5055,28 +5067,25 @@ if (includeAutoCaptionsCheckbox) includeAutoCaptionsCheckbox.checked = userSetti
     // ===== ONBOARDING WIZARD SYSTEM =====
     initOnboarding();
 
-    // ===== UPDATE CHECK SYSTEM =====
-    initUpdateCheck();
-
     // ===== SCROLL TO TOP BUTTON =====
 
     // ===== UPDATE CHECK & CHANGELOG SYSTEM =====
 const UPDATE_LAST_SEEN_KEY = 'gvl_lastSeenVersion';
 const UPDATE_POPUP_DELAY_MS = 2500;
-const DEFAULT_APP_VERSION = '3.1.2';
+const DEFAULT_APP_VERSION = '3.2.0';
 const FALLBACK_APP_CHANGELOG = {
     version: DEFAULT_APP_VERSION,
-    title: "Correct Brand Logo v3.1.2",
+    title: "Smarter Setup v3.2.0",
     date: 'August 2026',
     required: false,
     badge: 'New',
-    summary: 'The approved Logo1 icon now appears consistently across Windows and the smaller 3.1 package remains intact.',
+    summary: 'A clearer five-step setup now saves your download preferences directly, without detouring through Settings.',
     items: [
-        { icon: 'fa-icons', color: '#6f42c1', title: 'Correct Logo Everywhere', desc: 'The approved Logo1 icon is now the sole public brand asset and is embedded in the executable, installer, uninstaller, desktop and Start Menu shortcuts, taskbar windows, system tray, web favicons, and Apps & Features entry.' },
-        { icon: 'fa-hard-drive', color: '#3498db', title: '44% Smaller Installation', desc: 'Duplicate packaged resources and the unused FFplay executable were removed, cutting the installed footprint from about 1.14 GiB to 652 MiB.' },
-        { icon: 'fa-broom', color: '#2ecc71', title: 'Cleaner Uninstall', desc: 'Uninstall now clears app caches, settings, logs, queues, updater files, shortcuts, startup entries, and legacy registration.' },
-        { icon: 'fa-folder-open', color: '#f39c12', title: 'Downloads Stay Protected', desc: 'Downloaded videos are kept by default, with a clear confirmation before the uninstaller removes them.' },
-        { icon: 'fa-film', color: '#9b59b6', title: 'Core Tools Retained', desc: 'FFmpeg, FFprobe, yt-dlp, and Node remain bundled so download, probing, conversion, and high-resolution workflows continue to work.' }
+        { icon: 'fa-wand-magic-sparkles', color: '#ed1736', title: 'Redesigned Five-Step Setup', desc: 'Every onboarding step now shares a clean red-and-white layout, the approved Logo1 brand icon, clearer progress, and smaller actions.' },
+        { icon: 'fa-folder-open', color: '#cf0829', title: 'Choose A Folder Directly', desc: 'Step 2 opens the native Windows folder picker and saves the result immediately to Settings without opening the Settings window.' },
+        { icon: 'fa-sliders', color: '#e84157', title: 'Format And Quality Defaults', desc: 'Step 3 now captures both the preferred download format and its matching quality so the first download is ready to go.' },
+        { icon: 'fa-bell', color: '#f05a72', title: 'Notification Preferences Saved', desc: 'Sound and desktop notification choices now persist from onboarding and appear correctly in Settings.' },
+        { icon: 'fa-font', color: '#aa1230', title: 'Bolder, More Readable Type', desc: 'The locally bundled Manrope typeface, stronger headings, compact controls, and responsive layout improve clarity at desktop and narrow window sizes.' }
     ]
 };
 let updatePopupTimer = null;
@@ -5136,6 +5145,10 @@ function showLatestChangesPopup(options = {}) {
 }
 
 function initUpdateCheck() {
+    if (!localStorage.getItem('ytdTutorialCompleted')) {
+        return;
+    }
+
     showLatestChangesPopup();
 }
 
@@ -5270,9 +5283,12 @@ function initOnboarding() {
 
     const onboardingState = {
         downloadFolder: '',
-        format: 'mp4',
-        quality: 'highest',
-        notifications: { sound: true, desktop: false }
+        format: userSettings?.defaultFormat || 'mp4',
+        quality: userSettings?.defaultQuality || 'highest',
+        notifications: {
+            sound: userSettings?.notificationSound ?? true,
+            desktop: userSettings?.notificationPopup ?? false
+        }
     };
 
     const TOTAL_STEPS = 5;
@@ -5308,264 +5324,265 @@ function initOnboarding() {
         return 'Downloads folder';
     }
 
+    function persistOnboardingSettings(settingsPatch) {
+        userSettings = {
+            ...(userSettings || loadSettings()),
+            ...settingsPatch
+        };
+        localStorage.setItem('ytdUserSettings', JSON.stringify(userSettings));
+        window.userSettings = userSettings;
+    }
+
+    function persistDownloadFolder(folderPath) {
+        onboardingState.downloadFolder = folderPath;
+        localStorage.setItem('downloadFolder', folderPath);
+        persistOnboardingSettings({ downloadFolder: folderPath });
+
+        const settingsFolderInput = document.getElementById('downloadFolder');
+        if (settingsFolderInput) settingsFolderInput.value = folderPath;
+    }
+
+    function getQualityOptions(format) {
+        return ['mp4', 'mkv'].includes(format)
+            ? [
+                ['highest', 'Best available (up to 8K)'],
+                ['2160', '4K (2160p)'],
+                ['1440', '2K (1440p)'],
+                ['1080', 'Full HD (1080p)'],
+                ['720', 'HD (720p)']
+            ]
+            : [
+                ['highest', 'Highest quality'],
+                ['320', '320 kbps'],
+                ['256', '256 kbps'],
+                ['192', '192 kbps']
+            ];
+    }
+
+    function populateOnboardingQuality(format, preferredQuality) {
+        const qualityInput = document.getElementById('onboardingQuality');
+        if (!qualityInput) return;
+
+        const qualityOptions = getQualityOptions(format);
+        qualityInput.replaceChildren(...qualityOptions.map(([quality, label]) => {
+            const option = document.createElement('option');
+            option.value = quality;
+            option.textContent = label;
+            return option;
+        }));
+        qualityInput.value = qualityOptions.some(([quality]) => quality === preferredQuality)
+            ? preferredQuality
+            : qualityOptions[0][0];
+        onboardingState.quality = qualityInput.value;
+    }
+
     function shortenPath(path, maxLen = 45) {
         if (!path || path.length <= maxLen) return path;
         return '...' + path.slice(-(maxLen - 3));
     }
 
-    function renderWelcome() {
+    function escapeOnboardingText(rawText) {
+        return String(rawText ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function renderSetupProgress(activeIndex) {
+        return steps.map((step, index) => {
+            const stateClass = index < activeIndex
+                ? 'is-complete'
+                : index === activeIndex
+                    ? 'is-active'
+                    : '';
+            const label = index < activeIndex
+                ? '<i class="fas fa-check" aria-hidden="true"></i>'
+                : String(index + 1);
+            return `<button class="setup-step-pill onboarding-step-dot ${stateClass}" type="button" data-step="${index}" aria-label="Go to ${step.id} step" ${index > activeIndex ? 'disabled' : ''}>${label}</button>`;
+        }).join('');
+    }
+
+    function renderSetupShell({ index, title, subtitle, visualIcon, body, actions }) {
         return `
-            <div class="onboarding-progress-bar">
-                <div class="onboarding-progress-fill" style="width: 20%"></div>
-            </div>
-            <div class="onboarding-step-indicators">
-                ${steps.map((_, i) => `<div class="onboarding-step-dot ${i === 0 ? 'active' : ''}" data-step="${i}"></div>`).join('')}
-            </div>
-            <div class="onboarding-scroll-area">
-                <div class="onboarding-step-view">
-                    <div class="onboarding-welcome-icon">
-                        <i class="fas fa-play"></i>
+            <div class="setup-shell">
+                <header class="setup-header">
+                    <img class="setup-brand-logo" src="/public/Logo1.ico" alt="GetVideosLocally" />
+                    <div class="setup-progress" aria-label="Setup progress">
+                        ${renderSetupProgress(index)}
                     </div>
-                    <h2 class="onboarding-step-title">Welcome to GetVideosLocally</h2>
-                    <p class="onboarding-step-subtitle">Download videos and audio from 1,000+ supported sites. Fast, private, and entirely on your computer.</p>
-                    <div class="onboarding-features">
-                        <div class="onboarding-feature-card">
-                            <div class="onboarding-feature-icon"><i class="fas fa-bolt"></i></div>
-                            <div class="onboarding-feature-text">Fast downloads with yt-dlp & FFmpeg</div>
-                        </div>
-                        <div class="onboarding-feature-card">
-                            <div class="onboarding-feature-icon"><i class="fas fa-shield-halved"></i></div>
-                            <div class="onboarding-feature-text">100% local &mdash; nothing leaves your machine</div>
-                        </div>
-                        <div class="onboarding-feature-card">
-                            <div class="onboarding-feature-icon"><i class="fas fa-music"></i></div>
-                            <div class="onboarding-feature-text">Video (MP4, MKV) &amp; audio (MP3, FLAC)</div>
-                        </div>
-                        <div class="onboarding-feature-card">
-                            <div class="onboarding-feature-icon"><i class="fas fa-list"></i></div>
-                            <div class="onboarding-feature-text">Full playlist support with batch download</div>
-                        </div>
+                    <button class="setup-close onboarding-close-btn" type="button" aria-label="Close setup">
+                        <i class="fas fa-xmark" aria-hidden="true"></i>
+                    </button>
+                </header>
+                <main class="setup-main">
+                    <section class="setup-copy">
+                        <p class="setup-kicker">Step ${index + 1} of ${TOTAL_STEPS}</p>
+                        <h2 class="setup-title">${title}</h2>
+                        <p class="setup-subtitle">${subtitle}</p>
+                        <div class="setup-body">${body}</div>
+                    </section>
+                    <div class="setup-visual" aria-hidden="true">
+                        <div class="setup-visual-orbit"></div>
+                        <div class="setup-visual-core"><i class="fas ${visualIcon}"></i></div>
                     </div>
-                </div>
-            </div>
-            <div class="onboarding-nav-bar">
-                <div class="onboarding-nav-info">Step 1 of ${TOTAL_STEPS}</div>
-                <div class="onboarding-nav-actions">
-                    <button class="onboarding-btn ghost" data-action="skip">Skip setup</button>
-                    <button class="onboarding-btn primary" data-action="next">Get Started <i class="fas fa-arrow-right"></i></button>
-                </div>
+                </main>
+                <footer class="setup-footer">
+                    <span class="setup-footer-note">You can change these options later in Settings.</span>
+                    <div class="setup-actions">${actions}</div>
+                </footer>
             </div>
         `;
+    }
+
+    function renderWelcome() {
+        const body = `
+            <div class="setup-feature-list">
+                <span><i class="fas fa-bolt"></i> Fast downloads with yt-dlp and FFmpeg</span>
+                <span><i class="fas fa-shield-halved"></i> Private processing on your computer</span>
+                <span><i class="fas fa-film"></i> Video, audio, playlists, and batch downloads</span>
+            </div>`;
+        const actions = `
+            <button class="setup-btn setup-btn-ghost" data-action="skip">Skip setup</button>
+            <button class="setup-btn setup-btn-primary" data-action="next">Get started <i class="fas fa-arrow-right"></i></button>`;
+        return renderSetupShell({
+            index: 0,
+            title: 'Welcome to GetVideosLocally',
+            subtitle: 'Download videos and audio from more than 1,000 supported sites—fast, private, and entirely on your computer.',
+            visualIcon: 'fa-play',
+            body,
+            actions
+        });
     }
 
     function renderLocation() {
         const currentFolder = getFolderDisplay();
         const shortFolder = shortenPath(currentFolder);
-        return `
-            <div class="onboarding-progress-bar">
-                <div class="onboarding-progress-fill" style="width: 40%"></div>
-            </div>
-            <div class="onboarding-step-indicators">
-                ${steps.map((_, i) => `<div class="onboarding-step-dot ${i === 1 ? 'active' : ''} ${i < 1 ? 'completed' : ''}" data-step="${i}"></div>`).join('')}
-            </div>
-            <div class="onboarding-scroll-area">
-                <div class="onboarding-step-view">
-                    <div class="onboarding-welcome-icon" style="background: linear-gradient(135deg, #3498db, #2980b9);">
-                        <i class="fas fa-folder-open"></i>
-                    </div>
-                    <h2 class="onboarding-step-title">Where should we save your downloads?</h2>
-                    <p class="onboarding-step-subtitle">Choose a folder on your computer. You can always change this later in Settings.</p>
-                    <div class="onboarding-form">
-                        <div class="onboarding-form-group">
-                            <label for="onboardingFolder">Download location</label>
-                            <div class="onboarding-folder-row">
-                                <input type="text" id="onboardingFolder" class="input-field" readonly value="${shortFolder}" />
-                                <button class="action-btn" id="onboardingChooseFolder" type="button" style="height:44px">
-                                    <i class="fas fa-folder-open"></i> Choose
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="onboarding-tip">
-                        <i class="fas fa-lightbulb"></i>
-                        <span>We'll create the folder for you if it doesn't exist yet.</span>
-                    </div>
+        const body = `
+            <div class="setup-form-group">
+                <label for="onboardingFolder">Download location</label>
+                <div class="setup-folder-row">
+                    <div class="setup-path-field"><i class="far fa-folder"></i><input type="text" id="onboardingFolder" readonly value="${escapeOnboardingText(shortFolder)}" /></div>
+                    <button class="setup-btn setup-btn-outline" id="onboardingChooseFolder" type="button"><i class="far fa-folder-open"></i> Choose</button>
                 </div>
             </div>
-            <div class="onboarding-nav-bar">
-                <div class="onboarding-nav-info">Step 2 of ${TOTAL_STEPS}</div>
-                <div class="onboarding-nav-actions">
-                    <button class="onboarding-btn outline" data-action="prev"><i class="fas fa-arrow-left"></i> Back</button>
-                    <button class="onboarding-btn primary" data-action="next">Continue <i class="fas fa-arrow-right"></i></button>
-                </div>
-            </div>
-        `;
+            <div class="setup-tip"><i class="fas fa-circle-info"></i><span>We'll create the folder for you if it doesn't exist yet.</span></div>
+            <p class="setup-location-status" id="onboardingFolderStatus" aria-live="polite"></p>`;
+        const actions = `
+            <button class="setup-btn setup-btn-outline" data-action="prev"><i class="fas fa-arrow-left"></i> Back</button>
+            <button class="setup-btn setup-btn-primary" data-action="next">Continue <i class="fas fa-arrow-right"></i></button>`;
+        return renderSetupShell({
+            index: 1,
+            title: 'Where should we save your downloads?',
+            subtitle: 'Choose a folder on your computer. You can always change this later in Settings.',
+            visualIcon: 'fa-folder-open',
+            body,
+            actions
+        });
     }
 
     function renderFormat() {
         const currentFormat = document.getElementById('format')?.value || onboardingState.format;
-        return `
-            <div class="onboarding-progress-bar">
-                <div class="onboarding-progress-fill" style="width: 60%"></div>
+        const qualityOptions = getQualityOptions(currentFormat);
+        const selectedQuality = qualityOptions.some(([quality]) => quality === onboardingState.quality)
+            ? onboardingState.quality
+            : qualityOptions[0][0];
+        const formats = [
+            ['mp4', 'fa-film', 'MP4 Video', 'Best compatibility'],
+            ['mp3', 'fa-music', 'MP3 Audio', 'Music and podcasts'],
+            ['mkv', 'fa-file-video', 'MKV Video', 'Multi-track video'],
+            ['flac', 'fa-headphones', 'FLAC Audio', 'Lossless audio']
+        ];
+        const body = `
+            <div class="setup-format-grid" id="onboardingFormatChoices">
+                ${formats.map(([format, icon, label, description]) => `
+                    <button class="setup-format-option onboarding-choice-card ${currentFormat === format ? 'selected' : ''}" type="button" data-format="${format}">
+                        <i class="fas ${icon}"></i>
+                        <span><strong>${label}</strong><small>${description}</small></span>
+                        <i class="fas fa-circle-check setup-option-check"></i>
+                    </button>`).join('')}
             </div>
-            <div class="onboarding-step-indicators">
-                ${steps.map((_, i) => `<div class="onboarding-step-dot ${i === 2 ? 'active' : ''} ${i < 2 ? 'completed' : ''}" data-step="${i}"></div>`).join('')}
-            </div>
-            <div class="onboarding-scroll-area">
-                <div class="onboarding-step-view">
-                    <div class="onboarding-welcome-icon" style="background: linear-gradient(135deg, #9b59b6, #8e44ad);">
-                        <i class="fas fa-sliders"></i>
-                    </div>
-                    <h2 class="onboarding-step-title">What do you download most?</h2>
-                    <p class="onboarding-step-subtitle">Pick your go-to format. You can switch anytime.</p>
-                    <div class="onboarding-choices" id="onboardingFormatChoices">
-                        <div class="onboarding-choice-card ${currentFormat === 'mp4' ? 'selected' : ''}" data-format="mp4">
-                            <div class="onboarding-choice-icon"><i class="fas fa-film"></i></div>
-                            <div class="onboarding-choice-label">MP4 Video</div>
-                            <div class="onboarding-choice-desc">Best for video, widely compatible</div>
-                        </div>
-                        <div class="onboarding-choice-card ${currentFormat === 'mp3' ? 'selected' : ''}" data-format="mp3">
-                            <div class="onboarding-choice-icon"><i class="fas fa-music"></i></div>
-                            <div class="onboarding-choice-label">MP3 Audio</div>
-                            <div class="onboarding-choice-desc">Music & podcasts</div>
-                        </div>
-                        <div class="onboarding-choice-card ${currentFormat === 'mkv' ? 'selected' : ''}" data-format="mkv">
-                            <div class="onboarding-choice-icon"><i class="fas fa-file-video"></i></div>
-                            <div class="onboarding-choice-label">MKV Video</div>
-                            <div class="onboarding-choice-desc">Open format, multi-track</div>
-                        </div>
-                        <div class="onboarding-choice-card ${currentFormat === 'flac' ? 'selected' : ''}" data-format="flac">
-                            <div class="onboarding-choice-icon"><i class="fas fa-headphones"></i></div>
-                            <div class="onboarding-choice-label">FLAC Audio</div>
-                            <div class="onboarding-choice-desc">Lossless quality, bigger files</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="onboarding-nav-bar">
-                <div class="onboarding-nav-info">Step 3 of ${TOTAL_STEPS}</div>
-                <div class="onboarding-nav-actions">
-                    <button class="onboarding-btn outline" data-action="prev"><i class="fas fa-arrow-left"></i> Back</button>
-                    <button class="onboarding-btn primary" data-action="next">Continue <i class="fas fa-arrow-right"></i></button>
-                </div>
-            </div>
-        `;
+            <div class="setup-quality-row">
+                <label for="onboardingQuality">Preferred quality</label>
+                <select id="onboardingQuality">
+                    ${qualityOptions.map(([quality, label]) => `<option value="${quality}" ${selectedQuality === quality ? 'selected' : ''}>${label}</option>`).join('')}
+                </select>
+            </div>`;
+        const actions = `
+            <button class="setup-btn setup-btn-outline" data-action="prev"><i class="fas fa-arrow-left"></i> Back</button>
+            <button class="setup-btn setup-btn-primary" data-action="next">Continue <i class="fas fa-arrow-right"></i></button>`;
+        return renderSetupShell({
+            index: 2,
+            title: 'What do you download most?',
+            subtitle: 'Choose your default format. You can switch formats for any download later.',
+            visualIcon: 'fa-sliders',
+            body,
+            actions
+        });
     }
 
     function renderNotifications() {
         const soundEnabled = document.getElementById('notificationSound')?.checked ?? onboardingState.notifications.sound;
         const desktopEnabled = document.getElementById('notificationPopup')?.checked ?? onboardingState.notifications.desktop;
-        return `
-            <div class="onboarding-progress-bar">
-                <div class="onboarding-progress-fill" style="width: 80%"></div>
-            </div>
-            <div class="onboarding-step-indicators">
-                ${steps.map((_, i) => `<div class="onboarding-step-dot ${i === 3 ? 'active' : ''} ${i < 3 ? 'completed' : ''}" data-step="${i}"></div>`).join('')}
-            </div>
-            <div class="onboarding-scroll-area">
-                <div class="onboarding-step-view">
-                    <div class="onboarding-welcome-icon" style="background: linear-gradient(135deg, #f39c12, #e67e22);">
-                        <i class="fas fa-bell"></i>
-                    </div>
-                    <h2 class="onboarding-step-title">Stay in the loop</h2>
-                    <p class="onboarding-step-subtitle">Get notified when your downloads finish. You can adjust these any time in Settings.</p>
-                    <div class="onboarding-toggle-list">
-                        <div class="onboarding-toggle-row">
-                            <div class="onboarding-toggle-info">
-                                <div class="onboarding-toggle-icon"><i class="fas fa-volume-high"></i></div>
-                                <div class="onboarding-toggle-text">
-                                    <div class="onboarding-toggle-label">Sound alerts</div>
-                                    <div class="onboarding-toggle-desc">Play a sound when downloads complete</div>
-                                </div>
-                            </div>
-                            <label class="onboarding-toggle-switch">
-                                <input type="checkbox" id="onboardingSoundToggle" ${soundEnabled ? 'checked' : ''}>
-                                <span class="onboarding-toggle-slider"></span>
-                            </label>
-                        </div>
-                        <div class="onboarding-toggle-row">
-                            <div class="onboarding-toggle-info">
-                                <div class="onboarding-toggle-icon"><i class="fas fa-desktop"></i></div>
-                                <div class="onboarding-toggle-text">
-                                    <div class="onboarding-toggle-label">Desktop notifications</div>
-                                    <div class="onboarding-toggle-desc">Show system notifications when done</div>
-                                </div>
-                            </div>
-                            <label class="onboarding-toggle-switch">
-                                <input type="checkbox" id="onboardingDesktopToggle" ${desktopEnabled ? 'checked' : ''}>
-                                <span class="onboarding-toggle-slider"></span>
-                            </label>
-                        </div>
-                    </div>
-                    <p class="onboarding-skip-label">You can change these later in Settings</p>
-                </div>
-            </div>
-            <div class="onboarding-nav-bar">
-                <div class="onboarding-nav-info">Step 4 of ${TOTAL_STEPS}</div>
-                <div class="onboarding-nav-actions">
-                    <button class="onboarding-btn outline" data-action="prev"><i class="fas fa-arrow-left"></i> Back</button>
-                    <button class="onboarding-btn primary" data-action="next">Continue <i class="fas fa-arrow-right"></i></button>
-                </div>
-            </div>
-        `;
+        const body = `
+            <div class="setup-toggle-list">
+                <label class="setup-toggle-row">
+                    <span class="setup-toggle-copy"><i class="fas fa-volume-high"></i><span><strong>Sound alerts</strong><small>Play a sound when downloads complete</small></span></span>
+                    <span class="setup-switch"><input type="checkbox" id="onboardingSoundToggle" ${soundEnabled ? 'checked' : ''}><span></span></span>
+                </label>
+                <label class="setup-toggle-row">
+                    <span class="setup-toggle-copy"><i class="fas fa-desktop"></i><span><strong>Desktop notifications</strong><small>Show a system notification when done</small></span></span>
+                    <span class="setup-switch"><input type="checkbox" id="onboardingDesktopToggle" ${desktopEnabled ? 'checked' : ''}><span></span></span>
+                </label>
+            </div>`;
+        const actions = `
+            <button class="setup-btn setup-btn-outline" data-action="prev"><i class="fas fa-arrow-left"></i> Back</button>
+            <button class="setup-btn setup-btn-primary" data-action="next">Continue <i class="fas fa-arrow-right"></i></button>`;
+        return renderSetupShell({
+            index: 3,
+            title: 'Stay in the loop',
+            subtitle: 'Choose how GetVideosLocally should let you know when a download finishes.',
+            visualIcon: 'fa-bell',
+            body,
+            actions
+        });
     }
 
     function renderComplete() {
         const formatLabels = { mp4: 'MP4 Video', mp3: 'MP3 Audio', mkv: 'MKV Video', flac: 'FLAC Audio', wav: 'WAV Audio', m4a: 'M4A Audio', opus: 'Opus Audio', webm: 'WEBM Video', mov: 'MOV Video' };
         const formatLabel = formatLabels[onboardingState.format] || onboardingState.format.toUpperCase();
-        const folder = shortenPath(onboardingState.downloadFolder || getFolderDisplay(), 35);
+        const qualityLabel = getQualityOptions(onboardingState.format)
+            .find(([quality]) => quality === onboardingState.quality)?.[1] || 'Highest quality';
+        const folder = escapeOnboardingText(shortenPath(onboardingState.downloadFolder || getFolderDisplay(), 35));
         const soundOn = document.getElementById('onboardingSoundToggle')?.checked ?? onboardingState.notifications.sound;
         const desktopOn = document.getElementById('onboardingDesktopToggle')?.checked ?? onboardingState.notifications.desktop;
-        return `
-            <div class="onboarding-progress-bar">
-                <div class="onboarding-progress-fill" style="width: 100%"></div>
-            </div>
-            <div class="onboarding-step-indicators">
-                ${steps.map((_, i) => `<div class="onboarding-step-dot completed" data-step="${i}"></div>`).join('')}
-            </div>
-            <div class="onboarding-scroll-area">
-                <div class="onboarding-step-view">
-                    <div class="onboarding-success-icon">
-                        <i class="fas fa-check"></i>
-                    </div>
-                    <h2 class="onboarding-step-title">You're all set!</h2>
-                    <p class="onboarding-step-subtitle">Your preferences are saved. Paste a video URL to start your first download.</p>
-                    <div class="onboarding-summary">
-                        <div class="onboarding-summary-item">
-                            <span class="onboarding-summary-icon"><i class="fas fa-check"></i></span>
-                            <span class="onboarding-summary-label">Download folder</span>
-                            <span class="onboarding-summary-value">${folder}</span>
-                        </div>
-                        <div class="onboarding-summary-item">
-                            <span class="onboarding-summary-icon"><i class="fas fa-check"></i></span>
-                            <span class="onboarding-summary-label">Default format</span>
-                            <span class="onboarding-summary-value">${formatLabel}</span>
-                        </div>
-                        <div class="onboarding-summary-item">
-                            <span class="onboarding-summary-icon"><i class="fas fa-check"></i></span>
-                            <span class="onboarding-summary-label">Sound alerts</span>
-                            <span class="onboarding-summary-value">${soundOn ? 'On' : 'Off'}</span>
-                        </div>
-                        <div class="onboarding-summary-item">
-                            <span class="onboarding-summary-icon"><i class="fas fa-check"></i></span>
-                            <span class="onboarding-summary-label">Desktop notifications</span>
-                            <span class="onboarding-summary-value">${desktopOn ? 'On' : 'Off'}</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="onboarding-nav-bar">
-                <div class="onboarding-nav-info">All done</div>
-                <div class="onboarding-nav-actions">
-                    <button class="onboarding-btn success" data-action="finish"><i class="fas fa-download"></i> Start Downloading</button>
-                </div>
-            </div>
-        `;
+        const body = `
+            <dl class="setup-summary">
+                <div><dt>Download folder</dt><dd>${folder}</dd></div>
+                <div><dt>Default format</dt><dd>${formatLabel}</dd></div>
+                <div><dt>Preferred quality</dt><dd>${qualityLabel}</dd></div>
+                <div><dt>Sound alerts</dt><dd>${soundOn ? 'On' : 'Off'}</dd></div>
+                <div><dt>Desktop notifications</dt><dd>${desktopOn ? 'On' : 'Off'}</dd></div>
+            </dl>`;
+        const actions = `
+            <button class="setup-btn setup-btn-outline" data-action="prev"><i class="fas fa-arrow-left"></i> Back</button>
+            <button class="setup-btn setup-btn-primary" data-action="finish">Start downloading <i class="fas fa-arrow-right"></i></button>`;
+        return renderSetupShell({
+            index: 4,
+            title: "You're all set!",
+            subtitle: 'Your preferences are saved. Paste a video URL to start your first download.',
+            visualIcon: 'fa-check',
+            body,
+            actions
+        });
     }
 
     function renderStep(index) {
         const renderers = [renderWelcome, renderLocation, renderFormat, renderNotifications, renderComplete];
         content.innerHTML = renderers[index]();
+        content.scrollTop = 0;
+        content.querySelector('.setup-main')?.scrollTo({ top: 0, left: 0 });
         attachStepListeners(index);
     }
 
@@ -5583,11 +5600,21 @@ function initOnboarding() {
         if (selected) {
             const format = selected.dataset.format;
             onboardingState.format = format;
+            const onboardingQuality = document.getElementById('onboardingQuality');
+            onboardingState.quality = onboardingQuality?.value || 'highest';
             const formatSelect = document.getElementById('format');
             if (formatSelect) {
                 formatSelect.value = format;
                 formatSelect.dispatchEvent(new Event('change'));
             }
+            const qualitySelect = document.getElementById('quality');
+            if (qualitySelect && Array.from(qualitySelect.options).some(option => option.value === onboardingState.quality)) {
+                qualitySelect.value = onboardingState.quality;
+            }
+            persistOnboardingSettings({
+                defaultFormat: onboardingState.format,
+                defaultQuality: onboardingState.quality
+            });
         }
     }
 
@@ -5605,6 +5632,10 @@ function initOnboarding() {
             const el = document.getElementById('notificationPopup');
             if (el) el.checked = desktopToggle.checked;
         }
+        persistOnboardingSettings({
+            notificationSound: onboardingState.notifications.sound,
+            notificationPopup: onboardingState.notifications.desktop
+        });
     }
 
     function attachStepListeners(index) {
@@ -5642,31 +5673,49 @@ function initOnboarding() {
 
         if (index === 1) {
             document.getElementById('onboardingChooseFolder')?.addEventListener('click', async () => {
-                if (window.electronAPI && window.electronAPI.openFolderDialog) {
-                    try {
-                        const folderPath = await window.electronAPI.openFolderDialog();
-                        if (folderPath) {
-                            const folder = folderPath.replace(/\\/g, '/');
-                            onboardingState.downloadFolder = folder;
-                            const folderInput = document.getElementById('onboardingFolder');
-                            if (folderInput) folderInput.value = shortenPath(folder);
-                            const mainFolderInput = document.getElementById('downloadFolder');
-                            if (mainFolderInput) {
-                                mainFolderInput.value = folder;
-                                localStorage.setItem('downloadFolder', folder);
-                            }
-                        }
-                    } catch (e) {
-                        console.error('Folder selection cancelled or failed:', e);
+                const chooseButton = document.getElementById('onboardingChooseFolder');
+                const status = document.getElementById('onboardingFolderStatus');
+                const setStatus = (message, state = '') => {
+                    if (!status) return;
+                    status.textContent = message;
+                    status.dataset.state = state;
+                };
+
+                if (!window.electronAPI?.openFolderDialog) {
+                    setStatus('The folder picker is unavailable. Restart the desktop app and try again.', 'error');
+                    return;
+                }
+
+                if (chooseButton) {
+                    chooseButton.disabled = true;
+                    chooseButton.setAttribute('aria-busy', 'true');
+                    chooseButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Choosing';
+                }
+                setStatus('Waiting for a folder selection…');
+
+                try {
+                    const selectedFolderPath = await window.electronAPI.openFolderDialog();
+                    if (!selectedFolderPath) {
+                        setStatus('No folder selected. Your current location is unchanged.');
+                        return;
                     }
-                } else {
-                    const settingsBtn = document.getElementById('settingsBtn');
-                    const settingsModal = document.getElementById('settingsModal');
-                    if (settingsBtn && settingsModal) {
-                        closeModal();
-                        settingsModal.style.display = 'flex';
-                        document.body.classList.add('modal-open');
-                        setTimeout(() => flashHighlight(settingsBtn), 300);
+
+                    const normalizedFolderPath = selectedFolderPath.replace(/\\/g, '/');
+                    persistDownloadFolder(normalizedFolderPath);
+                    const folderInput = document.getElementById('onboardingFolder');
+                    if (folderInput) {
+                        folderInput.value = shortenPath(normalizedFolderPath);
+                        folderInput.title = normalizedFolderPath;
+                    }
+                    setStatus('Saved to Settings.', 'success');
+                } catch (folderPickerError) {
+                    console.error('Folder selection failed:', folderPickerError);
+                    setStatus('We could not open the folder picker. Please try again.', 'error');
+                } finally {
+                    if (chooseButton) {
+                        chooseButton.disabled = false;
+                        chooseButton.removeAttribute('aria-busy');
+                        chooseButton.innerHTML = '<i class="far fa-folder-open"></i> Choose';
                     }
                 }
             });
@@ -5678,7 +5727,11 @@ function initOnboarding() {
                     content.querySelectorAll('.onboarding-choice-card').forEach(c => c.classList.remove('selected'));
                     card.classList.add('selected');
                     onboardingState.format = card.dataset.format;
+                    populateOnboardingQuality(onboardingState.format, onboardingState.quality);
                 });
+            });
+            document.getElementById('onboardingQuality')?.addEventListener('change', event => {
+                onboardingState.quality = event.target.value;
             });
         }
 
@@ -5737,6 +5790,9 @@ function initOnboarding() {
         setTimeout(() => openModal(), 1000);
     }
 }
+
+// Initialize only after the update constants and onboarding helpers exist.
+initUpdateCheck();
 
 
 // Ensure default download folder is set correctly on first launch

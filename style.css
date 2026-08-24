@@ -67,6 +67,18 @@
     --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
 }
 
+/* Manrope - Local variable font for the setup experience */
+@font-face {
+    font-family: 'Manrope';
+    font-style: normal;
+    font-weight: 400 800;
+    font-display: swap;
+    src: url('/public/fonts/manrope-latin.woff2') format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC,
+        U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F,
+        U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
 .settings-help-text {
     margin: 0.35rem 0 0;
     color: var(--text-muted);
@@ -5701,6 +5713,694 @@ body {
         font-size: 0.85rem;
         padding: 0 1rem;
         height: 40px;
+    }
+}
+
+/* ===== LIGHT RED SETUP EXPERIENCE ===== */
+#onboardingModal {
+    --setup-red: #ed1736;
+    --setup-red-dark: #cf0829;
+    --setup-ink: #101522;
+    --setup-muted: #626977;
+    --setup-line: #e5e7eb;
+    background: rgba(16, 21, 34, 0.62);
+    backdrop-filter: blur(10px);
+}
+
+#onboardingModal .onboarding-modal-content {
+    width: min(1080px, calc(100vw - 2rem));
+    max-width: 1080px;
+    height: min(720px, calc(100dvh - 2rem));
+    max-height: calc(100dvh - 2rem);
+    color: var(--setup-ink);
+    background: #fff;
+    border: 1px solid rgba(237, 23, 54, 0.55);
+    border-top: 4px solid var(--setup-red);
+    border-radius: 24px;
+    box-shadow: 0 32px 90px rgba(16, 21, 34, 0.28);
+}
+
+.setup-shell {
+    position: relative;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    width: 100%;
+    height: 100%;
+    font-family: 'Manrope', 'Segoe UI Variable Text', sans-serif;
+    background:
+        radial-gradient(circle at 100% 0%, rgba(237, 23, 54, 0.05), transparent 30%),
+        linear-gradient(135deg, #fff 0%, #fff 70%, #fff8f9 100%);
+}
+
+.setup-header {
+    display: grid;
+    grid-template-columns: 52px minmax(0, 1fr) 52px;
+    align-items: center;
+    gap: 1rem;
+    padding: 1.4rem 2.25rem 0.85rem;
+}
+
+.setup-brand-logo {
+    width: 44px;
+    height: 44px;
+    object-fit: contain;
+}
+
+.setup-progress {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    gap: 1.1rem;
+}
+
+.setup-progress::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: min(460px, 78%);
+    height: 1px;
+    background: var(--setup-line);
+    transform: translate(-50%, -50%);
+}
+
+.setup-step-pill.onboarding-step-dot {
+    position: relative;
+    z-index: 1;
+    width: 60px;
+    height: 38px;
+    padding: 0;
+    border: 1px solid var(--setup-line);
+    border-radius: 15px;
+    color: #858b96;
+    background: #fff;
+    font: 600 0.9rem "Segoe UI", sans-serif;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(16, 21, 34, 0.03);
+}
+
+.setup-step-pill.is-active {
+    color: #fff;
+    border-color: var(--setup-red);
+    background: linear-gradient(135deg, #ff183d, var(--setup-red-dark));
+    box-shadow: 0 8px 20px rgba(237, 23, 54, 0.22);
+}
+
+.setup-step-pill.is-complete {
+    color: var(--setup-red);
+}
+
+.setup-step-pill:disabled {
+    cursor: default;
+}
+
+.setup-close.onboarding-close-btn {
+    position: static;
+    width: 38px;
+    height: 38px;
+    justify-self: end;
+    padding: 0;
+    color: #737986;
+    background: transparent;
+    border-radius: 12px;
+    opacity: 1;
+}
+
+.setup-close.onboarding-close-btn:hover {
+    color: var(--setup-red-dark);
+    background: #fff1f3;
+}
+
+.setup-main {
+    display: grid;
+    grid-template-columns: minmax(0, 1.18fr) minmax(280px, 0.82fr);
+    align-items: center;
+    gap: clamp(2.5rem, 6vw, 5rem);
+    min-height: 0;
+    padding: 2.2rem clamp(3rem, 7vw, 5.5rem) 2.5rem;
+    overflow-y: auto;
+}
+
+.setup-copy {
+    min-width: 0;
+}
+
+.setup-kicker {
+    margin: 0 0 0.85rem;
+    color: var(--setup-red);
+    font-size: 0.9rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+
+.setup-title {
+    max-width: 650px;
+    margin: 0;
+    color: var(--setup-ink);
+    font-family: 'Manrope', 'Segoe UI Variable Display', sans-serif;
+    font-size: clamp(2.15rem, 4.5vw, 3.5rem);
+    font-weight: 800;
+    letter-spacing: -0.045em;
+    line-height: 1.04;
+}
+
+.setup-subtitle {
+    max-width: 590px;
+    margin: 1.15rem 0 0;
+    color: var(--setup-muted);
+    font-size: 1rem;
+    line-height: 1.65;
+}
+
+.setup-body {
+    margin-top: 1.8rem;
+}
+
+.setup-visual {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: min(100%, 330px);
+    aspect-ratio: 1;
+    justify-self: center;
+}
+
+.setup-visual-orbit {
+    position: absolute;
+    inset: 4%;
+    border: 1px solid rgba(237, 23, 54, 0.16);
+    border-radius: 44% 56% 48% 52%;
+    transform: rotate(14deg);
+}
+
+.setup-visual-orbit::before,
+.setup-visual-orbit::after {
+    content: "";
+    position: absolute;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: rgba(237, 23, 54, 0.55);
+}
+
+.setup-visual-orbit::before {
+    top: 16%;
+    right: -16px;
+}
+
+.setup-visual-orbit::after {
+    bottom: 8%;
+    left: -10px;
+}
+
+.setup-visual-core {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 74%;
+    aspect-ratio: 1;
+    color: #fff;
+    background: linear-gradient(145deg, #ff5f58 0%, #ff173e 48%, #d6002c 100%);
+    border-radius: 42% 58% 48% 52%;
+    box-shadow: 0 28px 46px rgba(237, 23, 54, 0.25);
+    font-size: clamp(3.2rem, 7vw, 5.2rem);
+}
+
+.setup-visual-core::after {
+    content: "";
+    position: absolute;
+    inset: 18%;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 50%;
+}
+
+.setup-feature-list {
+    display: grid;
+    gap: 0.75rem;
+    color: #3f4653;
+}
+
+.setup-feature-list span {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 0.9rem;
+}
+
+.setup-feature-list i {
+    width: 18px;
+    color: var(--setup-red);
+    text-align: center;
+}
+
+.setup-form-group label {
+    display: block;
+    margin-bottom: 0.55rem;
+    color: var(--setup-red);
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.setup-folder-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.65rem;
+}
+
+.setup-path-field {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-width: 0;
+    height: 42px;
+    padding: 0 0.9rem;
+    border: 1px solid #d9dde4;
+    border-radius: 11px;
+    color: var(--setup-red);
+    background: #fff;
+}
+
+.setup-path-field input {
+    min-width: 0;
+    width: 100%;
+    border: 0;
+    outline: 0;
+    color: #303642;
+    background: transparent;
+    font: inherit;
+}
+
+.setup-tip {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    margin-top: 0.8rem;
+    padding: 0.75rem 0.9rem;
+    color: #4c5360;
+    background: #fff2f4;
+    border-radius: 10px;
+    font-size: 0.82rem;
+}
+
+.setup-tip i {
+    color: var(--setup-red-dark);
+}
+
+.setup-location-status {
+    min-height: 1.2em;
+    margin: 0.55rem 0 0;
+    color: #717884;
+    font-size: 0.75rem;
+    font-weight: 650;
+}
+
+.setup-location-status[data-state="success"] {
+    color: #168257;
+}
+
+.setup-location-status[data-state="error"] {
+    color: #c11332;
+}
+
+.setup-format-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.65rem;
+}
+
+.setup-format-option.onboarding-choice-card {
+    display: grid;
+    grid-template-columns: 32px minmax(0, 1fr) 18px;
+    align-items: center;
+    gap: 0.65rem;
+    min-height: 62px;
+    padding: 0.7rem 0.8rem;
+    color: #343a46;
+    background: #fff;
+    border: 1px solid #dde0e5;
+    border-radius: 12px;
+    text-align: left;
+    transform: none;
+    box-shadow: none;
+}
+
+.setup-format-option.onboarding-choice-card:hover,
+.setup-format-option.onboarding-choice-card.selected {
+    border-color: var(--setup-red);
+    background: #fff6f7;
+    transform: none;
+    box-shadow: 0 5px 14px rgba(237, 23, 54, 0.08);
+}
+
+.setup-format-option.onboarding-choice-card::before {
+    content: none;
+}
+
+.setup-format-option > i:first-child {
+    color: var(--setup-red);
+    font-size: 1rem;
+    text-align: center;
+}
+
+.setup-format-option span {
+    display: grid;
+    gap: 0.15rem;
+}
+
+.setup-format-option strong {
+    font-size: 0.84rem;
+}
+
+.setup-format-option small {
+    color: #747b87;
+    font-size: 0.7rem;
+}
+
+.setup-option-check {
+    color: var(--setup-red);
+    opacity: 0;
+}
+
+.setup-quality-row {
+    display: grid;
+    grid-template-columns: auto minmax(180px, 1fr);
+    align-items: center;
+    gap: 0.8rem;
+    margin-top: 0.8rem;
+}
+
+.setup-quality-row label {
+    color: #5f6672;
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+.setup-quality-row select {
+    width: 100%;
+    height: 38px;
+    padding: 0 2rem 0 0.75rem;
+    color: #303642;
+    background: #fff;
+    border: 1px solid #d9dde4;
+    border-radius: 10px;
+    font: 650 0.78rem 'Manrope', 'Segoe UI Variable Text', sans-serif;
+}
+
+.setup-format-option.selected .setup-option-check {
+    opacity: 1;
+}
+
+.setup-toggle-list {
+    display: grid;
+    gap: 0.65rem;
+}
+
+.setup-toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.75rem 0.85rem;
+    border: 1px solid #dde0e5;
+    border-radius: 12px;
+    cursor: pointer;
+}
+
+.setup-toggle-copy {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.setup-toggle-copy > i {
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    color: var(--setup-red);
+    background: #fff1f3;
+    border-radius: 9px;
+}
+
+.setup-toggle-copy span {
+    display: grid;
+    gap: 0.15rem;
+}
+
+.setup-toggle-copy strong {
+    font-size: 0.85rem;
+}
+
+.setup-toggle-copy small {
+    color: #747b87;
+    font-size: 0.72rem;
+}
+
+.setup-switch {
+    position: relative;
+    width: 38px;
+    height: 22px;
+    flex: 0 0 auto;
+}
+
+.setup-switch input {
+    position: absolute;
+    opacity: 0;
+}
+
+.setup-switch > span {
+    position: absolute;
+    inset: 0;
+    border-radius: 99px;
+    background: #d7dae0;
+    transition: background 160ms ease;
+}
+
+.setup-switch > span::after {
+    content: "";
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(16, 21, 34, 0.18);
+    transition: transform 160ms ease;
+}
+
+.setup-switch input:checked + span {
+    background: var(--setup-red);
+}
+
+.setup-switch input:checked + span::after {
+    transform: translateX(16px);
+}
+
+.setup-switch input:focus-visible + span {
+    outline: 2px solid var(--setup-red);
+    outline-offset: 2px;
+}
+
+.setup-summary {
+    display: grid;
+    gap: 0;
+    margin: 0;
+    border-top: 1px solid var(--setup-line);
+}
+
+.setup-summary div {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.62rem 0;
+    border-bottom: 1px solid var(--setup-line);
+    font-size: 0.8rem;
+}
+
+.setup-summary dt {
+    color: #717884;
+}
+
+.setup-summary dd {
+    max-width: 60%;
+    margin: 0;
+    color: #272d38;
+    font-weight: 650;
+    overflow-wrap: anywhere;
+    text-align: right;
+}
+
+.setup-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1.15rem clamp(3rem, 7vw, 5.5rem);
+    border-top: 1px solid var(--setup-line);
+    background: rgba(255, 255, 255, 0.94);
+}
+
+.setup-footer-note {
+    color: #8a909a;
+    font-size: 0.72rem;
+}
+
+.setup-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+}
+
+.setup-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    height: 38px;
+    padding: 0 1.05rem;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    font-family: inherit;
+    font-size: 0.82rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease;
+}
+
+.setup-btn:hover {
+    transform: translateY(-1px);
+}
+
+.setup-btn:disabled {
+    cursor: wait;
+    opacity: 0.68;
+    transform: none;
+}
+
+.setup-btn-primary {
+    min-width: 126px;
+    color: #fff;
+    background: linear-gradient(135deg, #ff173e, var(--setup-red-dark));
+    box-shadow: 0 8px 18px rgba(237, 23, 54, 0.2);
+}
+
+.setup-btn-outline {
+    color: var(--setup-red-dark);
+    background: #fff;
+    border-color: rgba(237, 23, 54, 0.55);
+}
+
+.setup-btn-ghost {
+    color: #6e7480;
+    background: transparent;
+}
+
+@media (max-width: 850px) {
+    #onboardingModal .onboarding-modal-content {
+        width: min(720px, calc(100vw - 1.5rem));
+        height: min(760px, calc(100dvh - 1.5rem));
+    }
+
+    .setup-main {
+        grid-template-columns: minmax(0, 1fr) 190px;
+        gap: 2rem;
+        padding: 1.75rem 2.25rem 2rem;
+    }
+
+    .setup-title {
+        font-size: clamp(2rem, 6vw, 3rem);
+    }
+
+    .setup-footer {
+        padding: 1rem 2.25rem;
+    }
+}
+
+@media (max-width: 620px) {
+    #onboardingModal {
+        padding: 0;
+    }
+
+    #onboardingModal .onboarding-modal-content {
+        width: 100%;
+        height: 100dvh;
+        max-height: 100dvh;
+        border-right: 0;
+        border-bottom: 0;
+        border-left: 0;
+        border-radius: 0;
+    }
+
+    .setup-header {
+        grid-template-columns: 38px minmax(0, 1fr) 38px;
+        padding: 1rem;
+    }
+
+    .setup-brand-logo {
+        width: 34px;
+        height: 34px;
+    }
+
+    .setup-progress {
+        gap: 0.35rem;
+    }
+
+    .setup-step-pill.onboarding-step-dot {
+        width: 38px;
+        height: 32px;
+        border-radius: 11px;
+        font-size: 0.78rem;
+    }
+
+    .setup-main {
+        grid-template-columns: 1fr;
+        align-content: start;
+        gap: 1.25rem;
+        padding: 1.25rem 1.15rem 1.5rem;
+    }
+
+    .setup-title {
+        font-size: 2rem;
+    }
+
+    .setup-subtitle {
+        font-size: 0.9rem;
+    }
+
+    .setup-visual {
+        order: -1;
+        width: 130px;
+    }
+
+    .setup-body {
+        margin-top: 1.25rem;
+    }
+
+    .setup-folder-row,
+    .setup-format-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .setup-quality-row {
+        grid-template-columns: 1fr;
+        gap: 0.4rem;
+    }
+
+    .setup-footer {
+        justify-content: flex-end;
+        padding: 0.85rem 1rem;
+    }
+
+    .setup-footer-note {
+        display: none;
+    }
+
+    .setup-actions {
+        width: 100%;
+        justify-content: flex-end;
     }
 }
 

@@ -52,6 +52,11 @@
 
 ## Features
 
+### Smarter Setup v3.2.0
+- **Direct folder selection:** onboarding opens the native folder picker and immediately saves the chosen location to Settings.
+- **Useful first-run defaults:** format, quality, sound, and desktop notification preferences are captured before the first download.
+- **Clearer onboarding:** all five steps use the approved logo, a responsive red-and-white visual system, compact controls, and locally bundled Manrope typography.
+
 ### Correct Brand Logo v3.1.2
 - **Approved logo everywhere:** `public/Logo1.ico` is the sole public brand asset and owns web favicons, installer, uninstaller, executables, shortcuts, taskbar windows, system tray, and installed-app registration.
 
