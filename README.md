@@ -52,6 +52,13 @@
 
 ## Features
 
+### HDR & Interface Polish v3.2.3
+- **Opt-in HDR preference:** HDR defaults off for fresh settings, while Settings and Advanced Options can enable it globally or for one download.
+- **Accurate speed and 8K:** hybrid speed tracking recovers from tiny initial samples, and 8K (4320p) is an explicit quality target with strict resolution caps.
+- **Cleaner download controls:** Advanced Options is flatter and easier to scan, subtitles are integrated into Download Options, and headings use stronger typography.
+- **Redesigned helpers:** the cookie importer and coffee popup now use clearer red-and-white hierarchy with flat action buttons.
+- **Compact release notes:** What’s New uses a smaller two-column layout with visible close and Got it actions.
+
 ### UI Clarity v3.2.1
 - **Manrope everywhere:** the onboarding typeface is now the primary app font, including the header wordmark and main download heading.
 - **Flatter setup progress:** numbered onboarding steps use solid colors without gradients or shadows.

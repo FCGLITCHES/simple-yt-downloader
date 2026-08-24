@@ -110,6 +110,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const playlistActionSelect = document.getElementById('playlistAction');
     const playlistConcurrencySelect = document.getElementById('concurrency');
     const advancedDownloadOptions = document.getElementById('advancedDownloadOptions');
+    const hdrModeOverrideSelect = document.getElementById('hdrModeOverride');
     const scheduleDownloadToggle = document.getElementById('scheduleDownloadToggle');
     const scheduleDownloadAt = document.getElementById('scheduleDownloadAt');
     const startYoutubeDownloadBtn = document.getElementById('startYoutubeDownloadBtn');
@@ -166,9 +167,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const notificationSoundCheckbox = document.getElementById('notificationSound');
     const notificationPopupCheckbox = document.getElementById('notificationPopup');
     const keepPcAwakeCheckbox = document.getElementById('keepPcAwake');
-const subtitleModeSelect = document.getElementById('subtitleMode');
+    const preferHdrCheckbox = document.getElementById('preferHdr');
+    const subtitleModeSelect = document.getElementById('subtitleMode');
     const subtitleLanguagesInput = document.getElementById('subtitleLanguages');
-const includeAutoCaptionsCheckbox = document.getElementById('includeAutoCaptions');
+    const includeAutoCaptionsCheckbox = document.getElementById('includeAutoCaptions');
     const speedUnitDisplaySelect = document.getElementById('speedUnitDisplay');
     const resetSpeedBtn = document.getElementById('resetSpeedBtn');
     const downloadFolderInput = document.getElementById('downloadFolder');
@@ -1379,6 +1381,14 @@ const includeAutoCaptionsCheckbox = document.getElementById('includeAutoCaptions
                 let qualityText = quality;
                 if (quality === 'highest') {
                     qualityText = 'Best';
+                } else if (
+                    ['8k', '4320', '4320p'].includes(String(quality).toLowerCase())
+                ) {
+                    qualityText = '8K';
+                } else if (
+                    ['4k', '2160', '2160p'].includes(String(quality).toLowerCase())
+                ) {
+                    qualityText = '4K';
                 } else if (!isNaN(parseInt(quality))) {
                     qualityText = `${quality}p`;
                 }
@@ -1990,6 +2000,12 @@ const includeAutoCaptionsCheckbox = document.getElementById('includeAutoCaptions
         if (statusDiv) showStatus('Requesting download...', source, 'info');
         hideFailureHelp();
 
+        const hdrOverride = options.preferHdr ?? hdrModeOverrideSelect?.value;
+        const preferHdr = hdrOverride === 'enabled'
+            ? true
+            : hdrOverride === 'disabled'
+                ? false
+                : userSettings.preferHdr === true;
         const payload = {
             url, format, quality, clientId, source,
             playlistAction: playlistActionVal,
@@ -1997,6 +2013,7 @@ const includeAutoCaptionsCheckbox = document.getElementById('includeAutoCaptions
             singleConcurrency: singleConcurrencyVal,
             selectedPlaylistItems: Array.isArray(options.selectedPlaylistItems) ? options.selectedPlaylistItems : [],
             ...userSettings,
+            preferHdr,
             downloadFolder: getDownloadFolder()
         };
         const scheduledFor = scheduleDownloadToggle?.checked ? scheduleDownloadAt?.value : '';
@@ -2082,7 +2099,8 @@ const includeAutoCaptionsCheckbox = document.getElementById('includeAutoCaptions
                 source: 'youtube',
                 playlistAction,
                 concurrency: parseInt(concurrency),
-                singleConcurrency: parseInt(singleConcurrency)
+                singleConcurrency: parseInt(singleConcurrency),
+                preferHdr: hdrModeOverrideSelect?.value || 'settings'
             };
             try {
                 if (isPlaylist && playlistAction === 'full') {
@@ -2115,6 +2133,7 @@ const includeAutoCaptionsCheckbox = document.getElementById('includeAutoCaptions
             if (isVideoFormat) {
                 qualities = [
                     { value: 'highest', text: 'Best available (up to 8K)' },
+                    { value: '4320', text: '8K (4320p)' },
                     { value: '2160', text: '4K (2160p)' },
                     { value: '1440', text: '2K (1440p)' },
                     { value: '1080', text: '1080p' },
@@ -2366,9 +2385,10 @@ const includeAutoCaptionsCheckbox = document.getElementById('includeAutoCaptions
             errorTelemetry: false, // Opt-in error telemetry (default: disabled for privacy)
             startWithWindows: false, // Start app with Windows (default: disabled)
             supportPopupDisabled: false,
-subtitleMode: 'none',
+            preferHdr: false,
+            subtitleMode: 'none',
             subtitleLanguages: 'en.*,en',
-includeAutoCaptions: false,
+            includeAutoCaptions: false,
             smartRetry: true,
             smartRetryAttempts: 3,
             lanAccess: false
@@ -2412,9 +2432,10 @@ includeAutoCaptions: false,
             errorTelemetry: errorTelemetryCheckbox ? errorTelemetryCheckbox.checked : false,
             startWithWindows: newStartWithWindows,
             supportPopupDisabled: userSettings.supportPopupDisabled === true,
-subtitleMode: subtitleModeSelect ? subtitleModeSelect.value : 'none',
+            preferHdr: preferHdrCheckbox ? preferHdrCheckbox.checked : false,
+            subtitleMode: subtitleModeSelect ? subtitleModeSelect.value : 'none',
             subtitleLanguages: subtitleLanguagesInput ? subtitleLanguagesInput.value.trim() || 'en.*,en' : 'en.*,en',
-includeAutoCaptions: includeAutoCaptionsCheckbox ? includeAutoCaptionsCheckbox.checked : false,
+            includeAutoCaptions: includeAutoCaptionsCheckbox ? includeAutoCaptionsCheckbox.checked : false,
             smartRetry: true,
             smartRetryAttempts: 3,
             lanAccess: userSettings.lanAccess === true
@@ -2545,9 +2566,11 @@ includeAutoCaptions: includeAutoCaptionsCheckbox ? includeAutoCaptionsCheckbox.c
         if (downloadFolderInput) downloadFolderInput.value = userSettings.downloadFolder || '';
         if (skipDeleteConfirmationCheckbox) skipDeleteConfirmationCheckbox.checked = userSettings.skipDeleteConfirmation;
         if (themePresetSelect) themePresetSelect.value = userSettings.themePreset;
-if (subtitleModeSelect) subtitleModeSelect.value = userSettings.subtitleMode || 'none';
+        if (preferHdrCheckbox) preferHdrCheckbox.checked = userSettings.preferHdr === true;
+        if (subtitleModeSelect) subtitleModeSelect.value = userSettings.subtitleMode || 'none';
         if (subtitleLanguagesInput) subtitleLanguagesInput.value = userSettings.subtitleLanguages || 'en.*,en';
-if (includeAutoCaptionsCheckbox) includeAutoCaptionsCheckbox.checked = userSettings.includeAutoCaptions === true;
+        if (includeAutoCaptionsCheckbox) includeAutoCaptionsCheckbox.checked = userSettings.includeAutoCaptions === true;
+        updateSubtitleVisibility();
 
         // Handle Windows startup checkbox - fetch actual state from system
         const startWithWindowsCheckbox = document.getElementById('startWithWindows');
@@ -3081,7 +3104,10 @@ if (includeAutoCaptionsCheckbox) includeAutoCaptionsCheckbox.checked = userSetti
                     request.playlistAction,
                     request.concurrency,
                     request.singleConcurrency,
-                    { selectedPlaylistItems: selectedIds }
+                    {
+                        selectedPlaylistItems: selectedIds,
+                        preferHdr: request.preferHdr
+                    }
                 );
             } catch (error) {
                 showStatus(`Could not queue selected playlist items: ${error.message}`, 'youtube', 'error');
@@ -5072,26 +5098,27 @@ if (includeAutoCaptionsCheckbox) includeAutoCaptionsCheckbox.checked = userSetti
     // ===== UPDATE CHECK & CHANGELOG SYSTEM =====
 const UPDATE_LAST_SEEN_KEY = 'gvl_lastSeenVersion';
 const UPDATE_POPUP_DELAY_MS = 2500;
-const DEFAULT_APP_VERSION = '3.2.1';
+const DEFAULT_APP_VERSION = '3.2.3';
 const FALLBACK_APP_CHANGELOG = {
     version: DEFAULT_APP_VERSION,
-    title: "UI Clarity v3.2.1",
+    title: "HDR & Interface Polish v3.2.3",
     date: 'August 2026',
     required: false,
     badge: 'New',
-    summary: 'Typography, setup progress, footer contrast, and compact Settings guidance now share a clearer visual system.',
+    summary: 'HDR control, accurate transfer speeds, explicit 8K quality, and cleaner download settings arrive together.',
     items: [
-        { icon: 'fa-font', color: '#ed1736', title: 'Manrope Across The App', desc: 'The onboarding typeface now owns the main interface, including the header wordmark and Download Videos from 1000+ Sites heading.' },
-        { icon: 'fa-list-ol', color: '#cf0829', title: 'Flat Setup Progress', desc: 'Onboarding step numbers now use a clean solid treatment without gradients or drop shadows.' },
-        { icon: 'fa-heart', color: '#e84157', title: 'Clearer Support Button', desc: 'Light mode keeps both the heart and Support Me label white and removes the button shadow.' },
-        { icon: 'fa-circle-info', color: '#aa1230', title: 'Compact LAN Guidance', desc: 'The Windows Firewall explanation no longer occupies a permanent Settings row and appears on hover or keyboard focus instead.' },
-        { icon: 'fa-square-check', color: '#c5203b', title: 'Aligned Settings Controls', desc: 'Settings checkboxes and their labels now share a consistent centered line box in every theme.' }
+        { icon: 'fa-sun', title: 'HDR Control', desc: 'HDR starts off for broader playback compatibility, with saved and per-download controls when needed.' },
+        { icon: 'fa-display', title: 'Explicit 8K Quality', desc: '8K (4320p) is available as a real quality target while every lower choice stays capped correctly.' },
+        { icon: 'fa-gauge-high', title: 'Accurate Transfer Speeds', desc: 'Hybrid disk and yt-dlp speed tracking no longer gets pinned by tiny initial samples.' },
+        { icon: 'fa-closed-captioning', title: 'Integrated Subtitles', desc: 'Caption choices now read as a natural part of Download Options with clearer labels and grouping.' },
+        { icon: 'fa-cookie-bite', title: 'Cleaner Cookies', desc: 'The cookie importer now uses a focused red-and-white upload flow with flat actions and clearer guidance.' },
+        { icon: 'fa-window-restore', title: 'Compact Release Notes', desc: 'What’s New now fits into a smaller two-column view with visible close controls.' }
     ]
 };
 let updatePopupTimer = null;
 
 function getCurrentAppVersion() {
-    const rawVersion = typeof window.APP_VERSION === 'string' ? window.APP_VERSION.trim() : '';
+    const rawVersion = document.documentElement.dataset.appVersion?.trim() || '';
     return rawVersion || DEFAULT_APP_VERSION;
 }
 
@@ -5105,7 +5132,6 @@ function getValidAppChangelog() {
         .filter(item => item && typeof item === 'object')
         .map((item) => ({
             icon: String(item.icon || 'fa-circle-info'),
-            color: String(item.color || '#3498db'),
             title: String(item.title || 'Update'),
             desc: String(item.desc || 'Latest improvements are now available.')
         }));
@@ -5172,7 +5198,7 @@ function showUpdatePopup(changelog, version, storageKey) {
 
     const itemsHtml = changelog.items.map(item => `
         <div class="update-item">
-            <div class="update-item-icon" style="background: ${item.color}15; color: ${item.color};">
+            <div class="update-item-icon">
                 <i class="fas ${item.icon}"></i>
             </div>
             <div class="update-item-text">
@@ -5190,11 +5216,14 @@ function showUpdatePopup(changelog, version, storageKey) {
 
     content.innerHTML = `
         <div class="onboarding-progress-bar">
-            <div class="onboarding-progress-fill" style="width: 100%; background: linear-gradient(90deg, #2ecc71, #27ae60);"></div>
+            <div class="onboarding-progress-fill update-progress-fill"></div>
         </div>
+        <button class="onboarding-close-btn update-close-btn" id="updateCloseBtn" type="button" aria-label="Close what's new">
+            <i class="fas fa-times" aria-hidden="true"></i>
+        </button>
         <div class="onboarding-scroll-area">
             <div class="onboarding-step-view">
-                <div class="onboarding-success-icon" style="background: linear-gradient(135deg, #9b59b6, #8e44ad);">
+                <div class="onboarding-success-icon update-success-icon">
                     <i class="fas fa-arrow-up-from-bracket"></i>
                 </div>
                 <div class="update-title-row">
@@ -5210,7 +5239,7 @@ function showUpdatePopup(changelog, version, storageKey) {
         <div class="onboarding-nav-bar">
             <div class="onboarding-nav-info">v${version}</div>
             <div class="onboarding-nav-actions">
-                <button class="onboarding-btn primary" id="updateDismissBtn">Got it</button>
+                <button class="onboarding-btn primary" id="updateDismissBtn" type="button">Got it</button>
             </div>
         </div>
     `;
@@ -5222,9 +5251,9 @@ function showUpdatePopup(changelog, version, storageKey) {
         if (e.target === modal) dismissUpdate(modal, storageKey, version);
     };
 
-    document.getElementById('updateDismissBtn')?.addEventListener('click', () => {
-        dismissUpdate(modal, storageKey, version);
-    });
+    const dismiss = () => dismissUpdate(modal, storageKey, version);
+    document.getElementById('updateDismissBtn')?.addEventListener('click', dismiss);
+    document.getElementById('updateCloseBtn')?.addEventListener('click', dismiss);
 
     document.addEventListener('keydown', function handler(e) {
         if (e.key === 'Escape' && modal.style.display === 'flex') {
@@ -5242,6 +5271,8 @@ function dismissUpdate(modal, storageKey, version) {
 
 // ===== SCROLL TO TOP BUTTON =====
     initScrollToTop();
+    // Initialize only after the update constants and onboarding state exist.
+    initUpdateCheck();
 });
 
 function initScrollToTop() {
@@ -5790,10 +5821,6 @@ function initOnboarding() {
         setTimeout(() => openModal(), 1000);
     }
 }
-
-// Initialize only after the update constants and onboarding helpers exist.
-initUpdateCheck();
-
 
 // Ensure default download folder is set correctly on first launch
 window.addEventListener('DOMContentLoaded', async () => {

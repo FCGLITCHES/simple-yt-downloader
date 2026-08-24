@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-app-version="3.2.3">
 
 <head>
     <meta charset="UTF-8">
@@ -15,24 +15,6 @@
     <link rel="stylesheet" href="./public/fontawesome/css/all.min.css">
     <link rel="stylesheet" href="/style.css">
     <link rel="icon" type="image/x-icon" href="/public/Logo1.ico">
-    <script>
-        window.APP_VERSION = '3.2.1';
-        window.APP_CHANGELOG = {
-            version: '3.2.1',
-            title: "UI Clarity v3.2.1",
-            date: 'August 2026',
-            required: false,
-            badge: 'New',
-            summary: 'Typography, setup progress, footer contrast, and compact Settings guidance now share a clearer visual system.',
-            items: [
-                { icon: 'fa-font', color: '#ed1736', title: 'Manrope Across The App', desc: 'The onboarding typeface now owns the main interface, including the header wordmark and Download Videos from 1000+ Sites heading.' },
-                { icon: 'fa-list-ol', color: '#cf0829', title: 'Flat Setup Progress', desc: 'Onboarding step numbers now use a clean solid treatment without gradients or drop shadows.' },
-                { icon: 'fa-heart', color: '#e84157', title: 'Clearer Support Button', desc: 'Light mode keeps both the heart and Support Me label white and removes the button shadow.' },
-                { icon: 'fa-circle-info', color: '#aa1230', title: 'Compact LAN Guidance', desc: 'The Windows Firewall explanation no longer occupies a permanent Settings row and appears on hover or keyboard focus instead.' },
-                { icon: 'fa-square-check', color: '#c5203b', title: 'Aligned Settings Controls', desc: 'Settings checkboxes and their labels now share a consistent centered line box in every theme.' }
-            ]
-        };
-    </script>
 
 </head>
 
@@ -163,7 +145,13 @@
 
 <details id="advancedDownloadOptions" class="advanced-options-panel">
                         <summary class="advanced-options-summary">
-                            <span>Advanced Options</span>
+                            <span class="advanced-options-title">
+                                <i class="fas fa-sliders" aria-hidden="true"></i>
+                                <span>
+                                    <strong>Advanced Options</strong>
+                                    <small>Fine-tune this download</small>
+                                </span>
+                            </span>
                             <i class="fas fa-chevron-down" aria-hidden="true"></i>
                         </summary>
                         <div class="advanced-options-body">
@@ -174,6 +162,14 @@
                                         <option value="1" selected>1 at a time</option>
                                         <option value="3">3 at a time</option>
                                         <option value="5">5 at a time</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="hdrModeOverride">HDR video</label>
+                                    <select id="hdrModeOverride" class="select-field" aria-label="HDR preference for this download">
+                                        <option value="settings" selected>Use Settings preference</option>
+                                        <option value="enabled">Prefer HDR</option>
+                                        <option value="disabled">Prefer SDR</option>
                                     </select>
                                 </div>
                             </div>
@@ -329,7 +325,7 @@
                         <i class="fas fa-clock-rotate-left empty-state-icon"></i>
                         <p class="empty-state-title">No download history</p>
                         <p class="empty-state-subtitle">Your downloaded videos will appear here</p>
-                        <button id="emptyStateDownloadBtn" class="download-btn" type="button" style="margin-top:1rem;">
+                        <button id="emptyStateDownloadBtn" class="download-btn empty-state-download-btn" type="button">
                             <i class="fas fa-download"></i> <span class="btn-text">Start Downloading</span>
                         </button>
                     </div>
@@ -409,10 +405,22 @@
                             <label for="skipDuplicates">Skip duplicates</label>
                         </div>
 
+                        <div class="setting-item setting-item-with-help">
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="preferHdr" name="preferHdr">
+                                <label for="preferHdr">Prefer HDR video</label>
+                            </div>
+                        </div>
+
                         <div id="subtitleSettingsGroup" class="subtitle-settings-group">
+                            <div class="settings-subsection-heading">
+                                <i class="fas fa-closed-captioning" aria-hidden="true"></i>
+                                <span>
+                                    <strong>Subtitles</strong>
+                                </span>
+                            </div>
                             <div class="setting-item">
-                                <label for="subtitleMode">Subtitles:</label>
-                                <select id="subtitleMode" class="select-field">
+                                <select id="subtitleMode" class="select-field" aria-label="Subtitles">
                                     <option value="none">Do not download</option>
                                     <option value="embed">Download and embed when supported</option>
                                     <option value="separate">Download as separate files</option>
@@ -428,7 +436,7 @@
                                 <label for="includeAutoCaptions">Allow auto-generated captions as fallback</label>
                             </div>
                         </div>
-                        <div class="setting-item">
+                        <div class="setting-item playback-tip">
                             <small>💡 Tip: For best playback with Opus audio, we recommend
                                 <a href="https://mpc-hc.org/" target="_blank" rel="noopener noreferrer" class="tip-link-bold">Media Player
                                     Classic</a>.
@@ -585,7 +593,7 @@
 
     <!-- Update Available Modal -->
     <div id="updateModal" class="onboarding-modal is-hidden-initial">
-        <div class="onboarding-modal-content" style="max-width: min(520px, calc(100vw - 2rem)); width: min(92vw, 520px);">
+        <div class="onboarding-modal-content update-modal-content">
             <div id="updateContent"></div>
         </div>
     </div>

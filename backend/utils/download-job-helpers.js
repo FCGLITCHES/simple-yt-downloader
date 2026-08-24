@@ -2,6 +2,152 @@
 
 const path = require("path");
 
+const VIDEO_QUALITY_HEIGHTS = Object.freeze({
+  "8k": 4320,
+  "4320p": 4320,
+  "4k": 2160,
+  "2160p": 2160,
+  "2k": 1440,
+  "1440p": 1440,
+  "1080p": 1080,
+  "720p": 720,
+  "480p": 480,
+  "360p": 360,
+  "240p": 240,
+});
+
+function normalizeVideoTargetHeight(quality, invalidFallback = null) {
+  const normalizedQuality = String(quality || "")
+    .toLowerCase()
+    .trim();
+
+  if (normalizedQuality === "highest" || normalizedQuality === "") {
+    return 4320;
+  }
+
+  if (VIDEO_QUALITY_HEIGHTS[normalizedQuality]) {
+    return VIDEO_QUALITY_HEIGHTS[normalizedQuality];
+  }
+
+  const parsedHeight = Number.parseInt(normalizedQuality, 10);
+  if (
+    Number.isFinite(parsedHeight) &&
+    parsedHeight >= 144 &&
+    parsedHeight <= 8640
+  ) {
+    return parsedHeight;
+  }
+
+  if (Number.isFinite(invalidFallback)) {
+    return invalidFallback;
+  }
+
+  throw new RangeError(
+    `Invalid quality value: "${quality}". Expected a resolution from 144p to 8640p or a preset such as 8K, 4K, 2K, or highest.`,
+  );
+}
+
+function getHdrFormatSortKey(settings = {}) {
+  return settings.preferHdr === true ? "hdr:12" : "+hdr";
+}
+
+function createTransferSpeedEstimator({
+  smoothingAlpha = 0.2,
+  spikeMultiplier = 2.5,
+  sustainedSpikeSamples = 2,
+  staleAfterMs = 2500,
+} = {}) {
+  let activeFilePath = null;
+  let lastFileSize = 0;
+  let lastObservedAt = null;
+  let speedEma = null;
+  let highSampleStreak = 0;
+
+  function reset(filePath, fileSize, observedAt) {
+    activeFilePath = filePath;
+    lastFileSize = fileSize;
+    lastObservedAt = observedAt;
+    speedEma = null;
+    highSampleStreak = 0;
+  }
+
+  function observe({ filePath, fileSize, observedAt = Date.now() }) {
+    if (
+      !filePath ||
+      !Number.isFinite(fileSize) ||
+      fileSize < 0 ||
+      !Number.isFinite(observedAt)
+    ) {
+      return null;
+    }
+
+    if (
+      activeFilePath !== filePath ||
+      lastObservedAt === null ||
+      observedAt <= lastObservedAt ||
+      fileSize < lastFileSize
+    ) {
+      reset(filePath, fileSize, observedAt);
+      return null;
+    }
+
+    const elapsedSeconds = (observedAt - lastObservedAt) / 1000;
+    const bytesPerSecond = (fileSize - lastFileSize) / elapsedSeconds;
+    lastFileSize = fileSize;
+    lastObservedAt = observedAt;
+
+    if (!Number.isFinite(bytesPerSecond) || bytesPerSecond < 0) {
+      return speedEma;
+    }
+
+    if (speedEma === null || speedEma === 0) {
+      speedEma = bytesPerSecond;
+      return speedEma;
+    }
+
+    if (bytesPerSecond > speedEma * spikeMultiplier) {
+      highSampleStreak += 1;
+      if (highSampleStreak < sustainedSpikeSamples) {
+        return speedEma;
+      }
+    } else {
+      highSampleStreak = 0;
+    }
+
+    speedEma =
+      speedEma * (1 - smoothingAlpha) + bytesPerSecond * smoothingAlpha;
+    highSampleStreak = 0;
+    return speedEma;
+  }
+
+  function getSpeed({ now = Date.now(), fallbackSpeed = null } = {}) {
+    if (
+      speedEma === null ||
+      lastObservedAt === null ||
+      now - lastObservedAt > staleAfterMs
+    ) {
+      return fallbackSpeed;
+    }
+
+    if (
+      Number.isFinite(fallbackSpeed) &&
+      fallbackSpeed > 0 &&
+      (speedEma <= 0 ||
+        speedEma > fallbackSpeed * 8 ||
+        fallbackSpeed > speedEma * 8)
+    ) {
+      return fallbackSpeed;
+    }
+
+    return speedEma;
+  }
+
+  return {
+    getSpeed,
+    observe,
+  };
+}
+
 function sanitizePathSegment(value, fallback = "unknown") {
   const normalized = String(value || "")
     .replace(/[<>:"/\\|?*\u0000-\u001f]/g, " ")
@@ -18,7 +164,9 @@ function sanitizePathSegment(value, fallback = "unknown") {
 function getSiteKeyFromUrl(videoUrl) {
   try {
     const parsed = new URL(String(videoUrl || ""));
-    return parsed.hostname.replace(/^www\./i, "").toLowerCase() || "unknown-site";
+    return (
+      parsed.hostname.replace(/^www\./i, "").toLowerCase() || "unknown-site"
+    );
   } catch {
     return "unknown-site";
   }
@@ -64,7 +212,8 @@ function getAutoOrganizeSegments({
   );
   const creator = sanitizePathSegment(getCreatorLabel(videoInfo), "creator");
   const uploadDateFolder =
-    typeof videoInfo.uploadDate === "string" && videoInfo.uploadDate.length === 8
+    typeof videoInfo.uploadDate === "string" &&
+    videoInfo.uploadDate.length === 8
       ? formatDateFolder(
           `${videoInfo.uploadDate.slice(0, 4)}-${videoInfo.uploadDate.slice(
             4,
@@ -83,7 +232,8 @@ function getAutoOrganizeSegments({
   if (organizeMode === "date") return [dateFolder];
   if (organizeMode === "site-date") return [siteKey, dateFolder];
   if (organizeMode === "creator-date") return [creator, dateFolder];
-  if (organizeMode === "site-creator-date") return [siteKey, creator, dateFolder];
+  if (organizeMode === "site-creator-date")
+    return [siteKey, creator, dateFolder];
   if (organizeMode === "site-playlist") {
     return isPlaylistItem || playlistTitle ? [siteKey, playlist] : [siteKey];
   }
@@ -170,7 +320,9 @@ function computeSiteRetryDelayMs({ siteKey, attempt = 1, siteFailures = 0 }) {
   const baseDelayMs = normalizedSite.includes("youtube") ? 12000 : 7000;
   const cappedAttempt = Math.max(1, Math.min(Number(attempt) || 1, 6));
   const failureFactor = Math.max(0, Math.min(Number(siteFailures) || 0, 4));
-  return Math.round(baseDelayMs * 2 ** (cappedAttempt - 1) + failureFactor * 3000);
+  return Math.round(
+    baseDelayMs * 2 ** (cappedAttempt - 1) + failureFactor * 3000,
+  );
 }
 
 function shouldSmartRetry({
@@ -193,11 +345,14 @@ function shouldSmartRetry({
 module.exports = {
   buildSubtitleArgs,
   computeSiteRetryDelayMs,
+  createTransferSpeedEstimator,
   ensureOrganizedTargetDir,
   formatDateFolder,
   getAutoOrganizeSegments,
+  getHdrFormatSortKey,
   getSiteKeyFromUrl,
   isRetryableDownloadError,
+  normalizeVideoTargetHeight,
   sanitizePathSegment,
   shouldSmartRetry,
 };

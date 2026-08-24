@@ -1,3 +1,19 @@
+# GetVideosLocally v3.2.3
+
+## HDR, Download Accuracy, And Interface Polish
+
+- Fixed a speed-estimator failure where a tiny initial disk-write sample could pin the UI near zero even while yt-dlp was transferring at full speed.
+- Reset disk measurement when yt-dlp switches between video and audio output files and added a smoothed native-speed fallback for unreliable disk samples.
+- Added an explicit 8K (4320p) quality option and shared quality normalization for initial and resumed downloads.
+- Capped every video format selector to the requested height so 4K stays at 4K while 8K can select a real 7680×4320 source stream.
+- Added a persisted Prefer HDR setting and a per-download Advanced Options override; disabling it explicitly prefers SDR for broader playback compatibility.
+- Made HDR opt-in for fresh settings while preserving an existing user's saved preference.
+- Preserved HDR at the requested resolution when enabled by sorting frame rate and dynamic range before bitrate and codec preference.
+- Flattened and clarified Advanced Options, integrated subtitle choices into Download Options, and strengthened heading weight throughout modal surfaces.
+- Redesigned the cookie importer and coffee support popup around the approved red-and-white direction with flat action buttons.
+- Compacted What’s New into a two-column layout with a visible top-right close control and an always-visible Got it action.
+- Added permanent regressions for the reported low-speed display, stream switching, native fallback, quality normalization, and selector ceilings.
+
 # GetVideosLocally v3.2.1
 
 ## UI Clarity

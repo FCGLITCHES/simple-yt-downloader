@@ -8,7 +8,7 @@ const builderConfig = require("../electron-builder.json");
 const packageManifest = require("../package.json");
 const packageLock = require("../package-lock.json");
 
-test("3.2.1 release metadata stays aligned across package and UI boundaries", () => {
+test("3.2.3 release metadata stays aligned across package and UI boundaries", () => {
   const indexHtml = fs.readFileSync(
     path.join(projectRoot, "index.html"),
     "utf8",
@@ -18,15 +18,18 @@ test("3.2.1 release metadata stays aligned across package and UI boundaries", ()
     "utf8",
   );
 
-  assert.equal(packageManifest.version, "3.2.1");
-  assert.equal(packageLock.version, "3.2.1");
-  assert.equal(packageLock.packages[""].version, "3.2.1");
-  assert.match(indexHtml, /window\.APP_VERSION = '3\.2\.1'/);
-  assert.match(rendererScript, /DEFAULT_APP_VERSION = '3\.2\.1'/);
-  assert.match(indexHtml, /Manrope Across The App/);
-  assert.match(rendererScript, /Manrope Across The App/);
-  assert.match(indexHtml, /Compact LAN Guidance/);
-  assert.match(rendererScript, /Compact LAN Guidance/);
+  assert.equal(packageManifest.version, "3.2.3");
+  assert.equal(packageLock.version, "3.2.3");
+  assert.equal(packageLock.packages[""].version, "3.2.3");
+  assert.match(indexHtml, /data-app-version="3\.2\.3"/);
+  assert.match(rendererScript, /DEFAULT_APP_VERSION = '3\.2\.3'/);
+  assert.match(rendererScript, /HDR Control/);
+  assert.match(rendererScript, /Cleaner Cookies/);
+  const updatePopupSource = rendererScript.slice(
+    rendererScript.indexOf("function showUpdatePopup"),
+    rendererScript.indexOf("function dismissUpdate"),
+  );
+  assert.doesNotMatch(updatePopupSource, /style="/);
 });
 
 test("installer packages each resource family exactly once", () => {
@@ -77,10 +80,7 @@ test("Windows brand icon owns executable, installer, window, and tray surfaces",
   assert.equal(builderConfig.mac.icon, canonicalIcon);
   assert.equal(builderConfig.linux.icon, canonicalIcon);
   assert.match(electronMain, /app\.setAppUserModelId\(APP_USER_MODEL_ID\)/);
-  assert.match(
-    electronMain,
-    /path\.join\(__dirname, 'public', 'Logo1\.ico'\)/,
-  );
+  assert.match(electronMain, /path\.join\(__dirname, 'public', 'Logo1\.ico'\)/);
   assert.match(electronMain, /new Tray\(trayIcon\.resize/);
   assert.equal(
     (electronMain.match(/icon: WINDOWS_BRAND_ICON_PATH/g) || []).length,
@@ -90,10 +90,7 @@ test("Windows brand icon owns executable, installer, window, and tray surfaces",
   assert.match(windowsBranding, /["']product-version["']: version/);
   assert.match(portableIconScript, /brandWindowsExecutable\(exePath\)/);
   assert.match(afterPackBranding, /brandWindowsExecutable\(executablePath\)/);
-  assert.match(
-    iconVerifier,
-    /["']public["'],\s*["']Logo1\.ico["']/,
-  );
+  assert.match(iconVerifier, /["']public["'],\s*["']Logo1\.ico["']/);
 });
 
 test("portable release ZIP includes the package version", () => {
@@ -112,10 +109,7 @@ test("portable release ZIP includes the package version", () => {
     path.join(projectRoot, "build-portable.js"),
     "utf8",
   );
-  assert.match(
-    portableBuildScript,
-    /"public",\s*"Logo1\.ico"/,
-  );
+  assert.match(portableBuildScript, /"public",\s*"Logo1\.ico"/);
   assert.doesNotMatch(portableBuildScript, /Logo_1|public[\\/]icons/);
 });
 

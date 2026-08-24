@@ -161,6 +161,14 @@ That means:
 8. Completed downloads are recorded into `history-index`.
 9. The renderer updates local UI state and syncs its history snapshot back to the backend.
 
+## Quality Selection And Speed Reporting
+
+Video quality names are normalized once in `backend/utils/download-job-helpers.js`. `highest`, `8k`, and `4320p` resolve to a 4320p ceiling; lower presets retain their own ceilings. Every yt-dlp video selector includes the requested maximum height so selecting 4K cannot silently pull an 8K stream, while the explicit 8K option can select a real 7680×4320 stream when the source exposes one. Within the requested resolution, sorting prioritizes frame rate and then applies the request's HDR preference before bitrate and codec preference.
+
+The persisted HDR owner is `preferHdr` inside the renderer's `ytdUserSettings` object. Settings writes the global default, while Advanced Options produces a one-request override without mutating that saved preference. The resolved boolean travels inside the download request's settings payload, remains attached to scheduled and recoverable jobs, and is converted by `getHdrFormatSortKey` into yt-dlp's HDR-first (`hdr:12`) or SDR-first (`+hdr`) sort key.
+
+Download speed is reported through a hybrid estimator. Disk growth remains the preferred measurement, but the estimator resets when yt-dlp switches from one output stream to another, accepts sustained increases after a low startup sample, and falls back to smoothed yt-dlp throughput when disk tracking is stale or differs implausibly from the native transfer rate. This prevents a tiny first write from pinning the UI at a false low speed for the rest of a fast download.
+
 ## Concurrency Model
 
 Concurrency is now centralized in `backend/config/download-config.js`.

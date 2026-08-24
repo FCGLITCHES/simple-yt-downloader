@@ -639,9 +639,9 @@ smoothedBps = (smoothedBps * 0.8) + (bps * 0.2);
 ```
 
 ### Lessons Learned
-- **Disk never lies**: For real download progress, actual file growth on disk is the only reliable metric.
+- **Disk context matters**: File growth is valuable only while the tracker follows the active yt-dlp output file.
 - **Smoothing is essential**: Raw I/O speeds are jumpy; EMA provides the "premium" feel users expect.
-- **Fallbacks are necessary**: Use parsed speed only as a placeholder until the destination file is actually created.
+- **Fallbacks are necessary**: Cross-check disk growth with smoothed yt-dlp throughput when the active file changes or disk samples become stale.
 
 ---
 
@@ -686,10 +686,30 @@ if (headerSpeedSlider) {
 
 ---
 
+## 🐛 Bug #16: Download Speed Display Pinned Near Zero
+
+`Tags: speed, disk-i-o, EMA, yt-dlp, multi-stream, 8K`
+
+### Problem
+The UI could remain near `0.03 Mbps` even while yt-dlp was transferring a 4K or 8K stream at tens of MiB/s.
+
+### Root Cause
+The disk-speed EMA accepted its first tiny write as the baseline, then rejected every real high-throughput sample above 2.5 times that baseline as a spike. The tracker also retained state when yt-dlp switched between video and audio output files.
+
+### Solution
+Disk measurement now accepts sustained increases, resets on output-file changes, and uses smoothed yt-dlp throughput when the disk sample is stale or implausibly different. Quality normalization is shared, every selector is capped to the requested resolution, and the UI exposes an explicit 8K (4320p) option.
+
+### Lessons Learned
+- A first sample is not a trustworthy baseline.
+- Disk growth is useful only while the tracked file identity is stable.
+- Independent measurements should cross-check one another instead of allowing one stale source to dominate forever.
+
+---
+
 ## 🔧 Common Patterns & Quick Reference
 
 ### Accuracy Metrics (New)
-- **Prefer disk I/O over process stdout**: For real download progress, actual file growth on disk is the only reliable metric.
+- **Use hybrid transfer measurement**: Prefer fresh disk growth, but fall back to smoothed native throughput when files switch or measurements diverge implausibly.
 - **Smoothing is essential**: Use EMA (Exponential Moving Average) or Median filters to handle jumpy I/O data and filter outliers.
 
 ### UX Scaling (New)
@@ -758,4 +778,4 @@ if (headerSpeedSlider) {
 
 ---
 
-*Last updated: 2026-01-23*
+*Last updated: 2026-08-24*

@@ -361,7 +361,12 @@ body {
     background-size: 200% 200%;
 }
 
-h1, h2 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
     font-family: 'Manrope', 'Segoe UI Variable Display', sans-serif;
     font-weight: 800;
     letter-spacing: -0.035em;
@@ -768,15 +773,6 @@ body[data-ui-density="compact"] .settings-actions {
     margin-bottom: 0;
 }
 
-.advanced-options-row {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 0.5rem;
-    padding-bottom: 0.75rem;
-    margin-bottom: 0.5rem;
-    border-bottom: 1px solid var(--border-color);
-}
-
 .tip-link-bold {
     color: #e74c3c;
     font-weight: 700;
@@ -795,27 +791,109 @@ body[data-ui-density="compact"] .settings-actions {
 .subtitle-settings-group {
     display: flex;
     flex-direction: column;
-    gap: 0;
+    gap: 0.65rem;
+    margin-top: 0.8rem;
+    padding-top: 0.8rem;
+    border-top: 1px solid var(--border-color);
+}
+
+.empty-state-download-btn {
+    margin-top: 1rem;
+}
+
+.subtitle-settings-group .setting-item {
+    margin-bottom: 0;
+}
+
+.settings-subsection-heading {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.65rem;
+}
+
+.settings-subsection-heading > i {
+    width: 1.15rem;
+    margin-top: 0.2rem;
+    color: var(--primary-color);
+    text-align: center;
+}
+
+.settings-subsection-heading > span {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+}
+
+.settings-subsection-heading strong {
+    color: var(--text-color);
+    font-size: 0.92rem;
+    font-weight: 800;
+}
+
+.settings-subsection-heading small,
+.field-help {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    line-height: 1.45;
+}
+
+.setting-item-with-help {
+    padding: 0.65rem 0;
+    border-top: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.setting-item-with-help .checkbox-group {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.setting-item-with-help input[type="checkbox"] {
+    flex: 0 0 var(--settings-checkbox-size);
+    width: var(--settings-checkbox-size);
+    height: var(--settings-checkbox-size);
+    margin: 0;
+    accent-color: var(--primary-color);
+}
+
+.setting-item-with-help label {
+    margin: 0;
+    font-weight: 700;
+    line-height: 1.25;
+}
+
+.setting-item-with-help .settings-help-text {
+    display: block;
+    margin-left: calc(var(--settings-checkbox-size) + 0.4rem);
+}
+
+.playback-tip {
+    margin-top: 0.75rem;
+    padding-top: 0.7rem;
+    border-top: 1px solid var(--border-color);
+    color: var(--text-muted);
+    line-height: 1.45;
 }
 
 /* ===== UPDATE POPUP STYLES ===== */
 .update-items-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.55rem;
     width: 100%;
-    max-width: 440px;
+    max-width: none;
     text-align: left;
 }
 
 .update-item {
     display: flex;
     align-items: flex-start;
-    gap: 0.75rem;
+    gap: 0.6rem;
     background: var(--input-bg);
     border: 1px solid var(--border-color);
     border-radius: 12px;
-    padding: 0.85rem 1rem;
+    padding: 0.65rem 0.75rem;
     transition: border-color 0.2s ease;
 }
 
@@ -824,14 +902,31 @@ body[data-ui-density="compact"] .settings-actions {
 }
 
 .update-item-icon {
-    width: 36px;
-    height: 36px;
+    width: 30px;
+    height: 30px;
     border-radius: 8px;
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 0.9rem;
     flex-shrink: 0;
+    background: color-mix(in srgb, var(--primary-color) 10%, transparent);
+    color: var(--primary-color);
+}
+
+.update-item:nth-child(2n) .update-item-icon {
+    background: color-mix(in srgb, var(--error-color) 10%, transparent);
+    color: var(--error-color);
+}
+
+.update-progress-fill {
+    width: 100%;
+    background: var(--primary-color);
+}
+
+.update-success-icon {
+    background: color-mix(in srgb, var(--primary-color) 12%, var(--card-bg));
+    color: var(--primary-color);
 }
 
 .update-item-text {
@@ -842,21 +937,22 @@ body[data-ui-density="compact"] .settings-actions {
 }
 
 .update-item-title {
-    font-size: 0.9rem;
-    font-weight: 600;
+    font-size: 0.82rem;
+    font-weight: 800;
     color: var(--text-color);
     line-height: 1.3;
 }
 
 .update-item-desc {
-    font-size: 0.8rem;
+    font-size: 0.72rem;
     color: var(--text-color);
     opacity: 0.65;
-    line-height: 1.4;
+    line-height: 1.35;
 }
 
-@media (max-width: 480px) {
+@media (max-width: 560px) {
     .update-items-list {
+        grid-template-columns: 1fr;
         gap: 0.5rem;
     }
 
@@ -1979,38 +2075,54 @@ body.modal-open {
     color: var(--text-color);
     display: block;
     font-size: 1.5rem;
-    font-weight: 400;
+    font-weight: 800;
     flex-shrink: 0;
 }
 
 .support-modal {
-    max-width: min(32rem, calc(100vw - 2rem));
+    max-width: min(48rem, calc(100vw - 2rem));
     text-align: center;
+    padding: clamp(2rem, 5vw, 3.75rem);
+    border: 1px solid color-mix(in srgb, var(--primary-color) 25%, var(--border-color));
+    border-radius: 24px;
+    background:
+        radial-gradient(circle at 50% 12%, color-mix(in srgb, var(--primary-color) 7%, transparent), transparent 26%),
+        var(--card-bg);
+    box-shadow: none;
 }
 
 .support-modal-icon {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 4rem;
-    height: 4rem;
-    margin: 0 auto 1rem;
+    width: 6rem;
+    height: 6rem;
+    margin: 0 auto 2rem;
     border-radius: 999px;
-    background: color-mix(in srgb, var(--primary-color) 18%, transparent);
+    background: color-mix(in srgb, var(--primary-color) 8%, var(--card-bg));
+    border: 1px solid color-mix(in srgb, var(--primary-color) 24%, transparent);
     color: var(--primary-color);
-    font-size: 1.6rem;
+    font-size: 2.15rem;
+}
+
+.support-modal h2 {
+    margin-bottom: 1rem;
+    font-size: clamp(1.8rem, 4vw, 2.7rem);
+    line-height: 1.15;
 }
 
 .support-modal-copy,
 .support-modal-credit {
-    margin-bottom: 0.9rem;
+    max-width: 38rem;
+    margin: 0 auto 1rem;
     color: var(--text-muted);
     line-height: 1.6;
+    font-size: 1rem;
 }
 
 .support-modal-credit a {
     color: var(--primary-color);
-    font-weight: 600;
+    font-weight: 800;
     text-decoration: none;
 }
 
@@ -2019,16 +2131,38 @@ body.modal-open {
 }
 
 .support-modal-actions {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 0.75rem;
-    margin-top: 1.25rem;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.9rem;
+    margin-top: 2.25rem;
 }
 
 .support-modal-actions .action-btn {
-    flex: 1 1 11rem;
-    max-width: 14rem;
+    width: 100%;
+    min-height: 3.25rem;
+    margin: 0;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    box-shadow: none;
+    transform: none;
+    font-weight: 700;
+}
+
+.support-modal-actions .action-btn.primary {
+    border-color: var(--primary-color);
+    background: var(--primary-color);
+    color: #ffffff;
+}
+
+.support-modal-actions .action-btn:hover:not(:disabled) {
+    box-shadow: none;
+    transform: none;
+}
+
+@media (max-width: 720px) {
+    .support-modal-actions {
+        grid-template-columns: 1fr;
+    }
 }
 
 /* ==================== MODERN CLEAN CONFIRMATION MODAL ==================== */
@@ -4091,7 +4225,7 @@ button {
 .modal-content {
     max-width: 700px;
     width: 98vw;
-    max-height: 95vh;
+    max-height: 95dvh;
     overflow-y: auto;
     padding: 1rem;
     display: flex;
@@ -4330,6 +4464,10 @@ button {
     line-height: 1.25;
 }
 
+.settings-modal .setting-item.checkbox-group.is-hidden-initial {
+    display: none;
+}
+
 .settings-layout {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -4379,7 +4517,7 @@ button {
     margin: 0 0 0.7rem 0;
     font-size: 0.9rem;
     color: var(--primary-color);
-    font-weight: 600;
+    font-weight: 800;
     border-bottom: 1px solid var(--border-color);
     padding-bottom: 0.3rem;
     min-width: 0;
@@ -5794,6 +5932,79 @@ body {
     }
 }
 
+.update-modal-content {
+    width: min(94vw, 620px);
+    max-width: min(620px, calc(100vw - 2rem));
+    max-height: min(640px, calc(100dvh - 2rem));
+}
+
+#updateContent {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    min-height: 0;
+}
+
+#updateModal .onboarding-scroll-area {
+    padding: 1rem 1.25rem 0.75rem;
+}
+
+#updateModal .onboarding-step-view {
+    gap: 0.75rem;
+    padding: 0.15rem 0;
+}
+
+#updateModal .onboarding-success-icon {
+    width: 52px;
+    height: 52px;
+    font-size: 1.25rem;
+    box-shadow: none;
+    animation: none;
+}
+
+#updateModal .onboarding-step-title {
+    font-size: 1.3rem;
+}
+
+#updateModal .update-summary {
+    margin: 0;
+    max-width: 32rem;
+    font-size: 0.8rem;
+    line-height: 1.4;
+}
+
+#updateModal .onboarding-nav-bar {
+    padding: 0.7rem 1.25rem;
+}
+
+#updateModal .onboarding-btn {
+    height: 40px;
+    box-shadow: none;
+}
+
+#updateModal .update-close-btn {
+    top: 0.65rem;
+    right: 0.65rem;
+    opacity: 0.75;
+}
+
+@media (max-width: 560px) {
+    #updateModal {
+        padding: 0.5rem;
+    }
+
+    #updateModal .update-modal-content {
+        width: 100%;
+        height: auto;
+        max-height: calc(100dvh - 1rem);
+        border-radius: 16px;
+    }
+
+    #updateModal .onboarding-scroll-area {
+        padding: 0.9rem 1rem 0.65rem;
+    }
+}
+
 /* ===== LIGHT RED SETUP EXPERIENCE ===== */
 #onboardingModal {
     --setup-red: #ed1736;
@@ -5926,7 +6137,7 @@ body {
 .setup-kicker {
     margin: 0 0 0.85rem;
     color: var(--setup-red);
-    font-size: 0.9rem;
+    font-size: 0.8rem;
     font-weight: 700;
     letter-spacing: 0.02em;
 }
@@ -7131,10 +7342,9 @@ body {
 
 .advanced-options-panel {
     margin-bottom: 1rem;
-    border: 1px solid var(--border-color);
-    border-radius: 12px;
-    background: var(--card-bg);
-    overflow: hidden;
+    border-top: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border-color);
+    background: transparent;
 }
 
 .advanced-options-summary {
@@ -7142,19 +7352,17 @@ body {
     align-items: center;
     justify-content: space-between;
     gap: 0.75rem;
-    padding: 0.85rem 1.25rem;
-    font-weight: 600;
+    padding: 0.9rem 0.15rem;
+    font-weight: 800;
     font-size: 0.9375rem;
     color: var(--text-color);
     cursor: pointer;
     list-style: none;
-    opacity: 0.8;
-    transition: opacity 0.15s ease, background 0.15s ease;
+    transition: color 0.15s ease;
 }
 
 .advanced-options-summary:hover {
-    opacity: 1;
-    background: var(--input-bg);
+    color: var(--primary-color);
 }
 
 .advanced-options-summary::-webkit-details-marker {
@@ -7168,6 +7376,40 @@ body {
     transition: transform 0.25s ease, opacity 0.25s ease;
 }
 
+.advanced-options-title {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+}
+
+.advanced-options-title > i {
+    display: grid;
+    place-items: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--primary-color) 9%, transparent);
+    color: var(--primary-color);
+    opacity: 1;
+}
+
+.advanced-options-title > span {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.2;
+}
+
+.advanced-options-title strong {
+    font-weight: 800;
+}
+
+.advanced-options-title small {
+    margin-top: 0.15rem;
+    color: var(--text-muted);
+    font-size: 0.72rem;
+    font-weight: 500;
+}
+
 .advanced-options-panel[open] .advanced-options-summary i {
     transform: rotate(180deg);
     opacity: 0.8;
@@ -7175,12 +7417,20 @@ body {
 }
 
 .advanced-options-body {
-    padding: 0.75rem 1.25rem 1.25rem;
+    padding: 1rem 0.15rem;
     border-top: 1px solid var(--border-color);
 }
 
+.advanced-options-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.85rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
 .advanced-options-body .form-group {
-    margin-bottom: 0.5rem;
+    margin-bottom: 0;
 }
 
 .advanced-options-body .form-group label {
@@ -7190,6 +7440,12 @@ body {
 .advanced-options-body .download-plan-row {
     margin-bottom: 0;
     padding-top: 0.75rem;
+}
+
+@media (max-width: 620px) {
+    .advanced-options-row {
+        grid-template-columns: 1fr;
+    }
 }
 
 .schedule-toggle-label {

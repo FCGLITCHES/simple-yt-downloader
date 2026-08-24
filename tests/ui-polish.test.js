@@ -8,13 +8,10 @@ const indexHtml = fs.readFileSync(path.join(projectRoot, "index.html"), "utf8");
 const stylesheet = fs.readFileSync(path.join(projectRoot, "style.css"), "utf8");
 
 test("Manrope is the primary app, heading, and header wordmark typeface", () => {
+  assert.match(stylesheet, /body\s*\{[^}]*font-family:\s*'Manrope'/s);
   assert.match(
     stylesheet,
-    /body\s*\{[^}]*font-family:\s*'Manrope'/s,
-  );
-  assert.match(
-    stylesheet,
-    /h1, h2\s*\{[^}]*font-family:\s*'Manrope'[^}]*font-weight:\s*800/s,
+    /h1,\s*h2,\s*h3,\s*h4,\s*h5,\s*h6\s*\{[^}]*font-family:\s*'Manrope'[^}]*font-weight:\s*800/s,
   );
   assert.match(
     stylesheet,
@@ -40,10 +37,7 @@ test("light theme support control keeps white content without a shadow", () => {
     /\[data-theme="light"\] \.footer \.support-btn[\s\S]*?color:\s*#fff;/,
   );
   assert.match(stylesheet, /\.support-btn\s*\{[^}]*box-shadow:\s*none/s);
-  assert.match(
-    stylesheet,
-    /\.support-btn:hover\s*\{[^}]*box-shadow:\s*none/s,
-  );
+  assert.match(stylesheet, /\.support-btn:hover\s*\{[^}]*box-shadow:\s*none/s);
 });
 
 test("LAN guidance is a hover and keyboard-focus tooltip", () => {

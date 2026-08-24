@@ -53,8 +53,11 @@ const {
 const {
   buildSubtitleArgs,
   computeSiteRetryDelayMs,
+  createTransferSpeedEstimator,
   ensureOrganizedTargetDir,
   getSiteKeyFromUrl,
+  getHdrFormatSortKey,
+  normalizeVideoTargetHeight,
   shouldSmartRetry,
 } = require("./backend/utils/download-job-helpers");
 const { createWebSocketHub } = require("./backend/websocket/client-hub");
@@ -2735,46 +2738,20 @@ const env = loadEnv(process.env);
         finalFilePathValue = result.actualPath || finalOutputFilename;
       } else if (videoFormats.includes(format)) {
         // ==================== QUALITY NORMALIZATION ====================
-        // Map string quality values to numeric heights
-        // Prevents parseInt("4k") → 4 bug
-        const qualityMap = {
-          "4k": 2160,
-          "2160p": 2160,
-          "2k": 1440,
-          "1440p": 1440,
-          "1080p": 1080,
-          "720p": 720,
-          "480p": 480,
-          "360p": 360,
-          "240p": 240,
-          highest: 2160,
-        };
-
         let targetHeight;
-        const qualityLower = (quality || "").toString().toLowerCase().trim();
-
-        if (qualityLower === "highest" || qualityLower === "") {
-          // HIGHEST MODE: Always target 4K+ and use MKV container
-          // Don't cap based on availableQualities - that can be unreliable
-          // Let yt-dlp's bestvideo selector pick the actual best available
-          targetHeight = 4320; // 8K ceiling - ensures MKV container and 4K format selector
-          logger.info(
-            `[${itemId}] 🎯 HIGHEST MODE: Using uncapped target (${targetHeight}p) to ensure best quality`,
+        try {
+          targetHeight = normalizeVideoTargetHeight(quality);
+        } catch (error) {
+          logger.error(
+            `[${itemId}] ❌ INVALID QUALITY VALUE: "${quality}" - ${error.message}`,
           );
-        } else if (qualityMap[qualityLower]) {
-          targetHeight = qualityMap[qualityLower];
-        } else {
-          const parsed = parseInt(quality);
-          if (!isNaN(parsed) && parsed >= 144 && parsed <= 8640) {
-            targetHeight = parsed;
-          } else {
-            logger.error(
-              `[${itemId}] ❌ INVALID QUALITY VALUE: "${quality}" - cannot parse to valid resolution`,
-            );
-            throw new Error(
-              `Invalid quality value: "${quality}". Expected numeric resolution (e.g., 1080, 2160) or preset (4k, 2k, highest)`,
-            );
-          }
+          throw error;
+        }
+
+        if (String(quality || "").trim().toLowerCase() === "highest") {
+          logger.info(
+            `[${itemId}] 🎯 HIGHEST MODE: Selecting the best stream up to ${targetHeight}p`,
+          );
         }
 
         logger.info(
@@ -2798,6 +2775,7 @@ const env = loadEnv(process.env);
         // Each selector chain ends with /best as ultimate fallback
         let formatString;
         let sortOrder;
+        const hdrSortKey = getHdrFormatSortKey(settings);
 
         // Filter to exclude auto-dubbed/translated audio: exclude tracks with asr=1 (auto-generated)
         const originalAudioFilter = "[asr!=1]";
@@ -2806,11 +2784,11 @@ const env = loadEnv(process.env);
         if (containerFormat === "mov") {
           // MOV works best with H.264/H.265 codecs
           if (targetHeight >= 2160) {
-            formatString = `bestvideo*[vcodec^=avc][ext=mp4]+bestaudio${originalAudioFilter}[ext=m4a]/bestvideo*[vcodec^=avc][ext=mp4]+bestaudio[ext=m4a]/bestvideo*[vcodec^=hevc][ext=mp4]+bestaudio${originalAudioFilter}[ext=m4a]/bestvideo*[vcodec^=hevc][ext=mp4]+bestaudio[ext=m4a]/bestvideo*[ext=mp4]+bestaudio${originalAudioFilter}[ext=m4a]/bestvideo*[ext=mp4]+bestaudio[ext=m4a]/best`;
-            sortOrder = "res,tbr,vcodec:h264,vcodec:hevc";
+            formatString = `bestvideo*[height<=${targetHeight}][vcodec^=avc][ext=mp4]+bestaudio${originalAudioFilter}[ext=m4a]/bestvideo*[height<=${targetHeight}][vcodec^=avc][ext=mp4]+bestaudio[ext=m4a]/bestvideo*[height<=${targetHeight}][vcodec^=hevc][ext=mp4]+bestaudio${originalAudioFilter}[ext=m4a]/bestvideo*[height<=${targetHeight}][vcodec^=hevc][ext=mp4]+bestaudio[ext=m4a]/bestvideo*[height<=${targetHeight}][ext=mp4]+bestaudio${originalAudioFilter}[ext=m4a]/bestvideo*[height<=${targetHeight}][ext=mp4]+bestaudio[ext=m4a]/best[height<=${targetHeight}]`;
+            sortOrder = `res,fps,${hdrSortKey},tbr,vcodec:h264,vcodec:hevc`;
           } else {
-            formatString = `bv*[height<=${targetHeight}][vcodec^=avc][ext=mp4]+ba${originalAudioFilter}[ext=m4a]/bv*[height<=${targetHeight}][vcodec^=avc][ext=mp4]+ba[ext=m4a]/bv*[height<=${targetHeight}][vcodec^=hevc][ext=mp4]+ba${originalAudioFilter}[ext=m4a]/bv*[height<=${targetHeight}][vcodec^=hevc][ext=mp4]+ba[ext=m4a]/bv*[height<=${targetHeight}][ext=mp4]+ba${originalAudioFilter}[ext=m4a]/bv*[height<=${targetHeight}][ext=mp4]+ba[ext=m4a]/best`;
-            sortOrder = "res,tbr,vcodec:h264,vcodec:hevc";
+            formatString = `bv*[height<=${targetHeight}][vcodec^=avc][ext=mp4]+ba${originalAudioFilter}[ext=m4a]/bv*[height<=${targetHeight}][vcodec^=avc][ext=mp4]+ba[ext=m4a]/bv*[height<=${targetHeight}][vcodec^=hevc][ext=mp4]+ba${originalAudioFilter}[ext=m4a]/bv*[height<=${targetHeight}][vcodec^=hevc][ext=mp4]+ba[ext=m4a]/bv*[height<=${targetHeight}][ext=mp4]+ba${originalAudioFilter}[ext=m4a]/bv*[height<=${targetHeight}][ext=mp4]+ba[ext=m4a]/best[height<=${targetHeight}]`;
+            sortOrder = `res,fps,${hdrSortKey},tbr,vcodec:h264,vcodec:hevc`;
           }
           logger.info(
             `[${itemId}] 📺 FORMAT: MOV MODE - Selector: ${formatString}`,
@@ -2818,33 +2796,33 @@ const env = loadEnv(process.env);
         } else if (containerFormat === "webm") {
           // WEBM works best with VP8/VP9 codecs
           if (targetHeight >= 2160) {
-            formatString = `bestvideo*[vcodec^=vp9]+bestaudio${originalAudioFilter}[acodec^=opus]/bestvideo*[vcodec^=vp9]+bestaudio[acodec^=opus]/bestvideo*[vcodec^=vp8]+bestaudio${originalAudioFilter}[acodec^=vorbis]/bestvideo*[vcodec^=vp8]+bestaudio[acodec^=vorbis]/bestvideo*[vcodec^=vp9]+bestaudio${originalAudioFilter}/bestvideo*[vcodec^=vp9]+bestaudio/best`;
-            sortOrder = "res,tbr,vcodec:vp9,vcodec:vp8";
+            formatString = `bestvideo*[height<=${targetHeight}][vcodec^=vp9]+bestaudio${originalAudioFilter}[acodec^=opus]/bestvideo*[height<=${targetHeight}][vcodec^=vp9]+bestaudio[acodec^=opus]/bestvideo*[height<=${targetHeight}][vcodec^=vp8]+bestaudio${originalAudioFilter}[acodec^=vorbis]/bestvideo*[height<=${targetHeight}][vcodec^=vp8]+bestaudio[acodec^=vorbis]/bestvideo*[height<=${targetHeight}][vcodec^=vp9]+bestaudio${originalAudioFilter}/bestvideo*[height<=${targetHeight}][vcodec^=vp9]+bestaudio/best[height<=${targetHeight}]`;
+            sortOrder = `res,fps,${hdrSortKey},tbr,vcodec:vp9,vcodec:vp8`;
           } else {
-            formatString = `bv*[height<=${targetHeight}][vcodec^=vp9]+ba${originalAudioFilter}[acodec^=opus]/bv*[height<=${targetHeight}][vcodec^=vp9]+ba[acodec^=opus]/bv*[height<=${targetHeight}][vcodec^=vp8]+ba${originalAudioFilter}[acodec^=vorbis]/bv*[height<=${targetHeight}][vcodec^=vp8]+ba[acodec^=vorbis]/bv*[height<=${targetHeight}][vcodec^=vp9]+ba${originalAudioFilter}/bv*[height<=${targetHeight}][vcodec^=vp9]+ba/best`;
-            sortOrder = "res,tbr,vcodec:vp9,vcodec:vp8";
+            formatString = `bv*[height<=${targetHeight}][vcodec^=vp9]+ba${originalAudioFilter}[acodec^=opus]/bv*[height<=${targetHeight}][vcodec^=vp9]+ba[acodec^=opus]/bv*[height<=${targetHeight}][vcodec^=vp8]+ba${originalAudioFilter}[acodec^=vorbis]/bv*[height<=${targetHeight}][vcodec^=vp8]+ba[acodec^=vorbis]/bv*[height<=${targetHeight}][vcodec^=vp9]+ba${originalAudioFilter}/bv*[height<=${targetHeight}][vcodec^=vp9]+ba/best[height<=${targetHeight}]`;
+            sortOrder = `res,fps,${hdrSortKey},tbr,vcodec:vp9,vcodec:vp8`;
           }
           logger.info(
             `[${itemId}] 📺 FORMAT: WEBM MODE - Selector: ${formatString}`,
           );
         } else if (targetHeight >= 2160) {
           // 4K+ / HIGHEST MODE: Prefer original audio, fallback to any audio
-          formatString = `bestvideo*+bestaudio${originalAudioFilter}/bestvideo*+bestaudio/best`;
-          sortOrder = "res,tbr,vcodec:av01,vcodec:vp9.2,vcodec:vp9,vcodec:h264";
+          formatString = `bestvideo*[height<=${targetHeight}]+bestaudio${originalAudioFilter}/bestvideo*[height<=${targetHeight}]+bestaudio/best[height<=${targetHeight}]`;
+          sortOrder = `res,fps,${hdrSortKey},tbr,vcodec:av01,vcodec:vp9.2,vcodec:vp9,vcodec:h264`;
           logger.info(
             `[${itemId}] 📺 FORMAT: HIGHEST/4K+ MODE - Selector: ${formatString}`,
           );
         } else if (targetHeight >= 1440) {
           // 2K (1440p): Prefer 1440p → 1080p → bestvideo+original audio → best
-          formatString = `bv*[height=1440]+ba${originalAudioFilter}/bv*[height=1440]+ba/bv*[height>=1440]+ba${originalAudioFilter}/bv*[height>=1440]+ba/bv*[height>=1080]+ba${originalAudioFilter}/bv*[height>=1080]+ba/bestvideo*+bestaudio${originalAudioFilter}/bestvideo*+bestaudio/best`;
-          sortOrder = "res,tbr,vcodec:av01,vcodec:vp9.2,vcodec:vp9,vcodec:h264";
+          formatString = `bv*[height<=${targetHeight}]+ba${originalAudioFilter}/bv*[height<=${targetHeight}]+ba/best[height<=${targetHeight}]`;
+          sortOrder = `res,fps,${hdrSortKey},tbr,vcodec:av01,vcodec:vp9.2,vcodec:vp9,vcodec:h264`;
           logger.info(
             `[${itemId}] 📺 FORMAT: 2K MODE - Selector: ${formatString}`,
           );
         } else {
           // 1080p and below: Prefer H.264/MP4 → any video+original audio → best
-          formatString = `bv*[height<=${targetHeight}][ext=mp4][vcodec^=avc]+ba${originalAudioFilter}[ext=m4a]/bv*[height<=${targetHeight}][ext=mp4][vcodec^=avc]+ba[ext=m4a]/bv*[height<=${targetHeight}][ext=mp4]+ba${originalAudioFilter}[ext=m4a]/bv*[height<=${targetHeight}][ext=mp4]+ba[ext=m4a]/bv*[height<=${targetHeight}]+ba${originalAudioFilter}/bv*[height<=${targetHeight}]+ba/bestvideo*+bestaudio${originalAudioFilter}/bestvideo*+bestaudio/best`;
-          sortOrder = `res,tbr,vcodec:h264,ext:mp4`;
+          formatString = `bv*[height<=${targetHeight}][ext=mp4][vcodec^=avc]+ba${originalAudioFilter}[ext=m4a]/bv*[height<=${targetHeight}][ext=mp4][vcodec^=avc]+ba[ext=m4a]/bv*[height<=${targetHeight}][ext=mp4]+ba${originalAudioFilter}[ext=m4a]/bv*[height<=${targetHeight}][ext=mp4]+ba[ext=m4a]/bv*[height<=${targetHeight}]+ba${originalAudioFilter}/bv*[height<=${targetHeight}]+ba/bestvideo*[height<=${targetHeight}]+bestaudio${originalAudioFilter}/bestvideo*[height<=${targetHeight}]+bestaudio/best[height<=${targetHeight}]`;
+          sortOrder = `res,fps,${hdrSortKey},tbr,vcodec:h264,ext:mp4`;
           logger.info(
             `[${itemId}] 📺 FORMAT: STANDARD MODE (${targetHeight}p) - Selector: ${formatString}`,
           );
@@ -3543,31 +3521,7 @@ const env = loadEnv(process.env);
         ytdlpArgs.push("--embed-metadata");
       } else if (videoFormats.includes(format)) {
         // Video download - use similar logic to processVideo
-        const qualityMap = {
-          "4k": 2160,
-          "2160p": 2160,
-          "2k": 1440,
-          "1440p": 1440,
-          "1080p": 1080,
-          "720p": 720,
-          "480p": 480,
-          "360p": 360,
-          "240p": 240,
-          highest: 2160,
-        };
-
-        let targetHeight;
-        const qualityLower = (quality || "").toString().toLowerCase().trim();
-
-        if (qualityLower === "highest" || qualityLower === "") {
-          targetHeight = 4320;
-        } else if (qualityMap[qualityLower]) {
-          targetHeight = qualityMap[qualityLower];
-        } else {
-          const parsed = parseInt(quality);
-          targetHeight =
-            !isNaN(parsed) && parsed >= 144 && parsed <= 8640 ? parsed : 1080;
-        }
+        const targetHeight = normalizeVideoTargetHeight(quality, 1080);
 
         const containerFormat = format;
         const finalOutputFilename = outputTemplate.replace(
@@ -3575,19 +3529,14 @@ const env = loadEnv(process.env);
           containerFormat,
         );
 
-        // Format selector
-        let formatString;
-        if (targetHeight >= 2160) {
-          formatString = `bestvideo[height<=${targetHeight}]+bestaudio/bestvideo+bestaudio/best`;
-        } else {
-          formatString = `bestvideo[height<=${targetHeight}]+bestaudio/bestvideo[height<=${targetHeight}]+bestaudio/best`;
-        }
+        const formatString = `bestvideo[height<=${targetHeight}]+bestaudio/best[height<=${targetHeight}]`;
+        const hdrSortKey = getHdrFormatSortKey(settings);
 
         ytdlpArgs.push(
           "-f",
           formatString,
           "-S",
-          `res,tbr`,
+          `res,fps,${hdrSortKey},tbr`,
           "--merge-output-format",
           containerFormat,
           "--no-playlist",
@@ -4059,14 +4008,12 @@ const env = loadEnv(process.env);
       let speedSamples = [];
       let rateLimitDetected = false;
 
-      // DISK-BASED SPEED MEASUREMENT (ground truth)
+      // HYBRID SPEED MEASUREMENT: disk growth first, smoothed yt-dlp fallback
       let diskSpeedInterval = null;
-      let diskSpeedEma = null; // Exponential moving average
-      let lastDiskSize = 0;
-      let lastDiskCheckTime = Date.now();
+      const diskSpeedEstimator = createTransferSpeedEstimator();
       let lastSentPercent = null;
       let lastSpeedSendTime = Date.now();
-      let parsedSpeedFallback = null; // Only used before file path is known
+      let parsedSpeedEma = null;
 
       ytdlpProc.stdout.on("data", (data) => {
         stdoutData += data;
@@ -4118,8 +4065,7 @@ const env = loadEnv(process.env);
               `[${itemId}] 📁 NEW DESTINATION DETECTED: ${destinationPath}`,
             );
 
-            // START DISK-BASED SPEED MEASUREMENT
-            // This gives ground truth speed by measuring actual bytes written to disk
+            // Start hybrid speed measurement when yt-dlp reveals an output path.
             if (!diskSpeedInterval) {
               // Find the actual file being written (could be .part file)
               const getActiveFilePath = () => {
@@ -4148,56 +4094,17 @@ const env = loadEnv(process.env);
                 return null;
               };
 
-              // Initialize with current file size
-              const initialPath = getActiveFilePath();
-              if (initialPath) {
-                try {
-                  lastDiskSize = fs.statSync(initialPath).size;
-                } catch (e) {
-                  lastDiskSize = 0;
-                }
-              }
-              lastDiskCheckTime = Date.now();
-
               diskSpeedInterval = setInterval(() => {
                 try {
                   const filePath = getActiveFilePath();
                   if (!filePath) return;
 
-                  const now = Date.now();
                   const stats = fs.statSync(filePath);
-                  const currentSize = stats.size;
-                  const deltaBytes = currentSize - lastDiskSize;
-                  const deltaTime = now - lastDiskCheckTime;
-
-                  if (deltaTime > 0 && deltaBytes >= 0) {
-                    // Calculate bytes per second
-                    const bps = (deltaBytes / deltaTime) * 1000;
-
-                    // Skip if file size decreased (file was deleted/replaced)
-                    if (deltaBytes < 0) {
-                      lastDiskSize = currentSize;
-                      lastDiskCheckTime = now;
-                      return;
-                    }
-
-                    // Apply EMA smoothing
-                    if (diskSpeedEma === null) {
-                      diskSpeedEma = bps;
-                    } else {
-                      // Ignore extreme spikes (> 2.5x current EMA)
-                      if (bps <= diskSpeedEma * 2.5 || diskSpeedEma === 0) {
-                        diskSpeedEma = diskSpeedEma * 0.8 + bps * 0.2;
-                      }
-                      // If EMA is 0 and we have any reading, use it
-                      if (diskSpeedEma === 0 && bps > 0) {
-                        diskSpeedEma = bps;
-                      }
-                    }
-                  }
-
-                  lastDiskSize = currentSize;
-                  lastDiskCheckTime = now;
+                  diskSpeedEstimator.observe({
+                    filePath,
+                    fileSize: stats.size,
+                    observedAt: Date.now(),
+                  });
                 } catch (e) {
                   // File might not exist yet or be locked, ignore
                 }
@@ -4239,7 +4146,10 @@ const env = loadEnv(process.env);
                   ) {
                     parsedBytes *= 1024;
                   }
-                  parsedSpeedFallback = parsedBytes;
+                  parsedSpeedEma =
+                    parsedSpeedEma === null
+                      ? parsedBytes
+                      : parsedSpeedEma * 0.75 + parsedBytes * 0.25;
                 }
               } catch (e) {
                 /* Ignore parsing errors */
@@ -4268,9 +4178,10 @@ const env = loadEnv(process.env);
               // SEND PROGRESS UPDATE (every 1 second for speed, more often for percent)
               const timeSinceLastSpeedSend = now - lastSpeedSendTime;
 
-              // Determine which speed to use: disk-based (ground truth) or parsed (fallback)
-              const speedToSend =
-                diskSpeedEma !== null ? diskSpeedEma : parsedSpeedFallback;
+              const speedToSend = diskSpeedEstimator.getSpeed({
+                now,
+                fallbackSpeed: parsedSpeedEma,
+              });
 
               if (timeSinceLastSpeedSend >= 1000) {
                 lastSpeedSendTime = now;
@@ -4305,8 +4216,9 @@ const env = loadEnv(process.env);
               if (percentOnlyMatch) {
                 const percent = parseFloat(percentOnlyMatch[1]);
                 if (!isNaN(percent)) {
-                  const speedToSend =
-                    diskSpeedEma !== null ? diskSpeedEma : parsedSpeedFallback;
+                  const speedToSend = diskSpeedEstimator.getSpeed({
+                    fallbackSpeed: parsedSpeedEma,
+                  });
                   lastSentPercent = percent;
                   sendMessageToClient(clientId, {
                     type: "progress",
