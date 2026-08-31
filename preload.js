@@ -10,6 +10,9 @@ contextBridge.exposeInMainWorld("electronAPI", {
   openPathInExplorer: async (rootPath, folderPath) => {
     return await ipcRenderer.invoke("openPathInExplorer", rootPath, folderPath);
   },
+  openMediaFile: async (rootPath, filePath) => {
+    return await ipcRenderer.invoke("open-media-file", rootPath, filePath);
+  },
   readClipboardText: async () => {
     return await ipcRenderer.invoke("readClipboardText");
   },

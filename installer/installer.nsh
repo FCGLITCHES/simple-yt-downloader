@@ -4,13 +4,70 @@
 !include "MUI2.nsh"
 !include "FileFunc.nsh"
 
+!ifndef BUILD_UNINSTALLER
+  Var /GLOBAL gvlUpdateUserDataBackup
+!endif
+
+!macro customInit
+  StrCpy $gvlUpdateUserDataBackup "$APPDATA\GetVideosLocally-update-preserve"
+
+  ; A prior failed update may have left the recovery snapshot in place.
+  ; Never overwrite it with a second snapshot.
+  IfFileExists "$gvlUpdateUserDataBackup\*.*" 0 gvl_snapshot_current_user_data
+  IfFileExists "$APPDATA\GetVideosLocally\*.*" gvl_update_backup_conflict gvl_update_init_complete
+
+  gvl_snapshot_current_user_data:
+    IfFileExists "$APPDATA\GetVideosLocally\*.*" 0 gvl_update_init_complete
+    ClearErrors
+    Rename "$APPDATA\GetVideosLocally" "$gvlUpdateUserDataBackup"
+    IfErrors gvl_update_snapshot_failed gvl_update_init_complete
+
+  gvl_update_backup_conflict:
+    MessageBox MB_OK|MB_ICONSTOP \
+      "GetVideosLocally found both live user data and an earlier update-recovery snapshot. The installer stopped without changing either folder.$\r$\n$\r$\nRecovery snapshot:$\r$\n$gvlUpdateUserDataBackup" /SD IDOK
+    Abort
+
+  gvl_update_snapshot_failed:
+    MessageBox MB_OK|MB_ICONSTOP \
+      "GetVideosLocally could not protect your history and settings before updating, so the installer stopped without removing the existing version." /SD IDOK
+    Abort
+
+  gvl_update_init_complete:
+!macroend
+
+!macro customInstall
+  IfFileExists "$gvlUpdateUserDataBackup\*.*" 0 gvl_update_restore_complete
+  IfFileExists "$APPDATA\GetVideosLocally\*.*" gvl_update_restore_conflict 0
+
+  ; Remove only an empty directory that may have been recreated by an older uninstaller.
+  RMDir "$APPDATA\GetVideosLocally"
+  ClearErrors
+  Rename "$gvlUpdateUserDataBackup" "$APPDATA\GetVideosLocally"
+  IfErrors gvl_update_restore_failed gvl_update_restore_complete
+
+  gvl_update_restore_conflict:
+    MessageBox MB_OK|MB_ICONSTOP \
+      "GetVideosLocally installed the new application but did not overwrite newly created user data. Your protected history remains at:$\r$\n$gvlUpdateUserDataBackup" /SD IDOK
+    Abort
+
+  gvl_update_restore_failed:
+    MessageBox MB_OK|MB_ICONSTOP \
+      "GetVideosLocally installed the new application but could not restore your protected history automatically. It remains at:$\r$\n$gvlUpdateUserDataBackup" /SD IDOK
+    Abort
+
+  gvl_update_restore_complete:
+!macroend
+
 !macro customUnInstall
-  ; Remove current and legacy shortcuts that may not be owned by this installer.
-  Delete "$SMPROGRAMS\GetVideosLocally.lnk"
-  RMDir /r "$SMPROGRAMS\GetVideosLocally"
-  RMDir /r "$SMPROGRAMS\SimplyYTD"
-  Delete "$SMSTARTUP\GetVideosLocally.lnk"
-  Delete "$SMSTARTUP\SimplyYTD.lnk"
+  ; electron-builder runs the previous uninstaller during an in-place update.
+  ; Keep all user state, including Local Storage and history-index.json, in that path.
+  ${ifNot} ${isUpdated}
+    ; Remove current and legacy shortcuts that may not be owned by this installer.
+    Delete "$SMPROGRAMS\GetVideosLocally.lnk"
+    RMDir /r "$SMPROGRAMS\GetVideosLocally"
+    RMDir /r "$SMPROGRAMS\SimplyYTD"
+    Delete "$SMSTARTUP\GetVideosLocally.lnk"
+    Delete "$SMSTARTUP\SimplyYTD.lnk"
 
   ; Remove current and legacy startup/app registration.
   DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "GetVideosLocally"
@@ -56,5 +113,6 @@
   gvl_remove_app_data:
     RMDir /r "$APPDATA\GetVideosLocally"
 
-  gvl_cleanup_complete:
+    gvl_cleanup_complete:
+  ${endIf}
 !macroend

@@ -157,7 +157,7 @@ function registerApiRoutes(
       return res.status(400).json({ error: "clientId is required" });
     }
 
-    res.json(historyIndex.getClientHistory(String(clientId)));
+    res.json(historyIndex.getUnifiedHistory());
   });
 
   app.post("/history-index/sync", async (req, res) => {
@@ -167,7 +167,7 @@ function registerApiRoutes(
     }
 
     try {
-      const synced = await historyIndex.syncClientHistory(
+      const synced = await historyIndex.syncUnifiedHistory(
         String(clientId),
         Array.isArray(history) ? history : [],
       );

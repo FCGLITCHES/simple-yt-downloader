@@ -4,7 +4,16 @@ downloads/
 dist/
 .cache/
 paused_jobs.json
+failed_jobs.json
+scheduled_jobs.json
+data/download-state.json
 *_last_check.json
+.icon-inspect/
+.playwright-cli/
+output/
+ZIPs/
+GetVideosLocally Setup *.exe
+GetVideosLocally-Portable*.zip
 .env
 .env.local
 .env.*.local

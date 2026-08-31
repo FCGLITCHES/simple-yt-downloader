@@ -91,6 +91,7 @@ class HistoryIndex {
       name: entry.name || entry.title || entry.filename || "Download complete",
       path: entry.path || entry.downloadUrl || "",
       fullPath: entry.fullPath || "",
+      folder: entry.folder || entry.downloadFolder || "",
       size: entry.size || entry.actualSize || "",
       mtime: entry.mtime || new Date().toISOString(),
       type: entry.type || this.inferType(entry),
@@ -128,6 +129,53 @@ class HistoryIndex {
       .map((item) => this.normalizeEntry({ ...item, clientId }))
       .filter(Boolean);
 
+    return this.setClientItems(clientId, normalizedItems);
+  }
+
+  getUnifiedHistory() {
+    const uniqueItems = new Map();
+
+    for (const clientState of Object.values(this.state.clients)) {
+      const items = Array.isArray(clientState?.items) ? clientState.items : [];
+      for (const item of items) {
+        const normalized = this.normalizeEntry(item);
+        if (!normalized) {
+          continue;
+        }
+
+        const entryKey = this.getEntryKey(normalized);
+        const existing = uniqueItems.get(entryKey);
+        if (
+          !existing ||
+          new Date(normalized.mtime).getTime() >
+            new Date(existing.mtime).getTime()
+        ) {
+          uniqueItems.set(entryKey, normalized);
+        }
+      }
+    }
+
+    const items = Array.from(uniqueItems.values())
+      .sort((firstItem, secondItem) => {
+        return (
+          new Date(secondItem.mtime).getTime() -
+          new Date(firstItem.mtime).getTime()
+        );
+      })
+      .slice(0, MAX_HISTORY_ITEMS_PER_CLIENT);
+
+    return {
+      items,
+      summary: this.buildSummary(items),
+    };
+  }
+
+  async syncUnifiedHistory(clientId, history = []) {
+    const normalizedItems = history
+      .map((item) => this.normalizeEntry({ ...item, clientId }))
+      .filter(Boolean);
+
+    this.state.clients = {};
     return this.setClientItems(clientId, normalizedItems);
   }
 

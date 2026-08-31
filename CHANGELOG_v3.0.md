@@ -1,3 +1,16 @@
+# GetVideosLocally v3.2.4 Hotfix
+
+## Download Location, History Actions, And Renderer Safety
+
+- Unified onboarding, Settings, and first-launch download-folder persistence around the saved `ytdUserSettings.downloadFolder` value.
+- Preserved each completed item’s original folder so history actions remain correct after the user changes the destination for future downloads.
+- Protected the full user-data directory before any older uninstaller runs during an in-place Windows upgrade, restored it after installation, and kept History visible in the main navigation.
+- Changed Play to launch the selected media file in the operating system’s default application while retaining path validation and trusted IPC checks.
+- Escaped remote titles, filenames, paths, timestamps, sizes, tab labels, and toast messages before inserting them into renderer HTML.
+- Flattened header counters and the theme selector, unified the history navigation and content surface, aligned its toolbar and filters, and compacted Settings checkbox groups.
+- Updated bundled yt-dlp to `2026.08.19` and removed vulnerable dependency versions from the production dependency tree.
+- Added permanent regressions for folder persistence, history ownership, media playback, path escape rejection, renderer HTML injection, and the refined UI states.
+
 # GetVideosLocally v3.2.3
 
 ## HDR, Download Accuracy, And Interface Polish

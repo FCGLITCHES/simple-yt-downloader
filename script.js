@@ -15,6 +15,57 @@ const SUPPORT_POPUP_LAST_VERSION_KEY = 'gvl_supportPopupLastShownVersion';
 const SUPPORT_DONATION_URL = 'https://donate.stripe.com/6oU00i73R6eh2yc0oU5AQ00';
 const LOCAL_THUMBNAIL_PLACEHOLDER = '/assets/thumbnail-placeholder.svg';
 const SETUP_HEALTH_RUN_KEY = 'gvlSetupHealthHasRun';
+const HTML_ESCAPE_MAP = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+};
+
+function escapeHtml(rawValue) {
+    return String(rawValue ?? '').replace(/[&<>"']/g, char => HTML_ESCAPE_MAP[char]);
+}
+
+function normalizeDownloadFolderPath(folderPath) {
+    return typeof folderPath === 'string' ? folderPath.trim() : '';
+}
+
+function getPersistedDownloadFolder() {
+    const settingsFolder = normalizeDownloadFolderPath(userSettings?.downloadFolder);
+    if (settingsFolder) return settingsFolder;
+
+    try {
+        const storedSettings = JSON.parse(localStorage.getItem('ytdUserSettings') || '{}');
+        const storedSettingsFolder = normalizeDownloadFolderPath(storedSettings.downloadFolder);
+        if (storedSettingsFolder) return storedSettingsFolder;
+    } catch (error) {
+        console.warn('Unable to read the saved download folder from Settings:', error);
+    }
+
+    return normalizeDownloadFolderPath(localStorage.getItem('downloadFolder'));
+}
+
+function persistDownloadFolderPath(folderPath) {
+    const normalizedFolderPath = normalizeDownloadFolderPath(folderPath);
+    userSettings = {
+        ...(userSettings || {}),
+        downloadFolder: normalizedFolderPath
+    };
+
+    localStorage.setItem('ytdUserSettings', JSON.stringify(userSettings));
+    if (normalizedFolderPath) {
+        localStorage.setItem('downloadFolder', normalizedFolderPath);
+    } else {
+        localStorage.removeItem('downloadFolder');
+    }
+    window.userSettings = userSettings;
+
+    const settingsFolderInput = document.getElementById('downloadFolder');
+    if (settingsFolderInput) settingsFolderInput.value = normalizedFolderPath;
+
+    return normalizedFolderPath;
+}
 
 // Make WebSocket globally accessible
 window.ws = ws;
@@ -203,9 +254,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function getDownloadFolder() {
-        // Always use the saved settings as the source of truth
-        // This ensures downloads go to the folder specified in settings, not just what's in the DOM
-        return userSettings?.downloadFolder || '';
+        return getPersistedDownloadFolder();
     }
 
     function setElementHiddenState(element, hidden) {
@@ -434,7 +483,10 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         if (window.electronAPI && window.electronAPI.openPathInExplorer) {
-            await window.electronAPI.openPathInExplorer(folderPath, folderPath);
+            const result = await window.electronAPI.openPathInExplorer(folderPath, folderPath);
+            if (!result?.success) {
+                showAlert(`Unable to open this folder: ${result?.error || 'Unknown error'}`, 'Open Folder Failed');
+            }
             return;
         }
         showAlert('Open folder is only available in the desktop app.', 'Not Available');
@@ -958,7 +1010,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Message Handling ---
     function handleWebSocketMessage(data) {
-        const { type, message, itemId, downloadUrl, filename, title, actualSize, percent, rawSpeed, speedBytesPerSec, source = activeDownloader, isPlaylistItem, playlistIndex, playlistId, playlistTitle, thumbnail, fullPath, format, quality } = data;
+        const { type, message, itemId, downloadUrl, filename, title, actualSize, percent, rawSpeed, speedBytesPerSec, source = activeDownloader, isPlaylistItem, playlistIndex, playlistId, playlistTitle, thumbnail, fullPath, downloadFolder, format, quality } = data;
         const currentItemState = downloadItemsState.get(itemId);
 
         // Hide playlist meta items (e.g., 'Fetching playlist: ...')
@@ -1039,7 +1091,7 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'complete':
                 // Use clean title from server if available, otherwise fall back to filename or title
                 const displayTitle = data.title || title || filename || 'Download complete';
-                updateDownloadItemComplete(itemId, message, downloadUrl, filename, actualSize, source, fullPath, thumbnail, displayTitle);
+                updateDownloadItemComplete(itemId, message, downloadUrl, filename, actualSize, source, fullPath, downloadFolder, thumbnail, displayTitle);
                 if (userSettings.notificationSound && completionSound) playNotificationSound();
                 // Only show notification if user is not on video tab or window is not focused
                 const isOnVideoTab = activeDownloader === 'youtube';
@@ -1069,7 +1121,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     name: displayTitle || filename,
                     path: downloadUrl,
                     fullPath: fullPath || null,  // Absolute path from server for reliable file location
-                    folder: data.downloadFolder || getDownloadFolder(),
+                    folder: downloadFolder || getDownloadFolder(),
                     type: subtabKey === 'youtube' ? 'youtubeSingles' : subtabKey,
                     size: actualSize || 'N/A',
                     mtime: new Date().toISOString(),
@@ -1512,7 +1564,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function updateDownloadItemComplete(itemId, message, downloadUrl, filename, actualSize, source, fullPath, thumb, cleanTitle) {
+    function updateDownloadItemComplete(itemId, message, downloadUrl, filename, actualSize, source, fullPath, downloadFolder, thumb, cleanTitle) {
         const itemDiv = document.getElementById(`item-${itemId}`);
         if (itemDiv) {
             // Update title with clean title if provided
@@ -1567,7 +1619,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (window.electronAPI && window.electronAPI.openPathInExplorer) {
                             try {
                                 let targetPath = fullPath;
-                                const downloadRoot = getDownloadFolder();
+                                const downloadRoot = downloadFolder || getDownloadFolder();
                                 if (!targetPath && downloadUrl && window.electronAPI?.resolvePath) {
                                     const rel = decodeURIComponent(downloadUrl.replace('/downloads/', ''));
                                     targetPath = await window.electronAPI.resolvePath(downloadRoot, rel);
@@ -2396,6 +2448,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const storedSettings = localStorage.getItem('ytdUserSettings');
         let settings = storedSettings ? JSON.parse(storedSettings) : { ...defaults };
         for (const key in defaults) if (settings[key] === undefined) settings[key] = defaults[key];
+        if (!normalizeDownloadFolderPath(settings.downloadFolder)) {
+            settings.downloadFolder = normalizeDownloadFolderPath(localStorage.getItem('downloadFolder'));
+        }
         return settings;
     }
 
@@ -2440,10 +2495,7 @@ document.addEventListener('DOMContentLoaded', () => {
             smartRetryAttempts: 3,
             lanAccess: userSettings.lanAccess === true
         };
-        localStorage.setItem('ytdUserSettings', JSON.stringify(userSettings));
-
-        // Update global reference
-        window.userSettings = userSettings;
+        persistDownloadFolderPath(userSettings.downloadFolder);
 
         // Apply theme and UI scale immediately
         applyTheme(userSettings.themePreset);
@@ -3194,7 +3246,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
             if (window.electronAPI && window.electronAPI.openPathInExplorer) {
-                await window.electronAPI.openPathInExplorer(folderPath, folderPath);
+                const result = await window.electronAPI.openPathInExplorer(folderPath, folderPath);
+                if (!result?.success) {
+                    await showAlert(`Unable to open this folder: ${result?.error || 'Unknown error'}`, 'Open Folder Failed');
+                }
             } else {
                 console.error('Open folder not available. window.electronAPI:', window.electronAPI);
                 showAlert('Open folder not available. Make sure you are running in Electron.', 'Not Available');
@@ -3558,49 +3613,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // After any download list change, call updateDownloadBadge()
     // For example, after adding/removing download items, call updateDownloadBadge();
 
-    // Folder picker logic
-    if (chooseFolderBtn && downloadFolderInput) {
-        chooseFolderBtn.onclick = async () => {
-            if (window.electronAPI && window.electronAPI.openFolderDialog) {
-                const folderPath = await window.electronAPI.openFolderDialog();
-                if (folderPath) {
-                    downloadFolderInput.value = folderPath;
-                }
-            } else {
-                console.error('Folder picker not available. window.electronAPI:', window.electronAPI);
-                showAlert('Folder picker not available. Make sure you are running in Electron.', 'Not Available');
-            }
-        };
-    }
-    if (defaultFolderBtn && downloadFolderInput) {
-        defaultFolderBtn.onclick = async () => {
-            if (window.electronAPI && window.electronAPI.getDefaultDownloadFolder) {
-                const defaultPath = await window.electronAPI.getDefaultDownloadFolder();
-                if (defaultPath) {
-                    downloadFolderInput.value = defaultPath;
-                }
-            } else {
-                console.error('Default folder not available. window.electronAPI:', window.electronAPI);
-                showAlert('Default folder not available. Make sure you are running in Electron.', 'Not Available');
-            }
-        };
-    }
-    if (openFolderBtn && downloadFolderInput) {
-        openFolderBtn.onclick = async () => {
-            const folderPath = downloadFolderInput.value;
-            if (!folderPath) {
-                showAlert('No folder selected.', 'No Selection');
-                return;
-            }
-            if (window.electronAPI && window.electronAPI.openPathInExplorer) {
-                await window.electronAPI.openPathInExplorer(folderPath, folderPath);
-            } else {
-                console.error('Open folder not available. window.electronAPI:', window.electronAPI);
-                showAlert('Open folder not available. Make sure you are running in Electron.', 'Not Available');
-            }
-        };
-    }
-
     const hasRunSetupHealth = Boolean(localStorage.getItem(SETUP_HEALTH_RUN_KEY));
     setSetupHealthSectionVisibility(false);
     if (hasRunSetupHealth && latestSetupHealthResult) {
@@ -3743,6 +3755,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 const nextBackendItems = Array.isArray(data.items) ? data.items : [];
                 if (requestRevision === historyIndexRevision || !Array.isArray(backendHistoryItems)) {
                     backendHistoryItems = nextBackendItems;
+                    if (nextBackendItems.length > 0) {
+                        localStorage.setItem('ytdHistory', JSON.stringify(nextBackendItems));
+                    }
                 }
                 historyIndexHydrated = true;
                 return Array.isArray(backendHistoryItems) ? backendHistoryItems : nextBackendItems;
@@ -3958,9 +3973,7 @@ document.addEventListener('DOMContentLoaded', () => {
     async function filterAndRenderHistory() {
         const allHistory = await getHistorySourceItems();
 
-        // Filter by clientId to make history computer-specific
-        // (Backward compatibility: show items that have no clientId, as they likely belong to this machine)
-        let filteredItems = allHistory.filter(item => !item.clientId || item.clientId === clientId);
+        let filteredItems = allHistory;
 
         filteredItems = filterHistoryByTime(filteredItems);
         filteredItems = filterHistoryBySearch(filteredItems);
@@ -4075,7 +4088,24 @@ document.addEventListener('DOMContentLoaded', () => {
                 fileExists = await window.electronAPI.pathExists(absPath);
             }
 
+            const containingFolder = window.electronAPI?.getDirname && absPath
+                ? await window.electronAPI.getDirname(absPath)
+                : item.folder || rootFolder;
+            const historyItemRoot = containingFolder || item.folder || rootFolder;
+            let containingFolderExists = Boolean(containingFolder);
+            if (containingFolderExists && window.electronAPI?.pathExists) {
+                containingFolderExists = await window.electronAPI.pathExists(containingFolder);
+            }
+
             let thumbnailSrc = item.thumbnail || LOCAL_THUMBNAIL_PLACEHOLDER;
+            const escapedThumbnailSrc = escapeHtml(thumbnailSrc);
+            const escapedName = escapeHtml(item.name);
+            const escapedMissingSuffix = !fileExists ? ' (Missing)' : '';
+            const escapedMtime = escapeHtml(new Date(item.mtime).toLocaleString());
+            const escapedSize = escapeHtml(item.size);
+            const escapedAbsPath = escapeHtml(absPath);
+            const escapedHistoryItemRoot = escapeHtml(historyItemRoot);
+            const escapedContainingFolder = escapeHtml(containingFolder);
 
             const div = document.createElement('div');
             div.className = 'history-item';
@@ -4085,19 +4115,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 div.classList.add('file-missing');
             }
             div.innerHTML = `
-                    <img class="history-thumb" src="${thumbnailSrc}" alt="Thumbnail" loading="lazy">
+                    <img class="history-thumb" src="${escapedThumbnailSrc}" alt="Thumbnail" loading="lazy">
                     <div style="flex: 1; min-width: 0;">
-                        <div class="history-title" title="${item.name.replace(/"/g, '&quot;')}">${item.name}${!fileExists ? ' (Missing)' : ''}</div>
-                        <div class="history-meta">${new Date(item.mtime).toLocaleString()} • ${item.size}</div>
+                        <div class="history-title" title="${escapedName}">${escapedName}${escapedMissingSuffix}</div>
+                        <div class="history-meta">${escapedMtime} • ${escapedSize}</div>
               </div>
               <div class="history-actions">
-                        <button class="history-action-btn play" title="Play Video" data-action="play" data-path="${absPath}" data-index="${index}" ${!fileExists ? 'disabled' : ''}>
+                        <button class="history-action-btn play" title="Play Video" data-action="play" data-root="${escapedHistoryItemRoot}" data-path="${escapedAbsPath}" data-index="${index}" ${!fileExists ? 'disabled' : ''}>
                   <i class="fas fa-play"></i>
                 </button>
-                        <button class="history-action-btn folder" title="Open Folder" data-action="folder" data-path="${absPath}" data-index="${index}">
+                        <button class="history-action-btn folder" title="Open Folder" data-action="folder" data-root="${escapedHistoryItemRoot}" data-path="${escapedContainingFolder}" data-index="${index}" ${!containingFolderExists ? 'disabled' : ''}>
                   <i class="fas fa-folder-open"></i>
                 </button>
-                        <button class="history-action-btn delete" title="Delete File" data-action="delete" data-path="${absPath}" data-index="${index}">
+                        <button class="history-action-btn delete" title="Delete File" data-action="delete" data-root="${escapedHistoryItemRoot}" data-path="${escapedAbsPath}" data-index="${index}">
                   <i class="fas fa-trash"></i>
                 </button>
               </div>`;
@@ -4145,6 +4175,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const videoCount = folderItem.videoCount || (folderItem.videos ? folderItem.videos.length : 0);
             const folderName = folderItem.name || 'Playlist Folder';
+            const escapedFolderName = escapeHtml(folderName);
+            const escapedFolderMtime = escapeHtml(new Date(folderItem.mtime).toLocaleString());
+            const escapedFolderSize = escapeHtml(folderItem.size);
 
             folderDiv.innerHTML = `
                 <div class="history-folder-header">
@@ -4153,8 +4186,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     </button>
                     <i class="fas fa-folder" style="margin-right: 8px; color: #4a90e2;"></i>
                     <div style="flex: 1; min-width: 0;">
-                        <div class="history-title" style="font-weight: 600;">${folderName}</div>
-                        <div class="history-meta">${new Date(folderItem.mtime).toLocaleString()} • ${folderItem.size} • ${videoCount} video${videoCount !== 1 ? 's' : ''}</div>
+                        <div class="history-title" style="font-weight: 600;">${escapedFolderName}</div>
+                        <div class="history-meta">${escapedFolderMtime} • ${escapedFolderSize} • ${videoCount} video${videoCount !== 1 ? 's' : ''}</div>
                     </div>
                 </div>
                 <div class="history-folder-content">
@@ -4692,6 +4725,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Remove existing modal if any
             const existing = document.getElementById('clearHistoryModal');
             if (existing) existing.remove();
+            const escapedTabName = escapeHtml(tabName);
 
             const modal = document.createElement('div');
             modal.id = 'clearHistoryModal';
@@ -4722,8 +4756,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         <button id="clearTabBtn" class="action-btn primary-btn-glow">
                             <i class="fas fa-folder-minus"></i>
                             <div>
-                                <span class="btn-title">Clear ${tabName}</span>
-                                <span class="btn-desc">Remove ${tabName.toLowerCase()} only</span>
+                                <span class="btn-title">Clear ${escapedTabName}</span>
+                                <span class="btn-desc">Remove ${escapeHtml(String(tabName).toLowerCase())} only</span>
                             </div>
                         </button>
                         <button id="clearAllBtn" class="action-btn danger-btn-outline">
@@ -4792,11 +4826,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (type === 'success') icon = 'check-circle';
         if (type === 'error') icon = 'exclamation-circle';
         if (type === 'warning') icon = 'exclamation-triangle';
+        const escapedMessage = escapeHtml(message);
 
         toast.innerHTML = `
             <div class="toast-content">
                 <i class="fas fa-${icon} toast-icon"></i>
-                <div class="toast-message">${message}</div>
+                <div class="toast-message">${escapedMessage}</div>
             </div>
             <div class="toast-progress"></div>
         `;
@@ -4929,7 +4964,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // Delete folders first
-        const rootFolder = getDownloadFolder();
         for (const folderPath of foldersToDelete) {
             try {
                 let absPath = folderPath;
@@ -4937,12 +4971,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     // Check if path is relative
                     const isRelative = !/^[a-zA-Z]:[\\/]/.test(folderPath) && !folderPath.startsWith('/');
                     if (isRelative) {
-                        absPath = await window.electronAPI.resolvePath(rootFolder, folderPath);
+                        absPath = await window.electronAPI.resolvePath(getDownloadFolder(), folderPath);
                     }
                 }
                 if (absPath && window.electronAPI?.deleteFolder) {
-                    await window.electronAPI.deleteFolder(rootFolder, absPath);
-                    deletedCount++;
+                    const containingFolder = window.electronAPI?.getDirname
+                        ? await window.electronAPI.getDirname(absPath)
+                        : getDownloadFolder();
+                    const result = await window.electronAPI.deleteFolder(containingFolder, absPath);
+                    if (result.success) deletedCount++;
                 }
             } catch (error) {
                 console.error(`Failed to delete folder ${folderPath}:`, error);
@@ -4962,16 +4999,19 @@ document.addEventListener('DOMContentLoaded', () => {
                         // Delete individual file
                         if (window.electronAPI?.deleteFile) {
                             let absPath;
-                            if (item.path && item.path.startsWith('/downloads/')) {
+                            if (item.fullPath) {
+                                absPath = item.fullPath;
+                            } else if (item.path && item.path.startsWith('/downloads/')) {
                                 const relativePath = decodeURIComponent(item.path.replace('/downloads/', ''));
-                                absPath = await window.electronAPI.resolvePath(rootFolder, relativePath);
+                                absPath = await window.electronAPI.resolvePath(item.folder || getDownloadFolder(), relativePath);
                             } else if (item.path) {
                                 absPath = item.path;
-                            } else if (item.fullPath) {
-                                absPath = item.fullPath;
                             }
                             if (absPath) {
-                                const result = await window.electronAPI.deleteFile(rootFolder, absPath);
+                                const containingFolder = window.electronAPI?.getDirname
+                                    ? await window.electronAPI.getDirname(absPath)
+                                    : item.folder || getDownloadFolder();
+                                const result = await window.electronAPI.deleteFile(containingFolder, absPath);
                                 if (result.success) deletedCount++;
                             }
                         }
@@ -5002,24 +5042,34 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!actionBtn) return;
 
         const action = actionBtn.dataset.action;
+        const rootPath = actionBtn.dataset.root;
         const filePath = actionBtn.dataset.path;
         const index = parseInt(actionBtn.dataset.index);
 
         if (action === 'play') {
-            if (window.electronAPI?.openPathInExplorer) {
-                await window.electronAPI.openPathInExplorer(getDownloadFolder(), filePath);
+            if (window.electronAPI?.openMediaFile) {
+                const result = await window.electronAPI.openMediaFile(rootPath, filePath);
+                if (!result?.success) {
+                    await showAlert(`Unable to play this video: ${result?.error || 'Unknown error'}`, 'Playback Failed');
+                }
+            } else {
+                await showAlert('Video playback is only available in the desktop app.', 'Not Available');
             }
         } else if (action === 'folder') {
-            if (window.electronAPI?.getDirname && window.electronAPI?.openPathInExplorer) {
-                const folderPath = await window.electronAPI.getDirname(filePath);
-                await window.electronAPI.openPathInExplorer(getDownloadFolder(), folderPath);
+            if (window.electronAPI?.openPathInExplorer) {
+                const result = await window.electronAPI.openPathInExplorer(rootPath, filePath);
+                if (!result?.success) {
+                    await showAlert(`Unable to open this folder: ${result?.error || 'Unknown error'}`, 'Open Folder Failed');
+                }
+            } else {
+                await showAlert('Opening folders is only available in the desktop app.', 'Not Available');
             }
         } else if (action === 'delete') {
             const confirmed = await confirmDelete('Are you sure you want to delete this file?', 'Delete File');
             if (confirmed) {
                 try {
                     if (window.electronAPI?.deleteFile) {
-                        const result = await window.electronAPI.deleteFile(getDownloadFolder(), filePath);
+                        const result = await window.electronAPI.deleteFile(rootPath, filePath);
                         if (result.success) {
                             // Remove from history
                             const history = readStoredHistory();
@@ -5098,21 +5148,21 @@ document.addEventListener('DOMContentLoaded', () => {
     // ===== UPDATE CHECK & CHANGELOG SYSTEM =====
 const UPDATE_LAST_SEEN_KEY = 'gvl_lastSeenVersion';
 const UPDATE_POPUP_DELAY_MS = 2500;
-const DEFAULT_APP_VERSION = '3.2.3';
+const DEFAULT_APP_VERSION = '3.2.4';
 const FALLBACK_APP_CHANGELOG = {
     version: DEFAULT_APP_VERSION,
-    title: "HDR & Interface Polish v3.2.3",
+    title: "Download Location & History Hotfix v3.2.4",
     date: 'August 2026',
     required: false,
-    badge: 'New',
-    summary: 'HDR control, accurate transfer speeds, explicit 8K quality, and cleaner download settings arrive together.',
+    badge: 'Hotfix',
+    summary: 'Download locations now persist consistently, history actions stay tied to the correct folder, and remote titles render safely.',
     items: [
-        { icon: 'fa-sun', title: 'HDR Control', desc: 'HDR starts off for broader playback compatibility, with saved and per-download controls when needed.' },
-        { icon: 'fa-display', title: 'Explicit 8K Quality', desc: '8K (4320p) is available as a real quality target while every lower choice stays capped correctly.' },
-        { icon: 'fa-gauge-high', title: 'Accurate Transfer Speeds', desc: 'Hybrid disk and yt-dlp speed tracking no longer gets pinned by tiny initial samples.' },
-        { icon: 'fa-closed-captioning', title: 'Integrated Subtitles', desc: 'Caption choices now read as a natural part of Download Options with clearer labels and grouping.' },
-        { icon: 'fa-cookie-bite', title: 'Cleaner Cookies', desc: 'The cookie importer now uses a focused red-and-white upload flow with flat actions and clearer guidance.' },
-        { icon: 'fa-window-restore', title: 'Compact Release Notes', desc: 'What’s New now fits into a smaller two-column view with visible close controls.' }
+        { icon: 'fa-folder-open', title: 'Reliable Download Location', desc: 'Onboarding, Settings, and first-launch defaults now share one persisted download-folder source of truth.' },
+        { icon: 'fa-clock-rotate-left', title: 'History Survives Updates', desc: 'Upgrades keep saved history and the History tab, while existing downloads retain their original folder.' },
+        { icon: 'fa-play', title: 'Working Play Action', desc: 'Play launches the selected media file in the operating system’s default application.' },
+        { icon: 'fa-shield-halved', title: 'Safer Remote Titles', desc: 'History and toast content escape remote text before it reaches HTML rendering boundaries.' },
+        { icon: 'fa-table-list', title: 'Clearer History', desc: 'The history toolbar, filters, counters, and content now read as one consistent workspace.' },
+        { icon: 'fa-wrench', title: 'Runtime Refresh', desc: 'yt-dlp and release dependencies were refreshed, with vulnerable package versions removed.' }
     ]
 };
 let updatePopupTimer = null;
@@ -5313,7 +5363,7 @@ function initOnboarding() {
     let currentStep = 0;
 
     const onboardingState = {
-        downloadFolder: '',
+        downloadFolder: getPersistedDownloadFolder(),
         format: userSettings?.defaultFormat || 'mp4',
         quality: userSettings?.defaultQuality || 'highest',
         notifications: {
@@ -5342,12 +5392,7 @@ function initOnboarding() {
     }
 
     function getFolderDisplay() {
-        const input = document.getElementById('downloadFolder');
-        if (input && input.value) {
-            onboardingState.downloadFolder = input.value;
-            return input.value;
-        }
-        const saved = localStorage.getItem('downloadFolder');
+        const saved = getPersistedDownloadFolder();
         if (saved) {
             onboardingState.downloadFolder = saved;
             return saved;
@@ -5365,12 +5410,8 @@ function initOnboarding() {
     }
 
     function persistDownloadFolder(folderPath) {
-        onboardingState.downloadFolder = folderPath;
-        localStorage.setItem('downloadFolder', folderPath);
-        persistOnboardingSettings({ downloadFolder: folderPath });
-
-        const settingsFolderInput = document.getElementById('downloadFolder');
-        if (settingsFolderInput) settingsFolderInput.value = folderPath;
+        const persistedFolderPath = persistDownloadFolderPath(folderPath);
+        onboardingState.downloadFolder = persistedFolderPath;
     }
 
     function getQualityOptions(format) {
@@ -5731,7 +5772,7 @@ function initOnboarding() {
                         return;
                     }
 
-                    const normalizedFolderPath = selectedFolderPath.replace(/\\/g, '/');
+                    const normalizedFolderPath = normalizeDownloadFolderPath(selectedFolderPath);
                     persistDownloadFolder(normalizedFolderPath);
                     const folderInput = document.getElementById('onboardingFolder');
                     if (folderInput) {
@@ -5856,53 +5897,14 @@ window.addEventListener('DOMContentLoaded', async () => {
     }
 
     if (downloadFolderInput) {
-        let savedFolder = localStorage.getItem('downloadFolder');
-        let isFirstLaunch = !localStorage.getItem('hasLaunchedBefore');
+        const savedFolder = getPersistedDownloadFolder();
+        const isFirstLaunch = !localStorage.getItem('hasLaunchedBefore');
+        const initialFolder = savedFolder || (isFirstLaunch
+            ? appDownloadsPath || userDownloadsPath
+            : userDownloadsPath || appDownloadsPath);
 
-        if (!savedFolder) {
-            if (isFirstLaunch) {
-                // First startup: use app's downloads folder
-                downloadFolderInput.value = appDownloadsPath;
-                localStorage.setItem('downloadFolder', appDownloadsPath);
-                localStorage.setItem('hasLaunchedBefore', 'true');
-            } else {
-                // Subsequent launches but no saved folder: use user's Downloads
-                downloadFolderInput.value = userDownloadsPath || appDownloadsPath;
-                localStorage.setItem('downloadFolder', userDownloadsPath || appDownloadsPath);
-            }
-        } else {
-            downloadFolderInput.value = savedFolder;
-        }
-    }
-
-    // Update default folder button to use the user's Downloads folder
-    const defaultFolderBtn = document.getElementById('defaultFolderBtn');
-    if (defaultFolderBtn) {
-        defaultFolderBtn.onclick = async () => {
-            const downloadFolderInput = document.getElementById('downloadFolder');
-            if (downloadFolderInput) {
-                let defaultPath = userDownloadsPath;
-
-                // If we don't have it yet, try to get it
-                if (!defaultPath && window.electronAPI && window.electronAPI.getDefaultDownloadFolder) {
-                    try {
-                        defaultPath = await window.electronAPI.getDefaultDownloadFolder();
-                    } catch (e) {
-                        console.error('Failed to get default download folder:', e);
-                        // Fallback for Windows - will be replaced by Electron API when available
-                        defaultPath = 'C:/Users/User/Downloads';
-                    }
-                }
-
-                if (!defaultPath) {
-                    // Final fallback
-                    defaultPath = 'C:/Users/User/Downloads';
-                }
-
-                downloadFolderInput.value = defaultPath;
-                localStorage.setItem('downloadFolder', defaultPath);
-            }
-        };
+        persistDownloadFolderPath(initialFolder);
+        localStorage.setItem('hasLaunchedBefore', 'true');
     }
     // ==================== CLOSE CONFIRMATION MODAL LOGIC ====================
     if (window.electronAPI && window.electronAPI.onShowCloseConfirmation) {

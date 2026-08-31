@@ -81,6 +81,8 @@ const fs = require('fs');
 const os = require('os'); // Required for os.platform()
 const net = require('net'); // Required for server readiness check
 const { validateDownloadPath, isDownloadsRoot } = require('./backend/utils/path-validator');
+const { createDesktopFileActions } = require('./backend/services/desktop-file-actions');
+const desktopFileActions = createDesktopFileActions({ shell });
 
 let mainWindow;
 let cookieWindow = null; // Track the cookie helper window
@@ -812,21 +814,19 @@ ipcMain.handle('getDefaultDownloadFolder', async () => {
 ipcMain.handle('openPathInExplorer', async (event, rootPath, folderPath) => {
   try {
     assertTrustedIpcSender(event);
-    const resolved = validateDownloadPath(rootPath, folderPath);
-    const stats = fs.statSync(resolved);
-
-    if (stats.isDirectory()) {
-      const error = await shell.openPath(resolved);
-      if (error) {
-        return { success: false, error };
-      }
-    } else {
-      shell.showItemInFolder(resolved);
-    }
-
-    return { success: true };
+    return await desktopFileActions.openPathInExplorer(rootPath, folderPath);
   } catch (error) {
     console.error('[openPathInExplorer]', error.message);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('open-media-file', async (event, rootPath, filePath) => {
+  try {
+    assertTrustedIpcSender(event);
+    return await desktopFileActions.openMediaFile(rootPath, filePath);
+  } catch (error) {
+    console.error('[open-media-file]', error.message);
     return { success: false, error: error.message };
   }
 });

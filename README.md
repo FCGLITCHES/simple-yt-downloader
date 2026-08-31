@@ -52,6 +52,14 @@
 
 ## Features
 
+### Download Location & History Hotfix v3.2.4
+- **Reliable destination persistence:** onboarding, Settings, and first-launch defaults now share one saved download-folder source of truth.
+- **Correct historical actions:** completed items retain their original folder, Play opens the media file, and Open Folder still works after the destination changes.
+- **History survives updates:** the installer protects user data before replacing an older version, restores local history storage afterward, and keeps the History tab in the main navigation.
+- **Safer renderer boundaries:** remote titles, filenames, paths, timestamps, sizes, and toast messages are escaped before HTML insertion.
+- **Clearer workspace:** header counters, history navigation, filters, and Settings checkbox groups use a flatter, more consistent layout.
+- **Refreshed runtime:** bundled yt-dlp is updated to `2026.08.19`, and vulnerable release dependencies were upgraded or pinned to patched versions.
+
 ### HDR & Interface Polish v3.2.3
 - **Opt-in HDR preference:** HDR defaults off for fresh settings, while Settings and Advanced Options can enable it globally or for one download.
 - **Accurate speed and 8K:** hybrid speed tracking recovers from tiny initial samples, and 8K (4320p) is an explicit quality target with strict resolution caps.

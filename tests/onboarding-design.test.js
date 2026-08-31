@@ -74,8 +74,9 @@ test("folder selection stays in onboarding and persists to Settings", () => {
 
   assert.match(folderListener, /electronAPI\.openFolderDialog\(\)/);
   assert.match(folderListener, /persistDownloadFolder\(normalizedFolderPath\)/);
-  assert.match(onboardingSource, /localStorage\.setItem\('ytdUserSettings'/);
-  assert.match(onboardingSource, /settingsFolderInput\.value = folderPath/);
+  assert.match(rendererSource, /function persistDownloadFolderPath\(folderPath\)/);
+  assert.match(rendererSource, /localStorage\.setItem\('ytdUserSettings'/);
+  assert.match(rendererSource, /settingsFolderInput\.value = normalizedFolderPath/);
   assert.doesNotMatch(folderListener, /settingsModal\.style\.display = 'flex'/);
   assert.match(folderListener, /Saved to Settings\./);
 });

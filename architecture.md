@@ -143,6 +143,10 @@ The renderer still writes local history to `localStorage` for resilience and bac
 
 The renderer now syncs that history to `/history-index/sync`, and reads indexed history from `/history-index`.
 
+Each normalized history entry keeps both its absolute `fullPath` and the `folder` that contained the completed download. History actions derive their validation root from that stored item location instead of the currently selected Settings folder, so older downloads remain playable and locatable after the user changes future download destinations.
+
+Windows version upgrades run the previously installed uninstaller before the new application files are written. The new installer first moves `%APPDATA%\GetVideosLocally` to a dedicated recovery path, stops if that snapshot cannot be created safely, and restores it after the application is installed. Its own uninstall cleanup also skips all user-state removal in update mode. Together these contracts protect `data\history-index.json`, Electron Local Storage, and future persisted state even when upgrading from an older release whose uninstaller predates the update guard. Cleanup remains available for a deliberate uninstall, while the main navigation continues to expose the static History tab and panel after an update.
+
 That means:
 
 - the renderer can still fall back safely if the backend is unavailable
@@ -160,6 +164,10 @@ That means:
 7. Completion payloads go through `download-runner`.
 8. Completed downloads are recorded into `history-index`.
 9. The renderer updates local UI state and syncs its history snapshot back to the backend.
+
+## Download Location Ownership
+
+The persisted `downloadFolder` field inside `ytdUserSettings` is the runtime source of truth. The legacy standalone `downloadFolder` local-storage key is maintained only as a synchronized compatibility mirror. First-launch defaults, onboarding selection, and Settings saves all update the same persisted field before download requests read it. Changing the destination affects future downloads; existing history entries retain their own completed folder.
 
 ## Quality Selection And Speed Reporting
 
@@ -200,6 +208,7 @@ Renderer-provided paths for delete and open operations are validated before any 
 - `delete-file` requires a trusted IPC sender, validates the target inside the downloads root, confirms the target is a file, then sends it to the Recycle Bin with `shell.trashItem`.
 - `delete-folder` requires a trusted IPC sender, validates the target inside the downloads root, confirms the target is a directory, rejects deleting the downloads root itself, then sends it to the Recycle Bin with `shell.trashItem`.
 - `openPathInExplorer` requires a trusted IPC sender, validates the target inside the downloads root, opens directories with `shell.openPath`, and reveals files with `shell.showItemInFolder`.
+- `open-media-file` requires a trusted IPC sender, validates that the target is a file inside the history item's stored folder, then launches it with the operating system's default media application.
 - No delete handler has a permanent-deletion fallback.
 
 IPC sender validation allows only the app's main renderer or the exact `http://127.0.0.1:PORT` origin for the active local server port.

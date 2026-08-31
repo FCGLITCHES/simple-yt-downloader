@@ -112,6 +112,7 @@ function createDownloadCompletionService({
         filename: payload.filename,
         path: payload.downloadUrl,
         fullPath: payload.fullPath,
+        folder: payload.downloadFolder,
         size: payload.actualSize,
         mtime: new Date().toISOString(),
         source: payload.source,
